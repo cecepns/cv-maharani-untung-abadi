@@ -18,8 +18,7 @@ Aplikasi ini dibangun 100% mematuhi aturan standar arsitektur pada [`AGENTS.md`]
 
 ### Backend
 - **Framework**: Express.js REST API (Single Server File Architecture `backend/server.js`)
-- **Database**: MySQL 8 / MariaDB (disertai skema DDL & seed data lengkap di `backend/sql/database.sql`)
-- **Resilience**: Dual-engine connection pool (MySQL2 + standalone automatic in-memory fallback store jika database offline)
+- **Database**: 100% Pure MySQL Connection Pool (`mysql2/promise`) - Zero Mock Data (Data real murni dari tabel database; jika tabel kosong mengembalikan `[]`, jika query gagal mengembalikan error status 500)
 - **File Upload**: Multer storage terisolasi di folder `uploads-cv-maharani/`
 - **Environment**: Dotenv `.env`
 
@@ -70,8 +69,8 @@ Dilengkapi template cetak print preview profesional siap cetak kertas / PDF:
    DB_PASS=
    DB_NAME=cv_maharani_db
    ```
-3. (Opsional) Import database MySQL:
-   Jika Anda menjalankan MySQL Server, buat database `cv_maharani_db` lalu import skema dari `sql/database.sql`:
+3. Import database MySQL:
+   Buat database `cv_maharani_db` di MySQL Anda, lalu import skema DDL & seed data awal dari `sql/database.sql`:
    ```bash
    mysql -u root -p cv_maharani_db < sql/database.sql
    ```
