@@ -5,30 +5,27 @@ import { API_ENDPOINTS } from '@/utils/endpoints';
 
 const AuthContext = createContext(null);
 
-const DEFAULT_USER = {
-  id: 1,
-  username: 'admin',
-  nama: 'Cecep / Super Admin',
-  email: 'admin@cvmaharani.com',
-  role: 'Superadmin',
-  departemen: 'Manajemen',
-  perusahaan: 'CV. Maharani Untung Abadi'
-};
-
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     try {
+      // Bersihkan token/user default lama jika ada
+      const savedToken = localStorage.getItem('cv_maharani_token');
+      if (savedToken === 'token-cv-maharani-default') {
+        localStorage.removeItem('cv_maharani_user');
+        localStorage.removeItem('cv_maharani_token');
+        return null;
+      }
       const saved = localStorage.getItem('cv_maharani_user');
-      if (saved) return JSON.parse(saved);
-      // Default initial login as admin if first visit
-      return DEFAULT_USER;
+      return saved ? JSON.parse(saved) : null;
     } catch {
-      return DEFAULT_USER;
+      return null;
     }
   });
 
   const [token, setToken] = useState(() => {
-    return localStorage.getItem('cv_maharani_token') || 'token-cv-maharani-default';
+    const savedToken = localStorage.getItem('cv_maharani_token');
+    if (savedToken === 'token-cv-maharani-default') return null;
+    return savedToken || null;
   });
 
   useEffect(() => {
@@ -77,7 +74,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isAuthenticated: Boolean(user), login, logout }}>
+    <AuthContext.Provider value={{ user, token, isAuthenticated: Boolean(user && token), login, logout }}>
       {children}
     </AuthContext.Provider>
   );

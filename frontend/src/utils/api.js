@@ -11,7 +11,7 @@ export const api = axios.create({
 // Interceptor for token attachment
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('cv_maharani_token') || localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }

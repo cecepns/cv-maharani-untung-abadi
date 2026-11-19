@@ -40,8 +40,8 @@ export default function Sidebar({ isOpen, onClose }) {
     navigate('/login');
   };
 
-  const displayName = user?.nama || 'Cecep / Admin';
-  const displayRole = user?.role || 'Superadmin';
+  const displayName = user?.nama || 'Admin Pabrik';
+  const displayRole = user?.role || 'Staff ERP';
   const initial = displayName.charAt(0).toUpperCase();
 
   // Navigation tree
