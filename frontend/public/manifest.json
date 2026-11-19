@@ -1,0 +1,16 @@
+{
+  "short_name": "CV. Maharani",
+  "name": "CV. Maharani Untung Abadi - Packaging & Corrugated ERP",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0b3f6e",
+  "theme_color": "#0159a1",
+  "display": "standalone",
+  "orientation": "portrait"
+}
