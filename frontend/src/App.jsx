@@ -20,6 +20,7 @@ import InvoicesPage from '@/pages/marketing/InvoicesPage';
 import FakturPajakPage from '@/pages/marketing/FakturPajakPage';
 import ReturPenjualanPage from '@/pages/marketing/ReturPenjualanPage';
 import LaporanOmsetPage from '@/pages/marketing/LaporanOmsetPage';
+import EstimasiHargaPage from '@/pages/marketing/EstimasiHargaPage';
 
 // Purchasing
 import SuppliersPage from '@/pages/purchasing/SuppliersPage';
@@ -124,6 +125,7 @@ export default function App() {
             <Route path="/" element={<Dashboard />} />
 
             {/* Marketing & Sales */}
+            <Route path="/marketing/estimasi-harga" element={<EstimasiHargaPage />} />
             <Route path="/marketing/customers" element={<CustomersPage />} />
             <Route path="/marketing/products" element={<ProductsPage />} />
             <Route path="/marketing/sales-orders" element={<SalesOrdersPage />} />

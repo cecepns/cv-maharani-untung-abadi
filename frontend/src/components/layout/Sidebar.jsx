@@ -25,6 +25,7 @@ import {
   Receipt,
   Scissors,
   ShieldCheck,
+  Calculator,
   LogOut
 } from 'lucide-react';
 
@@ -56,6 +57,7 @@ export default function Sidebar({ isOpen, onClose }) {
       title: 'Marketing & Sales',
       icon: ShoppingCart,
       items: [
+        { name: 'Kalkulator Estimasi Harga', path: '/marketing/estimasi-harga', icon: Calculator },
         { name: 'Master Customer', path: '/marketing/customers', icon: Users },
         { name: 'Master Box & Sheet', path: '/marketing/products', icon: Box },
         { name: 'Sales Order (SO)', path: '/marketing/sales-orders', icon: FileCheck },

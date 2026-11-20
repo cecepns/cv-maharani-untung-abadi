@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Layers, AlertCircle, Sliders, Info, CheckCircle2, RotateCcw, Calculator, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Edit2, Trash2, Layers, AlertCircle, Sliders, Info, CheckCircle2, RotateCcw, Calculator, ArrowRight, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { request } from '../../utils/request';
 import { API_ENDPOINTS } from '../../utils/endpoints';
@@ -22,6 +23,7 @@ const DEFAULT_TIPE = [
 ];
 
 export default function BahanSheetPage() {
+  const navigate = useNavigate();
   const [sheetList, setSheetList] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -85,16 +87,40 @@ export default function BahanSheetPage() {
 
   // Standalone Simulator & Kalkulator Index Sheet Modal
   const [isCalcModalOpen, setIsCalcModalOpen] = useState(false);
+  const [calcBoxMode, setCalcBoxMode] = useState(false);
+  const [calcBoxDimensions, setCalcBoxDimensions] = useState({ p: 400, l: 200, t: 130 });
   const [calcForm, setCalcForm] = useState({
-    panjang_mm: 1000,
-    lebar_mm: 1200,
+    panjang_mm: 1243,
+    lebar_mm: 342,
     qty_lembar: 1000,
     flute: 'B/F',
     substansi: 'K125/M125/K125',
     gsm: 420,
     metode: 'm2', // 'm2' | 'kg'
-    nilai_index: 2800,
+    nilai_index: 7000,
   });
+
+  const handleApplyBoxToSheetCalc = (p, l, t, flute) => {
+    const P_box = Number(p) || 0;
+    const L_box = Number(l) || 0;
+    const T_box = Number(t) || 0;
+    let kupingan = 43;
+    let creasing = 12;
+    if (flute === 'C/F') { kupingan = 47; creasing = 18; }
+    else if (flute === 'B/C') { kupingan = 63; creasing = 24; }
+    else if (flute === 'E/F') { kupingan = 35; creasing = 8; }
+    else if (flute === 'Duplex' || flute === 'Ivory') { kupingan = 25; creasing = 5; }
+
+    const P_sheet = ((P_box + L_box) * 2) + kupingan;
+    const L_sheet = L_box + T_box + creasing;
+
+    setCalcForm((prev) => ({
+      ...prev,
+      panjang_mm: P_sheet,
+      lebar_mm: L_sheet
+    }));
+    toast.success(`Ukuran sheet otomatis dihitung: ${P_sheet} x ${L_sheet} mm`);
+  };
 
   // Confirm Delete Sheet
   const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, id: null, name: '' });
@@ -938,17 +964,89 @@ export default function BahanSheetPage() {
         size="lg"
       >
         <div className="space-y-5">
-          <div className="bg-emerald-50/70 p-3.5 rounded-2xl border border-emerald-200 text-xs text-emerald-950 flex items-start gap-3">
-            <div className="p-2 bg-emerald-600 text-white rounded-xl mt-0.5">
-              <Calculator className="w-5 h-5" />
+          <div className="bg-emerald-50/70 p-3.5 rounded-2xl border border-emerald-200 text-xs text-emerald-950 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-emerald-600 text-white rounded-xl mt-0.5 shrink-0">
+                <Calculator className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="font-bold text-sm text-emerald-900 mb-0.5">Rumus Index Harga Supplier Corrugated</div>
+                <p className="text-emerald-800 leading-relaxed text-[11px]">
+                  Hitung harga sheet dari <strong>Index Luas (Rp / m²)</strong> atau <strong>Index Berat Tonase (Rp / kg)</strong>.
+                </p>
+              </div>
             </div>
-            <div>
-              <div className="font-bold text-sm text-emerald-900 mb-0.5">Rumus Index Harga Supplier Corrugated</div>
-              <p className="text-emerald-800 leading-relaxed">
-                Pabrik karton lembaran (supplier sheet) biasanya memberikan penawaran harga menggunakan sistem index:
-                <strong> Index Luas (Rp / m²)</strong> atau <strong>Index Berat Tonase (Rp / kg)</strong> dikalikan gramatur kertas (GSM). Simulator ini membantu Anda menghitung harga per lembar dan total anggaran pembelian secara instan.
-              </p>
+            <button
+              type="button"
+              onClick={() => { setIsCalcModalOpen(false); navigate('/marketing/estimasi-harga'); }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-colors shrink-0 shadow-2xs"
+            >
+              Kalkulator Harga Dus (Margin/Diskon) <ExternalLink className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Toggle: Hitung dari Box vs Input Sheet Langsung */}
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-800">
+                Pilihan Input Dimensi:
+              </span>
+              <div className="flex items-center gap-1.5 bg-white p-1 border border-slate-200 rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => setCalcBoxMode(false)}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded ${!calcBoxMode ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+                >
+                  Sheet Langsung (P x L)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCalcBoxMode(true)}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded ${calcBoxMode ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+                >
+                  Dari Ukuran Box (P x L x T)
+                </button>
+              </div>
             </div>
+
+            {calcBoxMode && (
+              <div className="grid grid-cols-4 gap-2 pt-2 border-t border-slate-200 items-end">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Panjang Box (mm)</label>
+                  <input
+                    type="number"
+                    value={calcBoxDimensions.p}
+                    onChange={(e) => setCalcBoxDimensions({ ...calcBoxDimensions, p: Number(e.target.value) || 0 })}
+                    className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Lebar Box (mm)</label>
+                  <input
+                    type="number"
+                    value={calcBoxDimensions.l}
+                    onChange={(e) => setCalcBoxDimensions({ ...calcBoxDimensions, l: Number(e.target.value) || 0 })}
+                    className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Tinggi Box (mm)</label>
+                  <input
+                    type="number"
+                    value={calcBoxDimensions.t}
+                    onChange={(e) => setCalcBoxDimensions({ ...calcBoxDimensions, t: Number(e.target.value) || 0 })}
+                    className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg font-bold"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleApplyBoxToSheetCalc(calcBoxDimensions.p, calcBoxDimensions.l, calcBoxDimensions.t, calcForm.flute)}
+                  className="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-bold transition-colors"
+                >
+                  Hitung Sheet Otomatis
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Form Input Kalkulator */}
