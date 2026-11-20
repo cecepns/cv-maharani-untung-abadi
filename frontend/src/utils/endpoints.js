@@ -40,6 +40,8 @@ export const API_ENDPOINTS = {
     SUPPLIER_DETAIL: (id) => `/api/purchasing/suppliers/${id}`,
     BAHAN_SHEET: '/api/purchasing/bahan-sheet',
     BAHAN_SHEET_DETAIL: (id) => `/api/purchasing/bahan-sheet/${id}`,
+    TIPE_SHEET: '/api/purchasing/tipe-sheet',
+    TIPE_SHEET_DETAIL: (id) => `/api/purchasing/tipe-sheet/${id}`,
     BAHAN_PEMBANTU: '/api/purchasing/bahan-pembantu',
     BAHAN_PEMBANTU_DETAIL: (id) => `/api/purchasing/bahan-pembantu/${id}`,
     ORDERS: '/api/purchasing/orders',

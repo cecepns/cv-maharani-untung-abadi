@@ -60,8 +60,51 @@ async function checkDatabaseConnection() {
     await connection.ping();
     connection.release();
     console.log(`✅ [MySQL Connected] Database: ${process.env.DB_NAME || 'cv_maharani_db'} on ${process.env.DB_HOST || 'localhost'}:${process.env.DB_PORT || 3306}`);
+    await initTipeBahanSheetTable();
   } catch (err) {
     console.error(`❌ [MySQL Error] Gagal terhubung ke database (${err.message}). Semua request database akan mengembalikan error ke client.`);
+  }
+}
+
+async function initTipeBahanSheetTable() {
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS tipe_bahan_sheet (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        kode VARCHAR(30) NOT NULL UNIQUE,
+        nama_tipe VARCHAR(100) NOT NULL,
+        kategori VARCHAR(50) DEFAULT 'Corrugated',
+        keterangan VARCHAR(255) DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Ensure flute column length in bahan_baku_sheet is at least VARCHAR(50)
+    try {
+      await db.query(`ALTER TABLE bahan_baku_sheet MODIFY flute VARCHAR(50) DEFAULT 'B/F'`);
+    } catch (_) { }
+
+    const [rows] = await db.query('SELECT COUNT(*) as cnt FROM tipe_bahan_sheet');
+    if (rows[0].cnt === 0) {
+      const defaultTypes = [
+        ['B/F', 'B-Flute Single Wall (~3mm)', 'Corrugated', 'Standard box pengiriman & packaging umum'],
+        ['C/F', 'C-Flute Single Wall (~4mm)', 'Corrugated', 'Daya tumpuk kuat untuk beban berat'],
+        ['E/F', 'E-Flute Micro Single Wall (~1.5mm)', 'Corrugated', 'Kotak pizza, kosmetik, hampers & dus die-cut halus'],
+        ['B/C', 'B/C Double Wall Dua Gelombang (~7mm)', 'Corrugated', 'Dus sparepart mesin, buah ekspor & industri berat'],
+        ['Duplex', 'Karton Duplex Coated (White/Grey)', 'Paperboard Solid', 'Box makanan/martabak, farmasi, dus sparepart (250-450 gsm)'],
+        ['Ivory', 'Karton Ivory Food Grade (White Both Sides)', 'Paperboard Solid', 'Packaging makanan premium, kosmetik & dus obat steril'],
+        ['Kraft', 'Kertas Kraft / Coklat Polos', 'Paperboard Solid', 'Paperbag, kardus coklat eco-friendly & layer penyekat']
+      ];
+      for (const t of defaultTypes) {
+        await db.query(
+          'INSERT IGNORE INTO tipe_bahan_sheet (kode, nama_tipe, kategori, keterangan) VALUES (?, ?, ?, ?)',
+          t
+        );
+      }
+      console.log('✅ [Init] Master Tipe Bahan Sheet (B/F, C/F, E/F, B/C, Duplex, Ivory, Kraft) siap digunakan');
+    }
+  } catch (e) {
+    console.error('Warning init tipe_bahan_sheet:', e.message);
   }
 }
 checkDatabaseConnection();
@@ -1046,14 +1089,15 @@ app.get('/api/purchasing/suppliers', async (req, res) => {
 
 app.post('/api/purchasing/suppliers', async (req, res) => {
   try {
-    const { kode_supplier, nama_supplier, pic, telepon, email, alamat, termin_bayar, kategori } = req.body;
+    const { kode_supplier, nama_supplier, kontak, pic, telepon, email, alamat, termin_bayar, kategori } = req.body;
     const kode = kode_supplier || `SUP-${Date.now().toString().slice(-4)}`;
+    const kontakVal = kontak || pic || '';
     const [result] = await db.query(
-      `INSERT INTO suppliers (kode_supplier, nama_supplier, pic, telepon, email, alamat, termin_bayar, kategori)
+      `INSERT INTO suppliers (kode_supplier, nama_supplier, kontak, telepon, email, alamat, termin_bayar, kategori)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [kode, nama_supplier, pic || '', telepon || '', email || '', alamat || '', termin_bayar || '30 Hari', kategori || 'Sheet Corrugated']
+      [kode, nama_supplier, kontakVal, telepon || '', email || '', alamat || '', termin_bayar || '30 Hari', kategori || 'Sheet Kertas']
     );
-    const [newSup] = await db.query('SELECT * FROM suppliers WHERE id = ?', [result.insertId]);
+    const [newSup] = await db.query('SELECT *, kontak AS pic FROM suppliers WHERE id = ?', [result.insertId]);
     res.json({ success: true, message: 'Supplier berhasil ditambahkan ke database', data: newSup[0] });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
@@ -1062,10 +1106,19 @@ app.post('/api/purchasing/suppliers', async (req, res) => {
 
 app.put('/api/purchasing/suppliers/:id', async (req, res) => {
   try {
-    const { nama_supplier, pic, telepon, email, alamat, termin_bayar, kategori } = req.body;
+    const { nama_supplier, kontak, pic, telepon, email, alamat, termin_bayar, kategori } = req.body;
+    const kontakVal = kontak !== undefined ? kontak : pic;
     const [result] = await db.query(
-      `UPDATE suppliers SET nama_supplier = COALESCE(?, nama_supplier), pic = COALESCE(?, pic), telepon = COALESCE(?, telepon), email = COALESCE(?, email), alamat = COALESCE(?, alamat), termin_bayar = COALESCE(?, termin_bayar), kategori = COALESCE(?, kategori) WHERE id = ?`,
-      [nama_supplier, pic, telepon, email, alamat, termin_bayar, kategori, req.params.id]
+      `UPDATE suppliers SET 
+         nama_supplier = COALESCE(?, nama_supplier), 
+         kontak = COALESCE(?, kontak), 
+         telepon = COALESCE(?, telepon), 
+         email = COALESCE(?, email), 
+         alamat = COALESCE(?, alamat), 
+         termin_bayar = COALESCE(?, termin_bayar), 
+         kategori = COALESCE(?, kategori) 
+       WHERE id = ?`,
+      [nama_supplier, kontakVal, telepon, email, alamat, termin_bayar, kategori, req.params.id]
     );
     if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Supplier tidak ditemukan' });
     res.json({ success: true, message: 'Supplier berhasil diperbarui' });
@@ -1084,6 +1137,76 @@ app.delete('/api/purchasing/suppliers/:id', async (req, res) => {
   }
 });
 
+// Master Tipe Bahan Sheet (Corrugated / Duplex / Ivory / Kraft)
+app.get('/api/purchasing/tipe-sheet', async (req, res) => {
+  try {
+    const search = (req.query.search || '').trim();
+    let whereSql = '';
+    let params = [];
+    if (search) {
+      whereSql = 'WHERE kode LIKE ? OR nama_tipe LIKE ? OR kategori LIKE ?';
+      params = [`%${search}%`, `%${search}%`, `%${search}%`];
+    }
+
+    if (req.query.all === 'true' || req.query.no_pagination === 'true') {
+      const [rows] = await db.query(`SELECT * FROM tipe_bahan_sheet ${whereSql} ORDER BY id ASC`, params);
+      return res.json({ success: true, data: rows });
+    }
+
+    const countSql = `SELECT COUNT(*) as total FROM tipe_bahan_sheet ${whereSql}`;
+    const selectSql = `SELECT * FROM tipe_bahan_sheet ${whereSql} ORDER BY id ASC`;
+    const result = await getPaginatedData(selectSql, countSql, params, params, req);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
+app.post('/api/purchasing/tipe-sheet', async (req, res) => {
+  try {
+    const { kode, nama_tipe, kategori, keterangan } = req.body;
+    if (!kode || !nama_tipe) {
+      return res.status(400).json({ success: false, message: 'Kode dan nama tipe bahan wajib diisi' });
+    }
+    const [result] = await db.query(
+      `INSERT INTO tipe_bahan_sheet (kode, nama_tipe, kategori, keterangan) VALUES (?, ?, ?, ?)`,
+      [kode.trim(), nama_tipe.trim(), kategori || 'Corrugated', keterangan || '']
+    );
+    res.json({ success: true, message: `Tipe bahan ${kode} berhasil ditambahkan`, data: { id: result.insertId } });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
+app.put('/api/purchasing/tipe-sheet/:id', async (req, res) => {
+  try {
+    const { kode, nama_tipe, kategori, keterangan } = req.body;
+    const [result] = await db.query(
+      `UPDATE tipe_bahan_sheet SET 
+         kode = COALESCE(?, kode), 
+         nama_tipe = COALESCE(?, nama_tipe), 
+         kategori = COALESCE(?, kategori), 
+         keterangan = COALESCE(?, keterangan) 
+       WHERE id = ?`,
+      [kode ? kode.trim() : null, nama_tipe ? nama_tipe.trim() : null, kategori, keterangan, req.params.id]
+    );
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Tipe bahan tidak ditemukan' });
+    res.json({ success: true, message: 'Tipe bahan berhasil diperbarui' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
+app.delete('/api/purchasing/tipe-sheet/:id', async (req, res) => {
+  try {
+    const [result] = await db.query('DELETE FROM tipe_bahan_sheet WHERE id = ?', [req.params.id]);
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Tipe bahan tidak ditemukan' });
+    res.json({ success: true, message: 'Tipe bahan berhasil dihapus' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
 // Bahan Baku Sheet
 app.get('/api/purchasing/bahan-sheet', async (req, res) => {
   try {
@@ -1091,11 +1214,17 @@ app.get('/api/purchasing/bahan-sheet', async (req, res) => {
     let whereSql = '';
     let params = [];
     if (search) {
-      whereSql = 'WHERE kode_sheet LIKE ? OR nama_sheet LIKE ? OR tipe_flute LIKE ? OR substansi LIKE ?';
-      params = [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`];
+      whereSql = 'WHERE bbs.kode_sheet LIKE ? OR bbs.nama_sheet LIKE ? OR bbs.flute LIKE ? OR bbs.substansi LIKE ? OR s.nama_supplier LIKE ?';
+      params = [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`];
     }
-    const countSql = `SELECT COUNT(*) as total FROM bahan_baku_sheet ${whereSql}`;
-    const selectSql = `SELECT * FROM bahan_baku_sheet ${whereSql} ORDER BY id DESC`;
+    const countSql = `SELECT COUNT(*) as total FROM bahan_baku_sheet bbs LEFT JOIN suppliers s ON bbs.supplier_id = s.id ${whereSql}`;
+    const selectSql = `
+      SELECT bbs.*, bbs.flute AS tipe_flute, s.nama_supplier, s.nama_supplier AS supplier_nama 
+      FROM bahan_baku_sheet bbs 
+      LEFT JOIN suppliers s ON bbs.supplier_id = s.id 
+      ${whereSql} 
+      ORDER BY bbs.id DESC
+    `;
     const result = await getPaginatedData(selectSql, countSql, params, params, req);
     res.json(result);
   } catch (err) {
@@ -1105,12 +1234,14 @@ app.get('/api/purchasing/bahan-sheet', async (req, res) => {
 
 app.post('/api/purchasing/bahan-sheet', async (req, res) => {
   try {
-    const { kode_sheet, nama_sheet, tipe_flute, substansi, panjang_mm, lebar_mm, stok_lembar, harga_per_lembar, min_stok } = req.body;
+    const { kode_sheet, nama_sheet, supplier_id, flute, tipe_flute, substansi, panjang_mm, lebar_mm, stok_lembar, harga_per_lembar, min_stok } = req.body;
     const kode = kode_sheet || `SHT-${Date.now().toString().slice(-4)}`;
+    const fluteVal = flute || tipe_flute || 'B/F';
+    const suppId = supplier_id ? parseInt(supplier_id, 10) : null;
     const [result] = await db.query(
-      `INSERT INTO bahan_baku_sheet (kode_sheet, nama_sheet, tipe_flute, substansi, panjang_mm, lebar_mm, stok_lembar, harga_per_lembar, min_stok)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [kode, nama_sheet, tipe_flute || 'B/F', substansi || 'K125/M125/K125', panjang_mm || 0, lebar_mm || 0, stok_lembar || 0, harga_per_lembar || 0, min_stok || 500]
+      `INSERT INTO bahan_baku_sheet (kode_sheet, nama_sheet, supplier_id, flute, substansi, panjang_mm, lebar_mm, stok_lembar, harga_per_lembar, min_stok)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [kode, nama_sheet, suppId, fluteVal, substansi || 'K125/M125/K125', panjang_mm || 0, lebar_mm || 0, stok_lembar || 0, harga_per_lembar || 0, min_stok || 500]
     );
     res.json({ success: true, message: 'Bahan baku sheet berhasil ditambahkan' });
   } catch (err) {
@@ -1120,10 +1251,22 @@ app.post('/api/purchasing/bahan-sheet', async (req, res) => {
 
 app.put('/api/purchasing/bahan-sheet/:id', async (req, res) => {
   try {
-    const { nama_sheet, tipe_flute, substansi, panjang_mm, lebar_mm, stok_lembar, harga_per_lembar, min_stok } = req.body;
+    const { nama_sheet, supplier_id, flute, tipe_flute, substansi, panjang_mm, lebar_mm, stok_lembar, harga_per_lembar, min_stok } = req.body;
+    const fluteVal = flute !== undefined ? flute : tipe_flute;
+    const suppId = supplier_id !== undefined ? (supplier_id ? parseInt(supplier_id, 10) : null) : undefined;
     const [result] = await db.query(
-      `UPDATE bahan_baku_sheet SET nama_sheet = COALESCE(?, nama_sheet), tipe_flute = COALESCE(?, tipe_flute), substansi = COALESCE(?, substansi), panjang_mm = COALESCE(?, panjang_mm), lebar_mm = COALESCE(?, lebar_mm), stok_lembar = COALESCE(?, stok_lembar), harga_per_lembar = COALESCE(?, harga_per_lembar), min_stok = COALESCE(?, min_stok) WHERE id = ?`,
-      [nama_sheet, tipe_flute, substansi, panjang_mm, lebar_mm, stok_lembar, harga_per_lembar, min_stok, req.params.id]
+      `UPDATE bahan_baku_sheet SET 
+         nama_sheet = COALESCE(?, nama_sheet), 
+         supplier_id = COALESCE(?, supplier_id), 
+         flute = COALESCE(?, flute), 
+         substansi = COALESCE(?, substansi), 
+         panjang_mm = COALESCE(?, panjang_mm), 
+         lebar_mm = COALESCE(?, lebar_mm), 
+         stok_lembar = COALESCE(?, stok_lembar), 
+         harga_per_lembar = COALESCE(?, harga_per_lembar), 
+         min_stok = COALESCE(?, min_stok) 
+       WHERE id = ?`,
+      [nama_sheet, suppId, fluteVal, substansi, panjang_mm, lebar_mm, stok_lembar, harga_per_lembar, min_stok, req.params.id]
     );
     if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Bahan sheet tidak ditemukan' });
     res.json({ success: true, message: 'Bahan sheet berhasil diperbarui' });
@@ -1153,7 +1296,7 @@ app.get('/api/purchasing/bahan-pembantu', async (req, res) => {
       params = [`%${search}%`, `%${search}%`, `%${search}%`];
     }
     const countSql = `SELECT COUNT(*) as total FROM bahan_pembantu ${whereSql}`;
-    const selectSql = `SELECT * FROM bahan_pembantu ${whereSql} ORDER BY id DESC`;
+    const selectSql = `SELECT *, stok AS stok_qty FROM bahan_pembantu ${whereSql} ORDER BY id DESC`;
     const result = await getPaginatedData(selectSql, countSql, params, params, req);
     res.json(result);
   } catch (err) {
@@ -1163,12 +1306,13 @@ app.get('/api/purchasing/bahan-pembantu', async (req, res) => {
 
 app.post('/api/purchasing/bahan-pembantu', async (req, res) => {
   try {
-    const { kode_bahan, nama_bahan, kategori, stok_qty, satuan, harga_satuan, min_stok } = req.body;
+    const { kode_bahan, nama_bahan, kategori, stok, stok_qty, satuan, harga_satuan, min_stok } = req.body;
     const kode = kode_bahan || `BP-${Date.now().toString().slice(-4)}`;
+    const stokVal = stok !== undefined ? stok : (stok_qty !== undefined ? stok_qty : 0);
     const [result] = await db.query(
-      `INSERT INTO bahan_pembantu (kode_bahan, nama_bahan, kategori, stok_qty, satuan, harga_satuan, min_stok)
+      `INSERT INTO bahan_pembantu (kode_bahan, nama_bahan, kategori, stok, satuan, harga_satuan, min_stok)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [kode, nama_bahan, kategori || 'Tinta Flexo', stok_qty || 0, satuan || 'Kg', harga_satuan || 0, min_stok || 10]
+      [kode, nama_bahan, kategori || 'Tinta Flexo', stokVal, satuan || 'Kg', harga_satuan || 0, min_stok || 10]
     );
     res.json({ success: true, message: 'Bahan pembantu berhasil ditambahkan' });
   } catch (err) {
@@ -1178,10 +1322,18 @@ app.post('/api/purchasing/bahan-pembantu', async (req, res) => {
 
 app.put('/api/purchasing/bahan-pembantu/:id', async (req, res) => {
   try {
-    const { nama_bahan, kategori, stok_qty, satuan, harga_satuan, min_stok } = req.body;
+    const { nama_bahan, kategori, stok, stok_qty, satuan, harga_satuan, min_stok } = req.body;
+    const stokVal = stok !== undefined ? stok : stok_qty;
     const [result] = await db.query(
-      `UPDATE bahan_pembantu SET nama_bahan = COALESCE(?, nama_bahan), kategori = COALESCE(?, kategori), stok_qty = COALESCE(?, stok_qty), satuan = COALESCE(?, satuan), harga_satuan = COALESCE(?, harga_satuan), min_stok = COALESCE(?, min_stok) WHERE id = ?`,
-      [nama_bahan, kategori, stok_qty, satuan, harga_satuan, min_stok, req.params.id]
+      `UPDATE bahan_pembantu SET 
+         nama_bahan = COALESCE(?, nama_bahan), 
+         kategori = COALESCE(?, kategori), 
+         stok = COALESCE(?, stok), 
+         satuan = COALESCE(?, satuan), 
+         harga_satuan = COALESCE(?, harga_satuan), 
+         min_stok = COALESCE(?, min_stok) 
+       WHERE id = ?`,
+      [nama_bahan, kategori, stokVal, satuan, harga_satuan, min_stok, req.params.id]
     );
     if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Bahan pembantu tidak ditemukan' });
     res.json({ success: true, message: 'Bahan pembantu berhasil diperbarui' });
@@ -1258,9 +1410,17 @@ app.post('/api/purchasing/orders', async (req, res) => {
 
     for (const it of items) {
       await connection.query(
-        `INSERT INTO purchase_order_items (po_id, deskripsi_barang, tipe_barang, barang_id, qty, satuan, harga_satuan, subtotal)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [poId, it.deskripsi_barang || 'Bahan Baku', it.tipe_barang || 'Sheet', it.barang_id || null, it.qty, it.satuan || 'Pcs', it.harga_satuan, Number(it.qty) * Number(it.harga_satuan)]
+        `INSERT INTO purchase_order_items (po_id, item_type, item_id, item_name, qty, harga_satuan, subtotal)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          poId,
+          it.item_type || it.tipe_barang || 'Sheet',
+          it.item_id || it.barang_id || 1,
+          it.item_name || it.deskripsi_barang || 'Bahan Baku',
+          it.qty,
+          it.harga_satuan,
+          Number(it.qty) * Number(it.harga_satuan)
+        ]
       );
     }
 
@@ -1274,6 +1434,16 @@ app.post('/api/purchasing/orders', async (req, res) => {
   }
 });
 
+app.delete('/api/purchasing/orders/:id', async (req, res) => {
+  try {
+    const [result] = await db.query('DELETE FROM purchase_orders WHERE id = ?', [req.params.id]);
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Purchase Order tidak ditemukan' });
+    res.json({ success: true, message: 'Purchase Order berhasil dihapus' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
 // Penerimaan Barang (LPB)
 app.get('/api/purchasing/penerimaan', async (req, res) => {
   try {
@@ -1281,12 +1451,12 @@ app.get('/api/purchasing/penerimaan', async (req, res) => {
     let whereSql = '';
     let params = [];
     if (search) {
-      whereSql = 'WHERE lpb.nomor_lpb LIKE ? OR s.nama_supplier LIKE ? OR lpb.nomor_sj_supplier LIKE ?';
-      params = [`%${search}%`, `%${search}%`, `%${search}%`];
+      whereSql = 'WHERE lpb.nomor_lpb LIKE ? OR s.nama_supplier LIKE ? OR lpb.no_sj_supplier LIKE ? OR lpb.nama_penerima LIKE ?';
+      params = [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`];
     }
     const countSql = `SELECT COUNT(*) as total FROM laporan_penerimaan_barang lpb LEFT JOIN suppliers s ON lpb.supplier_id = s.id ${whereSql}`;
     const selectSql = `
-      SELECT lpb.*, s.nama_supplier, po.nomor_po 
+      SELECT lpb.*, lpb.no_sj_supplier AS nomor_sj_supplier, lpb.nama_penerima AS penerima_nama, s.nama_supplier, po.nomor_po 
       FROM laporan_penerimaan_barang lpb 
       LEFT JOIN suppliers s ON lpb.supplier_id = s.id 
       LEFT JOIN purchase_orders po ON lpb.po_id = po.id 
@@ -1302,13 +1472,26 @@ app.get('/api/purchasing/penerimaan', async (req, res) => {
 
 app.post('/api/purchasing/penerimaan', async (req, res) => {
   try {
-    const { po_id, supplier_id, tanggal_terima, nomor_sj_supplier, penerima_nama, catatan } = req.body;
+    let { po_id, supplier_id, tanggal_terima, nomor_sj_supplier, no_sj_supplier, penerima_nama, nama_penerima, catatan } = req.body;
     const nomor_lpb = `LPB-${Date.now().toString().slice(-6)}`;
+    const noSj = no_sj_supplier || nomor_sj_supplier || 'SJ-SUP-01';
+    const namaPenerima = nama_penerima || penerima_nama || 'Maman Suratman';
+
+    if (!supplier_id && po_id) {
+      const [poRows] = await db.query('SELECT supplier_id FROM purchase_orders WHERE id = ?', [po_id]);
+      if (poRows.length > 0) {
+        supplier_id = poRows[0].supplier_id;
+      }
+    }
+    if (!supplier_id) {
+      const [supRows] = await db.query('SELECT id FROM suppliers LIMIT 1');
+      supplier_id = supRows.length > 0 ? supRows[0].id : 1;
+    }
 
     const [result] = await db.query(
-      `INSERT INTO laporan_penerimaan_barang (nomor_lpb, po_id, supplier_id, tanggal_terima, nomor_sj_supplier, penerima_nama, catatan, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'Selesai')`,
-      [nomor_lpb, po_id || null, supplier_id, tanggal_terima || new Date().toISOString().split('T')[0], nomor_sj_supplier || 'SJ-SUP-01', penerima_nama || 'Maman Suratman', catatan || '']
+      `INSERT INTO laporan_penerimaan_barang (nomor_lpb, po_id, supplier_id, tanggal_terima, no_sj_supplier, nama_penerima, catatan)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [nomor_lpb, po_id || null, supplier_id, tanggal_terima || new Date().toISOString().split('T')[0], noSj, namaPenerima, catatan || '']
     );
 
     res.json({ success: true, message: `LPB ${nomor_lpb} berhasil dicatat di database`, data: { id: result.insertId, nomor_lpb } });
@@ -1324,14 +1507,15 @@ app.get('/api/purchasing/nota-beli', async (req, res) => {
     let whereSql = '';
     let params = [];
     if (search) {
-      whereSql = 'WHERE np.nomor_nota LIKE ? OR s.nama_supplier LIKE ?';
+      whereSql = 'WHERE np.nomor_faktur_beli LIKE ? OR s.nama_supplier LIKE ?';
       params = [`%${search}%`, `%${search}%`];
     }
     const countSql = `SELECT COUNT(*) as total FROM nota_pembelian np LEFT JOIN suppliers s ON np.supplier_id = s.id ${whereSql}`;
     const selectSql = `
-      SELECT np.*, s.nama_supplier 
+      SELECT np.*, np.nomor_faktur_beli AS nomor_nota, s.nama_supplier, s.nama_supplier AS supplier_nama, po.nomor_po 
       FROM nota_pembelian np 
       LEFT JOIN suppliers s ON np.supplier_id = s.id 
+      LEFT JOIN purchase_orders po ON np.po_id = po.id 
       ${whereSql} 
       ORDER BY np.id DESC
     `;
@@ -1344,14 +1528,27 @@ app.get('/api/purchasing/nota-beli', async (req, res) => {
 
 app.post('/api/purchasing/nota-beli', async (req, res) => {
   try {
-    const { po_id, supplier_id, tanggal_nota, jatuh_tempo, subtotal, ppn, total_tagihan } = req.body;
-    const nomor_nota = `NOTA-${Date.now().toString().slice(-6)}`;
+    let { po_id, supplier_id, tanggal_faktur, tanggal_nota, jatuh_tempo, total_tagihan } = req.body;
+    const nomor_faktur = `FB-${Date.now().toString().slice(-6)}`;
+    const tgl = tanggal_faktur || tanggal_nota || new Date().toISOString().split('T')[0];
+    const jthTempo = jatuh_tempo || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
+    const total = parseFloat(total_tagihan) || 0;
+
+    if (!supplier_id && po_id) {
+      const [poRows] = await db.query('SELECT supplier_id FROM purchase_orders WHERE id = ?', [po_id]);
+      if (poRows.length > 0) supplier_id = poRows[0].supplier_id;
+    }
+    if (!supplier_id) {
+      const [supRows] = await db.query('SELECT id FROM suppliers LIMIT 1');
+      supplier_id = supRows.length > 0 ? supRows[0].id : 1;
+    }
+
     const [result] = await db.query(
-      `INSERT INTO nota_pembelian (nomor_nota, po_id, supplier_id, tanggal_nota, jatuh_tempo, subtotal, ppn, total_tagihan, sudah_dibayar, sisa_tagihan, status_bayar)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'Belum Lunas')`,
-      [nomor_nota, po_id || null, supplier_id, tanggal_nota || new Date().toISOString().split('T')[0], jatuh_tempo || new Date().toISOString().split('T')[0], subtotal || 0, ppn || 0, total_tagihan, total_tagihan]
+      `INSERT INTO nota_pembelian (nomor_faktur_beli, po_id, supplier_id, tanggal_faktur, jatuh_tempo, total_tagihan, sudah_dibayar, sisa_tagihan, status_bayar)
+       VALUES (?, ?, ?, ?, ?, ?, 0, ?, 'Belum Lunas')`,
+      [nomor_faktur, po_id || null, supplier_id, tgl, jthTempo, total, total]
     );
-    res.json({ success: true, message: `Nota pembelian ${nomor_nota} berhasil disimpan`, data: { id: result.insertId, nomor_nota } });
+    res.json({ success: true, message: `Nota pembelian ${nomor_faktur} berhasil disimpan`, data: { id: result.insertId, nomor_faktur_beli: nomor_faktur } });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
   }
@@ -1364,15 +1561,14 @@ app.get('/api/purchasing/retur-beli', async (req, res) => {
     let whereSql = '';
     let params = [];
     if (search) {
-      whereSql = 'WHERE rb.nomor_retur LIKE ? OR s.nama_supplier LIKE ?';
+      whereSql = 'WHERE rb.nomor_retur_beli LIKE ? OR s.nama_supplier LIKE ?';
       params = [`%${search}%`, `%${search}%`];
     }
     const countSql = `SELECT COUNT(*) as total FROM retur_pembelian rb LEFT JOIN suppliers s ON rb.supplier_id = s.id ${whereSql}`;
     const selectSql = `
-      SELECT rb.*, s.nama_supplier, np.nomor_nota 
+      SELECT rb.*, rb.nomor_retur_beli AS nomor_retur, s.nama_supplier, s.nama_supplier AS supplier_nama 
       FROM retur_pembelian rb 
       LEFT JOIN suppliers s ON rb.supplier_id = s.id 
-      LEFT JOIN nota_pembelian np ON rb.nota_id = np.id 
       ${whereSql} 
       ORDER BY rb.id DESC
     `;
@@ -1385,14 +1581,22 @@ app.get('/api/purchasing/retur-beli', async (req, res) => {
 
 app.post('/api/purchasing/retur-beli', async (req, res) => {
   try {
-    const { nota_id, supplier_id, tanggal_retur, deskripsi_barang, qty, alasan } = req.body;
+    let { supplier_id, supplier_nama, tanggal_retur, total_nilai, alasan, po_id } = req.body;
     const nomor_retur = `RET-B-${Date.now().toString().slice(-6)}`;
+    if (!supplier_id && supplier_nama) {
+      const [rows] = await db.query('SELECT id FROM suppliers WHERE nama_supplier = ? LIMIT 1', [supplier_nama]);
+      if (rows.length > 0) supplier_id = rows[0].id;
+    }
+    if (!supplier_id) {
+      const [rows] = await db.query('SELECT id FROM suppliers LIMIT 1');
+      supplier_id = rows.length > 0 ? rows[0].id : 1;
+    }
     const [result] = await db.query(
-      `INSERT INTO retur_pembelian (nomor_retur, nota_id, supplier_id, tanggal_retur, deskripsi_barang, qty, alasan, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'Disetujui')`,
-      [nomor_retur, nota_id || null, supplier_id, tanggal_retur || new Date().toISOString().split('T')[0], deskripsi_barang || 'Sheet Rusak', qty || 0, alasan || 'Flute basah / sobek']
+      `INSERT INTO retur_pembelian (nomor_retur_beli, po_id, supplier_id, tanggal_retur, alasan, total_nilai, status)
+       VALUES (?, ?, ?, ?, ?, ?, 'Disetujui')`,
+      [nomor_retur, po_id || null, supplier_id, tanggal_retur || new Date().toISOString().split('T')[0], alasan || 'Sheet cacat pabrik', total_nilai || 0]
     );
-    res.json({ success: true, message: 'Retur pembelian berhasil dicatat', data: { id: result.insertId, nomor_retur } });
+    res.json({ success: true, message: 'Retur pembelian berhasil dicatat', data: { id: result.insertId, nomor_retur_beli: nomor_retur } });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
   }
@@ -1407,11 +1611,11 @@ app.get('/api/gudang/stock-sheet', async (req, res) => {
     let whereSql = '';
     let params = [];
     if (search) {
-      whereSql = 'WHERE kode_sheet LIKE ? OR nama_sheet LIKE ? OR tipe_flute LIKE ? OR substansi LIKE ?';
+      whereSql = 'WHERE kode_sheet LIKE ? OR nama_sheet LIKE ? OR flute LIKE ? OR substansi LIKE ?';
       params = [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`];
     }
     const countSql = `SELECT COUNT(*) as total FROM bahan_baku_sheet ${whereSql}`;
-    const selectSql = `SELECT * FROM bahan_baku_sheet ${whereSql} ORDER BY stok_lembar ASC`;
+    const selectSql = `SELECT *, flute AS tipe_flute FROM bahan_baku_sheet ${whereSql} ORDER BY stok_lembar ASC`;
     const result = await getPaginatedData(selectSql, countSql, params, params, req);
     res.json(result);
   } catch (err) {
@@ -1429,7 +1633,7 @@ app.get('/api/gudang/stock-pembantu', async (req, res) => {
       params = [`%${search}%`, `%${search}%`, `%${search}%`];
     }
     const countSql = `SELECT COUNT(*) as total FROM bahan_pembantu ${whereSql}`;
-    const selectSql = `SELECT * FROM bahan_pembantu ${whereSql} ORDER BY stok_qty ASC`;
+    const selectSql = `SELECT *, stok AS stok_qty FROM bahan_pembantu ${whereSql} ORDER BY stok ASC`;
     const result = await getPaginatedData(selectSql, countSql, params, params, req);
     res.json(result);
   } catch (err) {
