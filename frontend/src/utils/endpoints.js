@@ -102,6 +102,7 @@ export const API_ENDPOINTS = {
     KARYAWAN: '/api/payroll/karyawan',
     KARYAWAN_DETAIL: (id) => `/api/payroll/karyawan/${id}`,
     ABSENSI: '/api/payroll/absensi',
+    ABSENSI_DETAIL: (id) => `/api/payroll/absensi/${id}`,
     ABSENSI_IMPORT_FINGERPRINT: '/api/payroll/absensi/import-fingerprint',
     ABSENSI_EXPORT: '/api/payroll/absensi/export',
     ABSENSI_TEMPLATE: '/api/payroll/absensi/template-fingerprint',

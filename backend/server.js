@@ -1263,7 +1263,7 @@ app.post('/api/purchasing/bahan-sheet', async (req, res) => {
   try {
     const { kode_sheet, nama_sheet, supplier_id, flute, tipe_flute, substansi, panjang_mm, lebar_mm, stok_lembar, harga_per_lembar, min_stok, nilai_index, metode_index } = req.body;
     const kode = kode_sheet || `SHT-${Date.now().toString().slice(-4)}`;
-    const fluteVal = flute || tipe_flute || 'B/F';
+    const fluteVal = String(flute || tipe_flute || 'B/F').slice(0, 50);
     const suppId = supplier_id ? parseInt(supplier_id, 10) : null;
     const nIndex = nilai_index ? parseFloat(nilai_index) : null;
     const mIndex = metode_index || null;
@@ -1278,13 +1278,6 @@ app.post('/api/purchasing/bahan-sheet', async (req, res) => {
       if (insertErr.message.includes('nilai_index') || insertErr.message.includes('metode_index')) {
         await db.query(
           `INSERT INTO bahan_baku_sheet (kode_sheet, nama_sheet, supplier_id, flute, substansi, panjang_mm, lebar_mm, stok_lembar, harga_per_lembar, min_stok)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [kode, nama_sheet, suppId, fluteVal, substansi || 'K125/M125/K125', panjang_mm || 0, lebar_mm || 0, stok_lembar || 0, harga_per_lembar || 0, min_stok || 500]
-        );
-      } else if (insertErr.message.includes('tipe_flute') || insertErr.message.includes('flute')) {
-        // Fallback in case table has column tipe_flute
-        await db.query(
-          `INSERT INTO bahan_baku_sheet (kode_sheet, nama_sheet, supplier_id, tipe_flute, substansi, panjang_mm, lebar_mm, stok_lembar, harga_per_lembar, min_stok)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [kode, nama_sheet, suppId, fluteVal, substansi || 'K125/M125/K125', panjang_mm || 0, lebar_mm || 0, stok_lembar || 0, harga_per_lembar || 0, min_stok || 500]
         );
@@ -2675,6 +2668,72 @@ app.get('/api/payroll/absensi', async (req, res) => {
   }
 });
 
+/**
+ * Helper: Hitung Jam Kerja Pokok & Jam Lembur secara adil & akurat
+ * Aturan Ketenagakerjaan & Pabrik:
+ * 1. Total jam di pabrik = Waktu Akhir - Jam Masuk
+ * 2. Dipotong istirahat (default 1 jam jika kerja >= 5 jam)
+ * 3. Jam Bersih harus memenuhi 8 jam kerja pokok dulu!
+ * 4. Jika Jam Bersih <= 8 jam -> Jam Pokok = Jam Bersih, Lembur = 0
+ * 5. Jika Jam Bersih > 8 jam -> Jam Pokok = 8 jam, Lembur = Jam Bersih - 8 jam
+ * (Mencakup lembur masuk lebih pagi dari shift, maupun lembur pulang malam)
+ */
+function calculateWorkAndOvertime(jamMasuk, jamPulang, jamIstirahatKeluar, jamIstirahatMasuk, jamLemburSelesai, jamLemburManual) {
+  const waktuAwal = (jamMasuk || '08:00').slice(0, 5);
+  const waktuAkhir = (jamLemburSelesai || jamPulang || '16:00').slice(0, 5);
+
+  const [hAwal, mAwal] = waktuAwal.split(':').map(Number);
+  const [hAkhir, mAkhir] = waktuAkhir.split(':').map(Number);
+
+  const menitAwal = (hAwal || 0) * 60 + (mAwal || 0);
+  const menitAkhir = (hAkhir || 0) * 60 + (mAkhir || 0);
+
+  let menitKotor = menitAkhir - menitAwal;
+  if (menitKotor < 0) menitKotor = 0;
+
+  // Durasi istirahat (default 60 menit jika kerja >= 5 jam)
+  let menitIstirahat = 0;
+  if (jamIstirahatKeluar && jamIstirahatMasuk) {
+    const [hIK, mIK] = jamIstirahatKeluar.slice(0, 5).split(':').map(Number);
+    const [hIM, mIM] = jamIstirahatMasuk.slice(0, 5).split(':').map(Number);
+    const m1 = (hIK || 0) * 60 + (mIK || 0);
+    const m2 = (hIM || 0) * 60 + (mIM || 0);
+    if (m2 > m1) menitIstirahat = m2 - m1;
+  } else if (menitKotor >= 5 * 60) {
+    menitIstirahat = 60;
+  }
+
+  const menitBersih = Math.max(0, menitKotor - menitIstirahat);
+  const jamBersih = Math.round((menitBersih / 60) * 10) / 10;
+
+  let jamPokok = 0;
+  let jamLembur = 0;
+
+  if (jamBersih <= 8.0) {
+    jamPokok = jamBersih;
+    jamLembur = 0;
+  } else {
+    jamPokok = 8.0;
+    jamLembur = Math.round((jamBersih - 8.0) * 10) / 10;
+  }
+
+  // Jika input manual lembur secara spesifik diisi admin dan jam bersih >= 8 jam
+  if (jamLemburManual !== undefined && jamLemburManual !== null && jamLemburManual !== '') {
+    const manualVal = Number(jamLemburManual);
+    if (!isNaN(manualVal) && manualVal >= 0 && jamBersih >= 8.0) {
+      jamLembur = manualVal;
+    }
+  }
+
+  return {
+    jamKotor: Math.round((menitKotor / 60) * 10) / 10,
+    jamIstirahat: Math.round((menitIstirahat / 60) * 10) / 10,
+    jamBersih,
+    jamPokok,
+    jamLembur
+  };
+}
+
 app.post('/api/payroll/absensi', async (req, res) => {
   try {
     const { 
@@ -2685,15 +2744,18 @@ app.post('/api/payroll/absensi', async (req, res) => {
     const [emp] = await db.query('SELECT nik FROM karyawan WHERE id = ?', [karyawan_id]);
     const nik = emp.length > 0 ? emp[0].nik : 'EMP-001';
 
-    let otHours = Number(jam_lembur) || 0;
-    if (otHours === 0 && jam_lembur_selesai) {
-      const [lh, lm] = jam_lembur_selesai.split(':').map(Number);
-      const [ph, pm] = (jam_pulang || '16:00').split(':').map(Number);
-      if (lh && ph && lh > ph) {
-        otHours = Math.max(0, (lh + (lm || 0) / 60) - (ph + (pm || 0) / 60));
-        otHours = Math.round(otHours * 10) / 10;
-      }
-    }
+    // Hitung jam kerja & lembur dengan aturan wajib 8 jam pokok dulu
+    const calc = calculateWorkAndOvertime(
+      jam_masuk || '08:00',
+      jam_pulang || '16:00',
+      jam_istirahat_keluar,
+      jam_istirahat_masuk,
+      jam_lembur_selesai,
+      jam_lembur
+    );
+
+    const otHours = calc.jamLembur;
+    const workHours = calc.jamPokok;
 
     try {
       await db.query(
@@ -2710,7 +2772,7 @@ app.post('/api/payroll/absensi', async (req, res) => {
           jam_pulang || '16:00', 
           jam_lembur_selesai || null,
           otHours, 
-          Number(total_jam_kerja) || 8.0,
+          workHours,
           catatan || 'Presensi Manual HR'
         ]
       );
@@ -2723,7 +2785,104 @@ app.post('/api/payroll/absensi', async (req, res) => {
       );
     }
 
-    res.json({ success: true, message: 'Presensi & rincian jam kerja multi-scan berhasil dicatat di database' });
+    res.json({ 
+      success: true, 
+      message: `Presensi berhasil dicatat: ${workHours} Jam Kerja Pokok, ${otHours} Jam Lembur`,
+      data: { jamPokok: workHours, jamLembur: otHours }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
+app.put('/api/payroll/absensi/:id', async (req, res) => {
+  try {
+    const { 
+      karyawan_id, tanggal, status_kehadiran, 
+      jam_masuk, jam_istirahat_keluar, jam_istirahat_masuk, jam_pulang, 
+      jam_lembur_selesai, jam_lembur, catatan 
+    } = req.body;
+
+    const calc = calculateWorkAndOvertime(
+      jam_masuk || '08:00',
+      jam_pulang || '16:00',
+      jam_istirahat_keluar,
+      jam_istirahat_masuk,
+      jam_lembur_selesai,
+      jam_lembur
+    );
+
+    const otHours = calc.jamLembur;
+    const workHours = calc.jamPokok;
+
+    try {
+      const [result] = await db.query(
+        `UPDATE absensi SET 
+           karyawan_id = COALESCE(?, karyawan_id),
+           tanggal = COALESCE(?, tanggal),
+           status_kehadiran = COALESCE(?, status_kehadiran),
+           jam_masuk = COALESCE(?, jam_masuk),
+           jam_istirahat_keluar = ?,
+           jam_istirahat_masuk = ?,
+           jam_pulang = COALESCE(?, jam_pulang),
+           jam_lembur_selesai = ?,
+           jam_lembur = ?,
+           total_jam_kerja = ?,
+           catatan = COALESCE(?, catatan)
+         WHERE id = ?`,
+        [
+          karyawan_id || null,
+          tanggal,
+          status_kehadiran,
+          jam_masuk,
+          jam_istirahat_keluar || null,
+          jam_istirahat_masuk || null,
+          jam_pulang,
+          jam_lembur_selesai || null,
+          otHours,
+          workHours,
+          catatan || '',
+          req.params.id
+        ]
+      );
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ success: false, message: 'Data absensi tidak ditemukan' });
+      }
+    } catch (_) {
+      const [result] = await db.query(
+        `UPDATE absensi SET 
+           karyawan_id = COALESCE(?, karyawan_id),
+           tanggal = COALESCE(?, tanggal),
+           status_kehadiran = COALESCE(?, status_kehadiran),
+           jam_masuk = COALESCE(?, jam_masuk),
+           jam_pulang = COALESCE(?, jam_pulang),
+           jam_lembur = ?,
+           catatan = COALESCE(?, catatan)
+         WHERE id = ?`,
+        [karyawan_id || null, tanggal, status_kehadiran, jam_masuk, jam_pulang, otHours, catatan, req.params.id]
+      );
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ success: false, message: 'Data absensi tidak ditemukan' });
+      }
+    }
+
+    res.json({ 
+      success: true, 
+      message: `Data absensi berhasil diperbarui: ${workHours} Jam Kerja Pokok, ${otHours} Jam Lembur`,
+      data: { jamPokok: workHours, jamLembur: otHours }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
+app.delete('/api/payroll/absensi/:id', async (req, res) => {
+  try {
+    const [result] = await db.query('DELETE FROM absensi WHERE id = ?', [req.params.id]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: 'Data absensi tidak ditemukan' });
+    }
+    res.json({ success: true, message: 'Data absensi berhasil dihapus dari database' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
   }
@@ -2824,19 +2983,10 @@ app.post('/api/payroll/absensi/import-fingerprint', async (req, res) => {
         jamLembur = Number(r.jam_lembur || r.Jam_Lembur) || 0;
         catatan = r.catatan || r.Catatan || 'Log Mesin Fingerprint (Multi-Scan)';
 
-        // Jika jam lembur belum dihitung tapi ada jam lembur selesai atau pulang > 16:00
-        if (jamLembur === 0 && lemburSelesai) {
-          const [lh, lm] = lemburSelesai.split(':').map(Number);
-          const [ph, pm] = jamPulang.split(':').map(Number);
-          if (lh && ph && lh > ph) {
-            jamLembur = Math.round(((lh + (lm || 0) / 60) - (ph + (pm || 0) / 60)) * 10) / 10;
-          }
-        } else if (jamLembur === 0 && jamPulang) {
-          const [ph, pm] = jamPulang.split(':').map(Number);
-          if (ph && ph >= 17) {
-            jamLembur = Math.round((ph - 16 + (pm || 0) / 60) * 10) / 10;
-          }
-        }
+        // Jika jam lembur diisi di baris file CSV, gunakan sebagai hint
+        const parsedLembur = Number(r.jam_lembur || r.Jam_Lembur) || 0;
+        const calc = calculateWorkAndOvertime(jamMasuk, jamPulang, istKeluar, istMasuk, lemburSelesai, parsedLembur);
+        jamLembur = calc.jamLembur;
       } else {
         // Multi-punch / multiple tap dalam 1 hari untuk karyawan yang sama (misal tap jam 08:00, 12:00, 13:00, 16:00, 20:00)
         const punchTimes = [];
@@ -2851,7 +3001,7 @@ app.post('/api/payroll/absensi/import-fingerprint', async (req, res) => {
         punchTimes.sort();
 
         if (punchTimes.length > 0) {
-          // Tap paling pagi = Jam Masuk
+          // Tap paling pagi = Jam Masuk (bisa jam 06:00, 07:00, 08:00 dsb)
           jamMasuk = punchTimes[0];
 
           for (let i = 1; i < punchTimes.length; i++) {
@@ -2875,20 +3025,17 @@ app.post('/api/payroll/absensi/import-fingerprint', async (req, res) => {
             jamPulang = punchTimes[1];
           }
 
-          if (lemburSelesai) {
-            const [lh, lm] = lemburSelesai.split(':').map(Number);
-            const [ph, pm] = (jamPulang || '16:00').split(':').map(Number);
-            if (lh && ph && lh > ph) {
-              jamLembur = Math.round(((lh + (lm || 0) / 60) - (ph + (pm || 0) / 60)) * 10) / 10;
-            }
-          }
+          const calc = calculateWorkAndOvertime(jamMasuk, jamPulang, istKeluar, istMasuk, lemburSelesai);
+          jamLembur = calc.jamLembur;
 
           catatan = `Multi-Scan Fingerprint (${punchTimes.length}x Tap: ${punchTimes.join(', ')})`;
         }
       }
 
-      // Hitung total jam kerja efektif (default 8 jam)
-      const totalKerja = 8.0;
+      // Hitung total jam kerja efektif & jam lembur dengan aturan wajib 8 jam
+      const calcResult = calculateWorkAndOvertime(jamMasuk, jamPulang, istKeluar, istMasuk, lemburSelesai, jamLembur);
+      const totalKerja = calcResult.jamPokok;
+      const finalLembur = calcResult.jamLembur;
 
       const [existing] = await db.query('SELECT id FROM absensi WHERE karyawan_id = ? AND tanggal = ?', [empId, tgl]);
       if (existing.length > 0) {
@@ -2905,12 +3052,12 @@ app.post('/api/payroll/absensi/import-fingerprint', async (req, res) => {
                metode = 'Mesin Fingerprint', 
                catatan = ? 
              WHERE id = ?`,
-            [jamMasuk, istKeluar, istMasuk, jamPulang, lemburSelesai, jamLembur, totalKerja, catatan || 'Log Mesin Fingerprint (Multi-Scan)', existing[0].id]
+            [jamMasuk, istKeluar, istMasuk, jamPulang, lemburSelesai, finalLembur, totalKerja, catatan || 'Log Mesin Fingerprint (Multi-Scan)', existing[0].id]
           );
         } catch (_) {
           await db.query(
             `UPDATE absensi SET jam_masuk = ?, jam_pulang = ?, jam_lembur = ?, metode = 'Mesin Fingerprint', catatan = ? WHERE id = ?`,
-            [jamMasuk, lemburSelesai || jamPulang, jamLembur, catatan, existing[0].id]
+            [jamMasuk, lemburSelesai || jamPulang, finalLembur, catatan, existing[0].id]
           );
         }
         updated++;
@@ -2919,7 +3066,7 @@ app.post('/api/payroll/absensi/import-fingerprint', async (req, res) => {
           await db.query(
             `INSERT INTO absensi (karyawan_id, nik, tanggal, status_kehadiran, jam_masuk, jam_istirahat_keluar, jam_istirahat_masuk, jam_pulang, jam_lembur_selesai, jam_lembur, total_jam_kerja, metode, catatan)
              VALUES (?, ?, ?, 'Hadir', ?, ?, ?, ?, ?, ?, ?, 'Mesin Fingerprint', ?)`,
-            [empId, empNik, tgl, jamMasuk, istKeluar, istMasuk, jamPulang, lemburSelesai, jamLembur, totalKerja, catatan || 'Log Mesin Fingerprint (Multi-Scan)']
+            [empId, empNik, tgl, jamMasuk, istKeluar, istMasuk, jamPulang, lemburSelesai, finalLembur, totalKerja, catatan || 'Log Mesin Fingerprint (Multi-Scan)']
           );
         } catch (_) {
           await db.query(

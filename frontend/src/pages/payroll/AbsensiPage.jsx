@@ -10,7 +10,9 @@ import {
   Upload, 
   FileSpreadsheet, 
   RefreshCw,
-  FileText
+  FileText,
+  Edit2,
+  Trash2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { api } from '@/utils/api';
@@ -19,9 +21,67 @@ import { API_ENDPOINTS } from '@/utils/endpoints';
 import SearchInput from '@/components/common/SearchInput';
 import Pagination from '@/components/common/Pagination';
 import Modal from '@/components/common/Modal';
+import ConfirmDialog from '@/components/common/ConfirmDialog';
 import Badge from '@/components/common/Badge';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import EmptyState from '@/components/common/EmptyState';
+
+/**
+ * Helper: Hitung Jam Kerja Pokok & Jam Lembur secara adil & akurat
+ * 1. Total Jam di Pabrik = Jam Akhir - Jam Masuk
+ * 2. Dipotong istirahat 1 jam (jika kerja >= 5 jam)
+ * 3. Wajib penuhi 8 jam pokok dulu!
+ *    - Jika jam bersih <= 8 jam -> Jam Pokok = jam bersih, Jam Lembur = 0
+ *    - Jika jam bersih > 8 jam -> Jam Pokok = 8 jam, Jam Lembur = jam bersih - 8 jam
+ * (Mencakup masuk lebih pagi dari shift, maupun lembur pulang malam)
+ */
+export const calculateWorkAndOvertime = (jamMasuk, jamPulang, jamIstirahatKeluar, jamIstirahatMasuk, jamLemburSelesai) => {
+  const waktuAwal = (jamMasuk || '08:00').slice(0, 5);
+  const waktuAkhir = (jamLemburSelesai || jamPulang || '16:00').slice(0, 5);
+
+  const [hAwal, mAwal] = waktuAwal.split(':').map(Number);
+  const [hAkhir, mAkhir] = waktuAkhir.split(':').map(Number);
+
+  const menitAwal = (hAwal || 0) * 60 + (mAwal || 0);
+  const menitAkhir = (hAkhir || 0) * 60 + (mAkhir || 0);
+
+  let menitKotor = menitAkhir - menitAwal;
+  if (menitKotor < 0) menitKotor = 0;
+
+  // Istirahat
+  let menitIstirahat = 0;
+  if (jamIstirahatKeluar && jamIstirahatMasuk) {
+    const [hIK, mIK] = jamIstirahatKeluar.slice(0, 5).split(':').map(Number);
+    const [hIM, mIM] = jamIstirahatMasuk.slice(0, 5).split(':').map(Number);
+    const m1 = (hIK || 0) * 60 + (mIK || 0);
+    const m2 = (hIM || 0) * 60 + (mIM || 0);
+    if (m2 > m1) menitIstirahat = m2 - m1;
+  } else if (menitKotor >= 5 * 60) {
+    menitIstirahat = 60;
+  }
+
+  const menitBersih = Math.max(0, menitKotor - menitIstirahat);
+  const jamBersih = Math.round((menitBersih / 60) * 10) / 10;
+
+  let jamPokok = 0;
+  let jamLembur = 0;
+
+  if (jamBersih <= 8.0) {
+    jamPokok = jamBersih;
+    jamLembur = 0;
+  } else {
+    jamPokok = 8.0;
+    jamLembur = Math.round((jamBersih - 8.0) * 10) / 10;
+  }
+
+  return {
+    jamKotor: Math.round((menitKotor / 60) * 10) / 10,
+    jamIstirahat: Math.round((menitIstirahat / 60) * 10) / 10,
+    jamBersih,
+    jamPokok,
+    jamLembur
+  };
+};
 
 export default function AbsensiPage() {
   const [absensiList, setAbsensiList] = useState([]);
@@ -32,9 +92,11 @@ export default function AbsensiPage() {
   const [limit, setLimit] = useState(10);
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
 
-  // Modal Manual Create
+  // Modal Manual Create / Edit
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
+    id: null,
     karyawan_id: '',
     tanggal: new Date().toISOString().split('T')[0],
     status_kehadiran: 'Hadir',
@@ -48,6 +110,10 @@ export default function AbsensiPage() {
     catatan: 'Hadir jam kerja reguler',
   });
   const [formLoading, setFormLoading] = useState(false);
+
+  // Confirm Delete Dialog
+  const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, id: null, name: '', date: '' });
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Modal Fingerprint Import
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -94,34 +160,106 @@ export default function AbsensiPage() {
   }, [page, limit, search]);
 
   const handleOpenCreate = () => {
-    setFormData({
+    setIsEditing(false);
+    const init = {
+      id: null,
       karyawan_id: karyawanList.length ? karyawanList[0].id : '',
       tanggal: new Date().toISOString().split('T')[0],
       status_kehadiran: 'Hadir',
-      jam_masuk: '08:00',
+      jam_masuk: '07:00',
       jam_istirahat_keluar: '12:00',
       jam_istirahat_masuk: '13:00',
       jam_pulang: '16:00',
-      jam_lembur_selesai: '19:30',
-      jam_lembur: 3.5,
+      jam_lembur_selesai: '',
+      jam_lembur: 0,
       total_jam_kerja: 8.0,
-      catatan: 'Lembur cetak & finishing karton flexo',
-    });
+      catatan: 'Hadir jam kerja reguler',
+    };
+    const calc = calculateWorkAndOvertime(init.jam_masuk, init.jam_pulang, init.jam_istirahat_keluar, init.jam_istirahat_masuk, init.jam_lembur_selesai);
+    init.total_jam_kerja = calc.jamPokok;
+    init.jam_lembur = calc.jamLembur;
+    setFormData(init);
     setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (item) => {
+    setIsEditing(true);
+    const editData = {
+      id: item.id,
+      karyawan_id: item.karyawan_id || (karyawanList.length ? karyawanList[0].id : ''),
+      tanggal: item.tanggal ? item.tanggal.slice(0, 10) : new Date().toISOString().split('T')[0],
+      status_kehadiran: item.status_kehadiran || 'Hadir',
+      jam_masuk: item.jam_masuk ? item.jam_masuk.slice(0, 5) : '07:00',
+      jam_istirahat_keluar: item.jam_istirahat_keluar ? item.jam_istirahat_keluar.slice(0, 5) : '12:00',
+      jam_istirahat_masuk: item.jam_istirahat_masuk ? item.jam_istirahat_masuk.slice(0, 5) : '13:00',
+      jam_pulang: item.jam_pulang ? item.jam_pulang.slice(0, 5) : '16:00',
+      jam_lembur_selesai: item.jam_lembur_selesai ? item.jam_lembur_selesai.slice(0, 5) : '',
+      jam_lembur: Number(item.jam_lembur) || 0,
+      total_jam_kerja: Number(item.total_jam_kerja) || 8.0,
+      catatan: item.catatan || '',
+    };
+    const calc = calculateWorkAndOvertime(
+      editData.jam_masuk,
+      editData.jam_pulang,
+      editData.jam_istirahat_keluar,
+      editData.jam_istirahat_masuk,
+      editData.jam_lembur_selesai
+    );
+    editData.total_jam_kerja = calc.jamPokok;
+    editData.jam_lembur = calc.jamLembur;
+    setFormData(editData);
+    setIsModalOpen(true);
+  };
+
+  const handleTimeChange = (field, value) => {
+    setFormData((prev) => {
+      const updated = { ...prev, [field]: value };
+      const calc = calculateWorkAndOvertime(
+        updated.jam_masuk,
+        updated.jam_pulang,
+        updated.jam_istirahat_keluar,
+        updated.jam_istirahat_masuk,
+        updated.jam_lembur_selesai
+      );
+      return {
+        ...updated,
+        total_jam_kerja: calc.jamPokok,
+        jam_lembur: calc.jamLembur,
+      };
+    });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       setFormLoading(true);
-      await request.post(API_ENDPOINTS.PAYROLL.ABSENSI, formData);
-      toast.success('Kehadiran & lembur karyawan berhasil dicatat');
+      if (isEditing) {
+        await request.put(API_ENDPOINTS.PAYROLL.ABSENSI_DETAIL(formData.id), formData);
+        toast.success('Data presensi & jam lembur berhasil diperbarui');
+      } else {
+        await request.post(API_ENDPOINTS.PAYROLL.ABSENSI, formData);
+        toast.success('Kehadiran & lembur karyawan berhasil dicatat');
+      }
       setIsModalOpen(false);
       fetchAbsensi();
     } catch (err) {
       toast.error(err.message || 'Gagal menyimpan absensi');
     } finally {
       setFormLoading(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    try {
+      setDeleteLoading(true);
+      await request.delete(API_ENDPOINTS.PAYROLL.ABSENSI_DETAIL(deleteDialog.id));
+      toast.success('Data absensi berhasil dihapus');
+      setDeleteDialog({ isOpen: false, id: null, name: '', date: '' });
+      fetchAbsensi();
+    } catch (err) {
+      toast.error(err.message || 'Gagal menghapus data absensi');
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -162,19 +300,16 @@ export default function AbsensiPage() {
           mapped.jam = obj.Jam || obj.Time || obj.Waktu;
         }
 
-        // Auto calculate overtime if checkout after 16:00 or has lembur_selesai
-        if (!mapped.jam_lembur && mapped.jam_lembur_selesai) {
-          const [lh, lm] = mapped.jam_lembur_selesai.split(':').map(Number);
-          const [ph, pm] = (mapped.jam_pulang || '16:00').split(':').map(Number);
-          if (lh && ph && lh > ph) {
-            mapped.jam_lembur = Math.round(((lh + (lm || 0) / 60) - (ph + (pm || 0) / 60)) * 10) / 10;
-          }
-        } else if (!mapped.jam_lembur && mapped.jam_pulang) {
-          const [h, m] = mapped.jam_pulang.split(':').map(Number);
-          if (h && h >= 17) {
-            mapped.jam_lembur = Math.round((h - 16 + (m >= 30 ? 0.5 : 0)) * 10) / 10;
-          }
-        }
+        // Kalkulasi otomatis jam pokok & jam lembur dengan aturan wajib 8 jam
+        const calc = calculateWorkAndOvertime(
+          mapped.jam_masuk,
+          mapped.jam_pulang,
+          mapped.jam_istirahat_keluar,
+          mapped.jam_istirahat_masuk,
+          mapped.jam_lembur_selesai
+        );
+        mapped.jam_lembur = calc.jamLembur;
+        mapped.total_jam_kerja = calc.jamPokok;
 
         result.push(mapped);
       }
@@ -315,9 +450,9 @@ export default function AbsensiPage() {
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-xs">
           <div className="p-2.5 bg-white border border-blue-100 rounded-xl">
-            <div className="text-[10px] text-slate-400 font-semibold uppercase">1. Jam Masuk</div>
-            <div className="text-sm font-bold text-emerald-700 font-mono">08:00</div>
-            <div className="text-[11px] text-slate-500">Mulai jam kerja pokok</div>
+            <div className="text-[10px] text-slate-400 font-semibold uppercase">1. Jam Masuk (Pagi)</div>
+            <div className="text-sm font-bold text-emerald-700 font-mono">06:00 / 07:00 / 08:00</div>
+            <div className="text-[11px] text-slate-500">Masuk jam 6 (lebih awal 1 jam) otomatis terakumulasi</div>
           </div>
           <div className="p-2.5 bg-white border border-blue-100 rounded-xl">
             <div className="text-[10px] text-slate-400 font-semibold uppercase">2. Keluar Istirahat</div>
@@ -327,17 +462,17 @@ export default function AbsensiPage() {
           <div className="p-2.5 bg-white border border-blue-100 rounded-xl">
             <div className="text-[10px] text-slate-400 font-semibold uppercase">3. Masuk Istirahat</div>
             <div className="text-sm font-bold text-blue-700 font-mono">13:00</div>
-            <div className="text-[11px] text-slate-500">Kembali kerja (1 jam break)</div>
+            <div className="text-[11px] text-slate-500">Kembali kerja (1 jam break dipotong otomatis)</div>
           </div>
           <div className="p-2.5 bg-white border border-blue-100 rounded-xl">
-            <div className="text-[10px] text-slate-400 font-semibold uppercase">4. Pulang Pokok</div>
-            <div className="text-sm font-bold text-slate-800 font-mono">16:00</div>
-            <div className="text-[11px] text-slate-500">Selesai 8 jam kerja</div>
+            <div className="text-[10px] text-slate-400 font-semibold uppercase">4. Target 8 Jam Pokok</div>
+            <div className="text-sm font-bold text-slate-800 font-mono">Wajib 8 Jam Pokok</div>
+            <div className="text-[11px] text-slate-500">Jika kerja cuman 6 jam, lembur = 0 (belum 8 jam)</div>
           </div>
           <div className="p-2.5 bg-amber-50/80 border border-amber-200 rounded-xl">
-            <div className="text-[10px] text-amber-800 font-semibold uppercase">5. Pulang Lembur</div>
-            <div className="text-sm font-bold text-amber-800 font-mono">19:30 / 20:00</div>
-            <div className="text-[11px] text-amber-900 font-semibold">Otomatis dihitung Jam OT</div>
+            <div className="text-[10px] text-amber-800 font-semibold uppercase">5. Kelebihan Lembur</div>
+            <div className="text-sm font-bold text-amber-800 font-mono">+ Jam Lembur (OT)</div>
+            <div className="text-[11px] text-amber-900 font-semibold">Sisa waktu bersih di atas 8 jam kerja</div>
           </div>
         </div>
       </div>
@@ -399,6 +534,7 @@ export default function AbsensiPage() {
                   <th className="px-4 py-3.5 text-center">Jam Lembur (OT)</th>
                   <th className="px-4 py-3.5">Metode</th>
                   <th className="px-4 py-3.5">Keterangan / Aktivitas</th>
+                  <th className="px-4 py-3.5 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -463,6 +599,24 @@ export default function AbsensiPage() {
                     </td>
                     <td className="px-4 py-3.5 text-xs text-slate-500 max-w-xs truncate">
                       {a.catatan}
+                    </td>
+                    <td className="px-4 py-3.5 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => handleOpenEdit(a)}
+                          className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+                          title="Edit Catatan Absensi"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteDialog({ isOpen: true, id: a.id, name: a.nama_lengkap, date: a.tanggal })}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          title="Hapus Catatan Absensi"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -657,7 +811,7 @@ export default function AbsensiPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Catat Presensi & Lembur Karyawan (Manual)"
+        title={isEditing ? 'Ubah Data Presensi & Lembur Karyawan' : 'Catat Presensi & Lembur Karyawan (Manual)'}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -708,11 +862,60 @@ export default function AbsensiPage() {
             </div>
           </div>
 
+          {/* Quick Presets for Easy Testing */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] text-slate-500 font-semibold mr-1">Contoh Cepat:</span>
+            <button
+              type="button"
+              onClick={() => {
+                handleTimeChange('jam_masuk', '07:00');
+                handleTimeChange('jam_pulang', '16:00');
+                handleTimeChange('jam_lembur_selesai', '');
+              }}
+              className="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded-lg font-medium"
+            >
+              Normal 07:00 - 16:00 (8 Jam)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                handleTimeChange('jam_masuk', '06:00');
+                handleTimeChange('jam_pulang', '16:00');
+                handleTimeChange('jam_lembur_selesai', '');
+              }}
+              className="text-[11px] bg-blue-50 hover:bg-blue-100 text-brand-700 px-2 py-0.5 rounded-lg font-medium"
+            >
+              Masuk Jam 6 Pagi (Lembur Pagi 1 Jam)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                handleTimeChange('jam_masuk', '09:00');
+                handleTimeChange('jam_pulang', '16:00');
+                handleTimeChange('jam_lembur_selesai', '');
+              }}
+              className="text-[11px] bg-amber-50 hover:bg-amber-100 text-amber-800 px-2 py-0.5 rounded-lg font-medium"
+            >
+              Kerja 6 Jam (0 Jam Lembur)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                handleTimeChange('jam_masuk', '07:00');
+                handleTimeChange('jam_pulang', '16:00');
+                handleTimeChange('jam_lembur_selesai', '19:30');
+              }}
+              className="text-[11px] bg-emerald-50 hover:bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-lg font-medium"
+            >
+              Lembur s/d 19:30 (3.5 Jam OT)
+            </button>
+          </div>
+
           {/* Multi-scan Timeline Form */}
           <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
             <div className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center justify-between">
-              <span>Rincian Jam Kerja Pokok & Istirahat (8 Jam Efektif)</span>
-              <span className="text-[11px] text-emerald-700 font-semibold font-mono">1 Hari Kerja Normal</span>
+              <span>Rincian Jam Kerja Pokok & Istirahat</span>
+              <span className="text-[11px] text-emerald-700 font-semibold font-mono">Wajib Penuhi 8 Jam Pokok Dulu</span>
             </div>
             
             <div className="grid grid-cols-2 gap-3">
@@ -723,9 +926,10 @@ export default function AbsensiPage() {
                 <input
                   type="time"
                   value={formData.jam_masuk}
-                  onChange={(e) => setFormData({ ...formData, jam_masuk: e.target.value })}
-                  className="w-full px-3 py-1.5 border border-slate-300 rounded-xl text-sm bg-white font-mono"
+                  onChange={(e) => handleTimeChange('jam_masuk', e.target.value)}
+                  className="w-full px-3 py-1.5 border border-slate-300 rounded-xl text-sm bg-white font-mono font-bold text-slate-800"
                 />
+                <span className="text-[10px] text-slate-400">Jika masuk jam 06:00 (lebih awal), otomatis dihitung lembur</span>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -734,20 +938,10 @@ export default function AbsensiPage() {
                 <input
                   type="time"
                   value={formData.jam_pulang}
-                  onChange={(e) => {
-                    const newPulang = e.target.value;
-                    let ot = formData.jam_lembur;
-                    if (formData.jam_lembur_selesai) {
-                      const [lh, lm] = formData.jam_lembur_selesai.split(':').map(Number);
-                      const [ph, pm] = newPulang.split(':').map(Number);
-                      if (lh && ph && lh > ph) {
-                        ot = Math.round(((lh + (lm || 0) / 60) - (ph + (pm || 0) / 60)) * 10) / 10;
-                      }
-                    }
-                    setFormData({ ...formData, jam_pulang: newPulang, jam_lembur: ot });
-                  }}
-                  className="w-full px-3 py-1.5 border border-slate-300 rounded-xl text-sm bg-white font-mono"
+                  onChange={(e) => handleTimeChange('jam_pulang', e.target.value)}
+                  className="w-full px-3 py-1.5 border border-slate-300 rounded-xl text-sm bg-white font-mono font-bold text-slate-800"
                 />
+                <span className="text-[10px] text-slate-400">Shift normal pulang jam 16:00 atau 17:00</span>
               </div>
             </div>
 
@@ -759,7 +953,7 @@ export default function AbsensiPage() {
                 <input
                   type="time"
                   value={formData.jam_istirahat_keluar}
-                  onChange={(e) => setFormData({ ...formData, jam_istirahat_keluar: e.target.value })}
+                  onChange={(e) => handleTimeChange('jam_istirahat_keluar', e.target.value)}
                   className="w-full px-3 py-1.5 border border-slate-300 rounded-xl text-xs bg-white font-mono"
                 />
               </div>
@@ -770,7 +964,7 @@ export default function AbsensiPage() {
                 <input
                   type="time"
                   value={formData.jam_istirahat_masuk}
-                  onChange={(e) => setFormData({ ...formData, jam_istirahat_masuk: e.target.value })}
+                  onChange={(e) => handleTimeChange('jam_istirahat_masuk', e.target.value)}
                   className="w-full px-3 py-1.5 border border-slate-300 rounded-xl text-xs bg-white font-mono"
                 />
               </div>
@@ -782,33 +976,22 @@ export default function AbsensiPage() {
             <div className="text-xs font-bold text-amber-900 uppercase tracking-wider flex items-center justify-between">
               <span>Lembur Kerja (Overtime)</span>
               <span className="text-[10px] text-amber-700 bg-amber-100 px-2 py-0.5 rounded font-semibold">
-                Kalkulasi Otomatis
+                Kalkulasi Otomatis Berdasarkan Waktu Bersih
               </span>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-amber-950 mb-1">
-                  Jam Selesai Lembur
+                  Jam Selesai Lembur (Malam)
                 </label>
                 <input
                   type="time"
                   value={formData.jam_lembur_selesai}
-                  onChange={(e) => {
-                    const newSelesai = e.target.value;
-                    let ot = formData.jam_lembur;
-                    if (newSelesai) {
-                      const [lh, lm] = newSelesai.split(':').map(Number);
-                      const [ph, pm] = (formData.jam_pulang || '16:00').split(':').map(Number);
-                      if (lh && ph && lh > ph) {
-                        ot = Math.round(((lh + (lm || 0) / 60) - (ph + (pm || 0) / 60)) * 10) / 10;
-                      }
-                    }
-                    setFormData({ ...formData, jam_lembur_selesai: newSelesai, jam_lembur: ot });
-                  }}
-                  className="w-full px-3 py-1.5 border border-amber-300 rounded-xl text-sm bg-white font-mono"
+                  onChange={(e) => handleTimeChange('jam_lembur_selesai', e.target.value)}
+                  className="w-full px-3 py-1.5 border border-amber-300 rounded-xl text-sm bg-white font-mono font-bold text-amber-900"
                 />
-                <span className="text-[10px] text-amber-700 italic">Contoh: 19:30 atau 20:00</span>
+                <span className="text-[10px] text-amber-700 italic">Isi jika lembur sore/malam (contoh: 19:30 atau 20:00)</span>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-amber-950 mb-1">
@@ -822,10 +1005,80 @@ export default function AbsensiPage() {
                   onChange={(e) => setFormData({ ...formData, jam_lembur: Number(e.target.value) })}
                   className="w-full px-3 py-1.5 border border-amber-300 rounded-xl text-sm bg-white font-bold text-amber-700"
                 />
-                <span className="text-[10px] text-amber-700">Dihitung otomatis atau edit manual</span>
+                <span className="text-[10px] text-amber-700">Dihitung otomatis atau dapat diedit</span>
               </div>
             </div>
           </div>
+
+          {/* Kartu Live Kalkulasi Otomatis */}
+          {(() => {
+            const liveCalc = calculateWorkAndOvertime(
+              formData.jam_masuk,
+              formData.jam_pulang,
+              formData.jam_istirahat_keluar,
+              formData.jam_istirahat_masuk,
+              formData.jam_lembur_selesai
+            );
+
+            return (
+              <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-2.5">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="w-4 h-4 text-brand-600" />
+                    Kalkulasi Jam Kerja & Status Lembur Otomatis:
+                  </span>
+                  <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                    liveCalc.jamBersih < 8.0 
+                      ? 'bg-amber-100 text-amber-800' 
+                      : liveCalc.jamLembur > 0 
+                        ? 'bg-blue-100 text-brand-800' 
+                        : 'bg-emerald-100 text-emerald-800'
+                  }`}>
+                    {liveCalc.jamBersih < 8.0 
+                      ? `Kerja Bersih ${liveCalc.jamBersih} Jam (Belum 8 Jam Pokok)` 
+                      : liveCalc.jamLembur > 0 
+                        ? `8 Jam Pokok + ${liveCalc.jamLembur} Jam OT` 
+                        : 'Pas 8 Jam Pokok Normal'}
+                  </span>
+                </div>
+                
+                <div className="grid grid-cols-4 gap-2 text-center text-[11px]">
+                  <div className="p-2 bg-slate-50 border border-slate-100 rounded-lg">
+                    <div className="text-slate-400">Total di Pabrik</div>
+                    <div className="font-bold text-slate-800 text-xs mt-0.5">{liveCalc.jamKotor} Jam</div>
+                  </div>
+                  <div className="p-2 bg-slate-50 border border-slate-100 rounded-lg">
+                    <div className="text-slate-400">Istirahat</div>
+                    <div className="font-bold text-slate-600 text-xs mt-0.5">-{liveCalc.jamIstirahat} Jam</div>
+                  </div>
+                  <div className="p-2 bg-emerald-50 border border-emerald-100 rounded-lg">
+                    <div className="text-emerald-700">Jam Pokok</div>
+                    <div className="font-bold text-emerald-800 text-xs mt-0.5">{liveCalc.jamPokok} Jam</div>
+                  </div>
+                  <div className="p-2 bg-amber-50 border border-amber-100 rounded-lg">
+                    <div className="text-amber-700">Jam Lembur</div>
+                    <div className="font-bold text-amber-800 text-xs mt-0.5">{liveCalc.jamLembur} Jam OT</div>
+                  </div>
+                </div>
+
+                <div className="text-[11px] leading-relaxed p-2 rounded-lg bg-slate-50 border border-slate-100">
+                  {liveCalc.jamBersih < 8.0 ? (
+                    <div className="text-amber-800 font-medium">
+                      ⚠️ <strong>Belum Memenuhi 8 Jam Pokok:</strong> Total jam kerja bersih baru <strong>{liveCalc.jamBersih} Jam</strong>. Sesuai ketentuan, lembur tidak akan dihitung sebelum 8 jam kerja pokok terpenuhi (Lembur = 0 Jam).
+                    </div>
+                  ) : liveCalc.jamLembur > 0 ? (
+                    <div className="text-brand-900 font-medium">
+                      🎉 <strong>Lembur Terhitung Otomatis:</strong> Karyawan telah memenuhi <strong>8 Jam Kerja Pokok</strong>. Kelebihan <strong>+{liveCalc.jamLembur} Jam</strong> (baik karena masuk lebih pagi di jam {formData.jam_masuk} maupun lembur sore/malam) otomatis dihitung sebagai Jam Lembur!
+                    </div>
+                  ) : (
+                    <div className="text-emerald-800 font-medium">
+                      ✓ <strong>Tepat 8 Jam Kerja Pokok Normal:</strong> Jam kerja bersih pas 8 jam. Tidak ada lembur.
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
@@ -853,11 +1106,21 @@ export default function AbsensiPage() {
               disabled={formLoading}
               className="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-semibold disabled:opacity-50"
             >
-              {formLoading ? 'Menyimpan...' : 'Simpan Presensi'}
+              {formLoading ? 'Menyimpan...' : isEditing ? 'Simpan Perubahan' : 'Simpan Presensi'}
             </button>
           </div>
         </form>
       </Modal>
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        isOpen={deleteDialog.isOpen}
+        onClose={() => setDeleteDialog({ isOpen: false, id: null, name: '', date: '' })}
+        onConfirm={confirmDelete}
+        isLoading={deleteLoading}
+        title="Hapus Catatan Absensi"
+        message={`Apakah Anda yakin ingin menghapus data absensi tanggal ${deleteDialog.date} untuk karyawan "${deleteDialog.name}"?`}
+      />
     </div>
   );
 }
