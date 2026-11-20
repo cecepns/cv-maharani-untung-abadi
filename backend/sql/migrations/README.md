@@ -9,6 +9,8 @@ Folder ini berisi berkas SQL Migration bertahap untuk memperbarui skema database
 | File | Tanggal | Deskripsi |
 | :--- | :---: | :--- |
 | [`20261120_001_create_tipe_bahan_sheet.sql`](./20261120_001_create_tipe_bahan_sheet.sql) | 20 Nov 2026 | - Membuat tabel master `tipe_bahan_sheet`<br>- Menambahkan default tipe (`B/F`, `C/F`, `E/F`, `B/C`, `Duplex`, `Ivory`, `Kraft`)<br>- Memperluas kolom `flute` pada `bahan_baku_sheet` menjadi `VARCHAR(50)` |
+| [`20261120_002_add_index_pricing_to_sheet.sql`](./20261120_002_add_index_pricing_to_sheet.sql) | 20 Nov 2026 | - Menambahkan kolom `nilai_index` dan `metode_index` pada tabel `bahan_baku_sheet` untuk mencatat formula kalkulasi harga sheet supplier |
+| [`20261120_003_add_multiscan_absensi.sql`](./20261120_003_add_multiscan_absensi.sql) | 20 Nov 2026 | - Menambahkan kolom multi-scan pada tabel `absensi` (`jam_istirahat_keluar`, `jam_istirahat_masuk`, `jam_lembur_selesai`, `total_jam_kerja`) untuk mengakomodasi alur absen masuk, istirahat, pulang, dan lembur |
 
 ---
 

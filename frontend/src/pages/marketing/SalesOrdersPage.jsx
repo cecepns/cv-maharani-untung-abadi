@@ -88,10 +88,13 @@ export default function SalesOrdersPage() {
   }, [page, limit, search, statusFilter]);
 
   const handleOpenCreate = () => {
+    const cust = customers.length ? customers[0] : null;
+    const isPkp = cust && cust.npwp && cust.npwp.trim() !== '';
     setFormData({
-      customer_id: customers.length ? customers[0].id : '',
+      customer_id: cust ? cust.id : '',
       sales_id: salesPersons.length ? salesPersons[0].id : '',
       tanggal_so: new Date().toISOString().split('T')[0],
+      tipe_pajak: isPkp ? 'PPN 11%' : 'Non-PPN',
       catatan: '',
       items: [
         {
@@ -103,6 +106,16 @@ export default function SalesOrdersPage() {
       ]
     });
     setIsModalOpen(true);
+  };
+
+  const handleCustomerChange = (custId) => {
+    const cust = customers.find(c => c.id === parseInt(custId, 10));
+    const isPkp = cust && cust.npwp && cust.npwp.trim() !== '';
+    setFormData(prev => ({
+      ...prev,
+      customer_id: custId,
+      tipe_pajak: isPkp ? 'PPN 11%' : prev.tipe_pajak
+    }));
   };
 
   const handleProductSelect = (index, prodId) => {
@@ -287,8 +300,13 @@ export default function SalesOrdersPage() {
                       <div className="font-bold text-emerald-700 text-sm">
                         Rp {Number(so.total_nilai).toLocaleString('id-ID')}
                       </div>
-                      <div className="text-[11px] text-slate-400">
-                        Subtotal: Rp {Number(so.subtotal).toLocaleString('id-ID')}
+                      <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
+                        <span>Subtotal: Rp {Number(so.subtotal).toLocaleString('id-ID')}</span>
+                        {Number(so.ppn) > 0 ? (
+                          <span className="px-1.5 py-0.2 bg-blue-50 text-blue-700 font-semibold rounded text-[10px]">PPN 11%</span>
+                        ) : (
+                          <span className="px-1.5 py-0.2 bg-slate-100 text-slate-600 font-semibold rounded text-[10px]">Non-PPN</span>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -361,13 +379,13 @@ export default function SalesOrdersPage() {
               <select
                 required
                 value={formData.customer_id}
-                onChange={(e) => setFormData({ ...formData, customer_id: e.target.value })}
+                onChange={(e) => handleCustomerChange(e.target.value)}
                 className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
               >
                 <option value="">-- Pilih Customer --</option>
                 {customers.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.nama_customer} ({c.kode_customer})
+                    {c.nama_customer} ({c.kode_customer}) {c.npwp ? '• PKP' : '• Non-PKP'}
                   </option>
                 ))}
               </select>
@@ -388,7 +406,7 @@ export default function SalesOrdersPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Tanggal Pesanan</label>
               <input
@@ -399,12 +417,23 @@ export default function SalesOrdersPage() {
               />
             </div>
             <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Jenis Pajak Transaksi</label>
+              <select
+                value={formData.tipe_pajak || 'Non-PPN'}
+                onChange={(e) => setFormData({ ...formData, tipe_pajak: e.target.value })}
+                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl font-medium"
+              >
+                <option value="Non-PPN">Non-PPN (0% - Non-PKP / UMKM)</option>
+                <option value="PPN 11%">PPN 11% (Customer PKP / Faktur Pajak)</option>
+              </select>
+            </div>
+            <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Catatan Tambahan</label>
               <input
                 type="text"
                 value={formData.catatan}
                 onChange={(e) => setFormData({ ...formData, catatan: e.target.value })}
-                placeholder="Pengiriman bertahap, packing strapping, dll"
+                placeholder="Pengiriman bertahap, packing, dll"
                 className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
               />
             </div>
@@ -485,6 +514,32 @@ export default function SalesOrdersPage() {
               ))}
             </div>
           </div>
+
+          {/* Ringkasan Subtotal & PPN Live */}
+          {(() => {
+            const currentSubtotal = formData.items.reduce((sum, it) => sum + (Number(it.qty || 0) * Number(it.harga_satuan || 0)), 0);
+            const isPpn = formData.tipe_pajak === 'PPN 11%';
+            const currentPpn = isPpn ? Math.round(currentSubtotal * 0.11) : 0;
+            const currentTotal = currentSubtotal + currentPpn;
+            return (
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs">
+                <div className="flex justify-between text-slate-600">
+                  <span>Subtotal Barang ({formData.items.length} item):</span>
+                  <span className="font-semibold">Rp {currentSubtotal.toLocaleString('id-ID')}</span>
+                </div>
+                <div className="flex justify-between text-slate-600">
+                  <span>PPN ({isPpn ? '11% - Transaksi PKP' : '0% - Non-PKP'}):</span>
+                  <span className={`font-semibold ${isPpn ? 'text-blue-700' : 'text-slate-500'}`}>
+                    {isPpn ? `Rp ${currentPpn.toLocaleString('id-ID')}` : 'Rp 0 (Bebas PPN)'}
+                  </span>
+                </div>
+                <div className="flex justify-between text-slate-900 font-bold text-sm pt-1.5 border-t border-slate-200">
+                  <span>Total Tagihan Sales Order:</span>
+                  <span className="text-emerald-700">Rp {currentTotal.toLocaleString('id-ID')}</span>
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
             <button

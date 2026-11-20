@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, BadgePercent, CheckCircle2, FileText, Search } from 'lucide-react';
+import { Plus, BadgePercent, CheckCircle2, FileText, Search, Info } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { request } from '../../utils/request';
 import { API_ENDPOINTS } from '../../utils/endpoints';
@@ -30,7 +30,11 @@ export default function FakturPajakPage() {
   const fetchInvoices = async () => {
     try {
       const res = await request.get(API_ENDPOINTS.MARKETING.INVOICES, { limit: 100 });
-      if (res.success) setInvoices(res.data);
+      if (res.success) {
+        // Hanya transaksi ber-PPN (Customer PKP) yang memerlukan Faktur Pajak
+        const ppnInvoices = res.data.filter(inv => Number(inv.ppn) > 0);
+        setInvoices(ppnInvoices);
+      }
     } catch (err) {
       console.error(err);
     }
@@ -116,6 +120,22 @@ export default function FakturPajakPage() {
           <Plus className="w-4 h-4" />
           Terbitkan Faktur Pajak
         </button>
+      </div>
+
+      {/* Info Banner Pajak */}
+      <div className="bg-blue-50/70 border border-blue-200/70 p-4 rounded-2xl flex items-start gap-3.5 text-xs text-slate-600">
+        <div className="p-2 bg-blue-500/10 text-blue-700 rounded-xl mt-0.5">
+          <Info className="w-5 h-5" />
+        </div>
+        <div className="space-y-1">
+          <div className="font-bold text-slate-800 text-sm flex items-center gap-2">
+            <span>Ketentuan Penerbitan Faktur Pajak (PPN 11%)</span>
+            <span className="px-2 py-0.5 text-[10px] font-semibold bg-blue-100 text-blue-800 rounded-full">Aturan Perpajakan</span>
+          </div>
+          <p className="leading-relaxed">
+            Semua customer <strong>belum tentu menggunakan pajak</strong>. Faktur Pajak <strong>HANYA</strong> diterbitkan untuk transaksi customer PKP yang dikenakan PPN 11%. Untuk pesanan customer Non-PKP / UMKM / retail (Non-PPN), Faktur Pajak <strong>TIDAK PERLU DIISI/DITERBITKAN</strong>; transaksi tersebut cukup menggunakan Surat Jalan dan Nota Penjualan biasa.
+          </p>
+        </div>
       </div>
 
       {/* Filter & Search Bar */}

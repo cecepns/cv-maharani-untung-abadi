@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Layers, AlertCircle, Sliders, Info, CheckCircle2, RotateCcw } from 'lucide-react';
+import { Plus, Edit2, Trash2, Layers, AlertCircle, Sliders, Info, CheckCircle2, RotateCcw, Calculator, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { request } from '../../utils/request';
 import { API_ENDPOINTS } from '../../utils/endpoints';
@@ -45,6 +45,18 @@ export default function BahanSheetPage() {
   const [deleteTipeDialog, setDeleteTipeDialog] = useState({ isOpen: false, id: null, kode: '' });
   const [deleteTipeLoading, setDeleteTipeLoading] = useState(false);
 
+  // GSM Helper per flute / solid paperboard
+  const getGsmFromFlute = (flute) => {
+    if (flute === 'B/F') return 420;
+    if (flute === 'C/F') return 435;
+    if (flute === 'E/F') return 410;
+    if (flute === 'B/C') return 680;
+    if (flute === 'Duplex') return 310;
+    if (flute === 'Ivory') return 300;
+    if (flute === 'Kraft') return 275;
+    return 420;
+  };
+
   // Modal Sheet State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -59,9 +71,30 @@ export default function BahanSheetPage() {
     lebar_mm: 1200,
     stok_lembar: 3000,
     harga_per_lembar: 3100,
+    nilai_index: '',
+    metode_index: 'm2',
     min_stok: 500,
   });
   const [formLoading, setFormLoading] = useState(false);
+
+  // Slot Kalkulator Index di Modal Sheet
+  const [showIndexSlot, setShowIndexSlot] = useState(false);
+  const [slotMetode, setSlotMetode] = useState('m2'); // 'm2' | 'kg'
+  const [slotNilaiIndex, setSlotNilaiIndex] = useState('');
+  const [slotGsm, setSlotGsm] = useState(420);
+
+  // Standalone Simulator & Kalkulator Index Sheet Modal
+  const [isCalcModalOpen, setIsCalcModalOpen] = useState(false);
+  const [calcForm, setCalcForm] = useState({
+    panjang_mm: 1000,
+    lebar_mm: 1200,
+    qty_lembar: 1000,
+    flute: 'B/F',
+    substansi: 'K125/M125/K125',
+    gsm: 420,
+    metode: 'm2', // 'm2' | 'kg'
+    nilai_index: 2800,
+  });
 
   // Confirm Delete Sheet
   const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, id: null, name: '' });
@@ -117,19 +150,26 @@ export default function BahanSheetPage() {
 
   const handleOpenCreate = () => {
     setIsEditing(false);
+    const initialFlute = tipeList.length ? tipeList[0].kode : 'B/F';
     setFormData({
       id: null,
       kode_sheet: '',
       nama_sheet: '',
       supplier_id: suppliers.length ? suppliers[0].id : '',
-      flute: tipeList.length ? tipeList[0].kode : 'B/F',
+      flute: initialFlute,
       substansi: 'K125/M125/K125',
       panjang_mm: 1000,
       lebar_mm: 1200,
       stok_lembar: 3000,
       harga_per_lembar: 3100,
+      nilai_index: '',
+      metode_index: 'm2',
       min_stok: 500,
     });
+    setSlotMetode('m2');
+    setSlotNilaiIndex('');
+    setSlotGsm(getGsmFromFlute(initialFlute));
+    setShowIndexSlot(false);
     setIsModalOpen(true);
   };
 
@@ -155,8 +195,14 @@ export default function BahanSheetPage() {
       lebar_mm: item.lebar_mm || 1200,
       stok_lembar: item.stok_lembar || 0,
       harga_per_lembar: item.harga_per_lembar || 0,
+      nilai_index: item.nilai_index || '',
+      metode_index: item.metode_index || 'm2',
       min_stok: item.min_stok || 500,
     });
+    setSlotMetode(item.metode_index || 'm2');
+    setSlotNilaiIndex(item.nilai_index ? String(item.nilai_index) : '');
+    setSlotGsm(getGsmFromFlute(item.flute || 'B/F'));
+    setShowIndexSlot(Boolean(item.nilai_index));
     setIsModalOpen(true);
   };
 
@@ -282,6 +328,14 @@ export default function BahanSheetPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
           <button
+            onClick={() => setIsCalcModalOpen(true)}
+            className="inline-flex items-center gap-2 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-sm font-semibold shadow-sm transition-all"
+            title="Kalkulator & Simulator Index Supplier (Rp/m² atau Rp/kg)"
+          >
+            <Calculator className="w-4 h-4 text-emerald-600" />
+            Kalkulator Index Sheet
+          </button>
+          <button
             onClick={() => {
               handleResetTipeForm();
               setIsTipeModalOpen(true);
@@ -394,7 +448,12 @@ export default function BahanSheetPage() {
                         {s.supplier_nama || 'PT. Fajar Surya Wisesa'}
                       </td>
                       <td className="px-6 py-4 font-bold text-slate-900">
-                        Rp {Number(s.harga_per_lembar).toLocaleString('id-ID')}
+                        <div>Rp {Number(s.harga_per_lembar).toLocaleString('id-ID')}</div>
+                        {s.nilai_index ? (
+                          <div className="text-[10px] text-emerald-700 font-semibold font-mono mt-0.5">
+                            Idx: Rp {Number(s.nilai_index).toLocaleString('id-ID')}/{s.metode_index === 'kg' ? 'kg' : 'm²'}
+                          </div>
+                        ) : null}
                       </td>
                       <td className="px-6 py-4">
                         <span className={`font-bold ${isLow ? 'text-rose-600' : 'text-emerald-700'}`}>
@@ -557,6 +616,123 @@ export default function BahanSheetPage() {
                 ))}
               </select>
             </div>
+          </div>
+
+          {/* Slot Hitung Otomatis dari Index Supplier */}
+          <div className="bg-gradient-to-r from-emerald-50/90 to-teal-50/60 p-3.5 rounded-2xl border border-emerald-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-emerald-600 text-white rounded-lg">
+                  <Calculator className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                    Slot Hitung Otomatis dari Index Supplier
+                    <span className="text-[10px] px-1.5 py-0.5 bg-emerald-200 text-emerald-900 rounded font-semibold">Fitur Cerdas</span>
+                  </div>
+                  <div className="text-[11px] text-emerald-700">Hitung harga lembar berdasarkan index Rp/m² atau Rp/kg supplier</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowIndexSlot(!showIndexSlot)}
+                className="text-xs font-semibold text-emerald-800 bg-white hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-300 transition-colors"
+              >
+                {showIndexSlot ? 'Tutup Slot' : 'Buka Slot Index'}
+              </button>
+            </div>
+
+            {showIndexSlot && (
+              <div className="mt-3 pt-3 border-t border-emerald-200/70 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-emerald-950 mb-1">Metode Index</label>
+                    <select
+                      value={slotMetode}
+                      onChange={(e) => setSlotMetode(e.target.value)}
+                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-emerald-300 rounded-xl focus:ring-1 focus:ring-emerald-500"
+                    >
+                      <option value="m2">Index Luas (Rp / m²)</option>
+                      <option value="kg">Index Berat Tonase (Rp / kg)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-emerald-950 mb-1">
+                      Nilai Index ({slotMetode === 'kg' ? 'Rp/kg' : 'Rp/m²'})
+                    </label>
+                    <input
+                      type="number"
+                      placeholder={slotMetode === 'kg' ? 'Contoh: 12000' : 'Contoh: 2800'}
+                      value={slotNilaiIndex}
+                      onChange={(e) => setSlotNilaiIndex(e.target.value)}
+                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-emerald-300 rounded-xl"
+                    />
+                  </div>
+                  {slotMetode === 'kg' && (
+                    <div>
+                      <label className="block text-[11px] font-semibold text-emerald-950 mb-1">Estimasi GSM (gr/m²)</label>
+                      <input
+                        type="number"
+                        value={slotGsm}
+                        onChange={(e) => setSlotGsm(Number(e.target.value) || 0)}
+                        className="w-full px-2.5 py-1.5 text-xs bg-white border border-emerald-300 rounded-xl"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Hasil Kalkulasi Slot */}
+                {(() => {
+                  const p_m = Number(formData.panjang_mm || 0) / 1000;
+                  const l_m = Number(formData.lebar_mm || 0) / 1000;
+                  const luas_m2 = p_m * l_m;
+                  const valIndex = Number(slotNilaiIndex || 0);
+                  let calculatedPrice = 0;
+                  let berat_kg = 0;
+
+                  if (slotMetode === 'm2') {
+                    calculatedPrice = Math.round(luas_m2 * valIndex);
+                  } else {
+                    berat_kg = luas_m2 * (Number(slotGsm || 0) / 1000);
+                    calculatedPrice = Math.round(berat_kg * valIndex);
+                  }
+
+                  return (
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/90 p-2.5 rounded-xl border border-emerald-200">
+                      <div className="text-xs text-slate-700 space-y-0.5">
+                        <div>
+                          Luas: <span className="font-semibold">{luas_m2.toFixed(4)} m²</span> / lembar
+                          {slotMetode === 'kg' && (
+                            <span className="ml-2">
+                              • Berat: <span className="font-semibold">{(berat_kg * 1000).toFixed(0)} gr</span> ({berat_kg.toFixed(3)} kg)
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-emerald-950 font-bold">
+                          Hasil Hitung: <span className="text-sm text-emerald-700">Rp {calculatedPrice.toLocaleString('id-ID')}</span> / lembar
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={calculatedPrice <= 0}
+                        onClick={() => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            harga_per_lembar: calculatedPrice,
+                            nilai_index: valIndex,
+                            metode_index: slotMetode,
+                          }));
+                          toast.success(`Harga Rp ${calculatedPrice.toLocaleString('id-ID')} berhasil diterapkan ke form`);
+                        }}
+                        className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 rounded-lg shadow-sm whitespace-nowrap"
+                      >
+                        Terapkan ke Harga Beli
+                      </button>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -751,6 +927,229 @@ export default function BahanSheetPage() {
               Selesai & Tutup
             </button>
           </div>
+        </div>
+      </Modal>
+
+      {/* Modal Kalkulator & Simulator Index Sheet Supplier */}
+      <Modal
+        isOpen={isCalcModalOpen}
+        onClose={() => setIsCalcModalOpen(false)}
+        title="Kalkulator & Simulator Index Sheet Supplier"
+        size="lg"
+      >
+        <div className="space-y-5">
+          <div className="bg-emerald-50/70 p-3.5 rounded-2xl border border-emerald-200 text-xs text-emerald-950 flex items-start gap-3">
+            <div className="p-2 bg-emerald-600 text-white rounded-xl mt-0.5">
+              <Calculator className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="font-bold text-sm text-emerald-900 mb-0.5">Rumus Index Harga Supplier Corrugated</div>
+              <p className="text-emerald-800 leading-relaxed">
+                Pabrik karton lembaran (supplier sheet) biasanya memberikan penawaran harga menggunakan sistem index:
+                <strong> Index Luas (Rp / m²)</strong> atau <strong>Index Berat Tonase (Rp / kg)</strong> dikalikan gramatur kertas (GSM). Simulator ini membantu Anda menghitung harga per lembar dan total anggaran pembelian secara instan.
+              </p>
+            </div>
+          </div>
+
+          {/* Form Input Kalkulator */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Panjang Sheet (mm)</label>
+              <input
+                type="number"
+                value={calcForm.panjang_mm}
+                onChange={(e) => setCalcForm({ ...calcForm, panjang_mm: Number(e.target.value) || 0 })}
+                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Lebar Sheet (mm)</label>
+              <input
+                type="number"
+                value={calcForm.lebar_mm}
+                onChange={(e) => setCalcForm({ ...calcForm, lebar_mm: Number(e.target.value) || 0 })}
+                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Rencana Beli (Qty Lembar)</label>
+              <input
+                type="number"
+                value={calcForm.qty_lembar}
+                onChange={(e) => setCalcForm({ ...calcForm, qty_lembar: Number(e.target.value) || 0 })}
+                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Tipe Bahan / Flute</label>
+              <select
+                value={calcForm.flute}
+                onChange={(e) => {
+                  const newFlute = e.target.value;
+                  const newGsm = getGsmFromFlute(newFlute);
+                  setCalcForm({ ...calcForm, flute: newFlute, gsm: newGsm });
+                }}
+                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
+              >
+                {(tipeList.length > 0 ? tipeList : DEFAULT_TIPE).map((t) => (
+                  <option key={t.id || t.kode} value={t.kode}>
+                    {t.kode} - {t.nama_tipe}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Metode Index Supplier</label>
+              <select
+                value={calcForm.metode}
+                onChange={(e) => setCalcForm({ ...calcForm, metode: e.target.value })}
+                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl font-semibold text-slate-800"
+              >
+                <option value="m2">Index Luas (Rp / m²)</option>
+                <option value="kg">Index Berat Tonase (Rp / kg)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Nilai Index ({calcForm.metode === 'kg' ? 'Rp/kg' : 'Rp/m²'})
+              </label>
+              <input
+                type="number"
+                value={calcForm.nilai_index}
+                onChange={(e) => setCalcForm({ ...calcForm, nilai_index: Number(e.target.value) || 0 })}
+                placeholder={calcForm.metode === 'kg' ? 'Contoh: 12000' : 'Contoh: 2800'}
+                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl font-semibold text-emerald-800"
+              />
+            </div>
+          </div>
+
+          {calcForm.metode === 'kg' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Substansi Kertas</label>
+                <input
+                  type="text"
+                  value={calcForm.substansi}
+                  onChange={(e) => setCalcForm({ ...calcForm, substansi: e.target.value })}
+                  placeholder="K125/M125/K125"
+                  className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Total Gramatur / GSM Gabungan (gr/m²)
+                </label>
+                <input
+                  type="number"
+                  value={calcForm.gsm}
+                  onChange={(e) => setCalcForm({ ...calcForm, gsm: Number(e.target.value) || 0 })}
+                  className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg"
+                />
+                <span className="text-[10px] text-slate-400">
+                  Estimasi otomatis: B/F (~420g), C/F (~435g), E/F (~410g), B/C (~680g), Duplex (~310g)
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Hasil Kalkulasi Detail */}
+          {(() => {
+            const p_m = (calcForm.panjang_mm || 0) / 1000;
+            const l_m = (calcForm.lebar_mm || 0) / 1000;
+            const luas_1_lbr = p_m * l_m;
+            const total_luas = luas_1_lbr * (calcForm.qty_lembar || 0);
+            const berat_1_lbr = luas_1_lbr * ((calcForm.gsm || 0) / 1000);
+            const total_tonase = berat_1_lbr * (calcForm.qty_lembar || 0);
+
+            let harga_per_lbr = 0;
+            if (calcForm.metode === 'm2') {
+              harga_per_lbr = Math.round(luas_1_lbr * (calcForm.nilai_index || 0));
+            } else {
+              harga_per_lbr = Math.round(berat_1_lbr * (calcForm.nilai_index || 0));
+            }
+
+            const total_biaya = Math.round(harga_per_lbr * (calcForm.qty_lembar || 0));
+
+            return (
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Hasil Simulasi Kalkulasi</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                    <div className="text-[11px] text-slate-500">Luas / Lembar</div>
+                    <div className="text-base font-bold text-slate-900">{luas_1_lbr.toFixed(4)} m²</div>
+                    <div className="text-[10px] text-slate-400">Total: {total_luas.toFixed(1)} m²</div>
+                  </div>
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                    <div className="text-[11px] text-slate-500">Berat / Lembar</div>
+                    <div className="text-base font-bold text-slate-900">{(berat_1_lbr * 1000).toFixed(0)} gram</div>
+                    <div className="text-[10px] text-slate-400">Total: {total_tonase.toFixed(1)} kg tonase</div>
+                  </div>
+                  <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl">
+                    <div className="text-[11px] text-emerald-800 font-medium">Harga Beli / Lembar</div>
+                    <div className="text-lg font-extrabold text-emerald-700">
+                      Rp {harga_per_lbr.toLocaleString('id-ID')}
+                    </div>
+                    <div className="text-[10px] text-emerald-600 font-mono">
+                      Via {calcForm.metode === 'kg' ? 'Index Kg' : 'Index m²'}
+                    </div>
+                  </div>
+                  <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl">
+                    <div className="text-[11px] text-amber-800 font-medium">Total Anggaran Pembelian</div>
+                    <div className="text-lg font-extrabold text-amber-700">
+                      Rp {total_biaya.toLocaleString('id-ID')}
+                    </div>
+                    <div className="text-[10px] text-amber-600">{Number(calcForm.qty_lembar).toLocaleString('id-ID')} Lembar</div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-200">
+                  <span className="text-xs text-slate-500">
+                    Gunakan hasil hitungan ini langsung untuk pendaftaran sheet baru.
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsCalcModalOpen(false)}
+                      className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
+                    >
+                      Tutup
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleOpenCreate();
+                        setFormData((prev) => ({
+                          ...prev,
+                          panjang_mm: calcForm.panjang_mm,
+                          lebar_mm: calcForm.lebar_mm,
+                          flute: calcForm.flute,
+                          substansi: calcForm.substansi,
+                          stok_lembar: calcForm.qty_lembar,
+                          harga_per_lembar: harga_per_lbr,
+                          nilai_index: calcForm.nilai_index,
+                          metode_index: calcForm.metode,
+                          nama_sheet: `Karton Sheet ${calcForm.flute} ${calcForm.panjang_mm}x${calcForm.lebar_mm}`,
+                        }));
+                        setSlotMetode(calcForm.metode);
+                        setSlotNilaiIndex(String(calcForm.nilai_index));
+                        setSlotGsm(calcForm.gsm);
+                        setShowIndexSlot(true);
+                        setIsCalcModalOpen(false);
+                        toast.success('Hasil kalkulator disalin ke form Tambah Sheet');
+                      }}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-sm"
+                    >
+                      <span>Salin ke Form Tambah Sheet</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </Modal>
 

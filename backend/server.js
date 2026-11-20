@@ -82,7 +82,27 @@ async function initTipeBahanSheetTable() {
     // Ensure flute column length in bahan_baku_sheet is at least VARCHAR(50)
     try {
       await db.query(`ALTER TABLE bahan_baku_sheet MODIFY flute VARCHAR(50) DEFAULT 'B/F'`);
+    } catch (_) {
+      try {
+        await db.query(`ALTER TABLE bahan_baku_sheet CHANGE COLUMN tipe_flute flute VARCHAR(50) DEFAULT 'B/F'`);
+      } catch (_) {
+        try {
+          await db.query(`ALTER TABLE bahan_baku_sheet ADD COLUMN flute VARCHAR(50) DEFAULT 'B/F'`);
+        } catch (_) {}
+      }
+    }
+    try {
+      await db.query(`ALTER TABLE bahan_baku_sheet ADD COLUMN nilai_index DECIMAL(10,2) DEFAULT NULL`);
     } catch (_) { }
+    try {
+      await db.query(`ALTER TABLE bahan_baku_sheet ADD COLUMN metode_index VARCHAR(30) DEFAULT NULL`);
+    } catch (_) { }
+
+    // Multi-scan attendance columns
+    try { await db.query(`ALTER TABLE absensi ADD COLUMN jam_istirahat_keluar TIME DEFAULT NULL`); } catch (_) { }
+    try { await db.query(`ALTER TABLE absensi ADD COLUMN jam_istirahat_masuk TIME DEFAULT NULL`); } catch (_) { }
+    try { await db.query(`ALTER TABLE absensi ADD COLUMN jam_lembur_selesai TIME DEFAULT NULL`); } catch (_) { }
+    try { await db.query(`ALTER TABLE absensi ADD COLUMN total_jam_kerja DECIMAL(4,1) DEFAULT 8.0`); } catch (_) { }
 
     const [rows] = await db.query('SELECT COUNT(*) as cnt FROM tipe_bahan_sheet');
     if (rows[0].cnt === 0) {
@@ -672,7 +692,10 @@ app.post('/api/marketing/sales-orders', async (req, res) => {
     }
 
     const subtotal = items.reduce((sum, it) => sum + (Number(it.qty) * Number(it.harga_satuan)), 0);
-    const ppn = Math.round(subtotal * 0.11);
+    const isPpn = req.body.is_ppn !== undefined 
+      ? Boolean(req.body.is_ppn) 
+      : (req.body.kenakan_ppn !== false && req.body.tipe_pajak !== 'Non-PPN');
+    const ppn = isPpn ? (req.body.ppn !== undefined ? Number(req.body.ppn) : Math.round(subtotal * 0.11)) : 0;
     const total_nilai = subtotal + ppn;
     const nomor_so = `SO-${Date.now().toString().slice(-6)}`;
 
@@ -898,7 +921,11 @@ app.get('/api/marketing/invoices', async (req, res) => {
 
 app.post('/api/marketing/invoices', async (req, res) => {
   try {
-    const { so_id, customer_id, tanggal_invoice, jatuh_tempo, subtotal, ppn, total_tagihan } = req.body;
+    let { so_id, customer_id, tanggal_invoice, jatuh_tempo, subtotal, ppn, total_tagihan } = req.body;
+    if (!customer_id && so_id) {
+      const [soRows] = await db.query('SELECT customer_id FROM sales_orders WHERE id = ?', [so_id]);
+      if (soRows.length > 0) customer_id = soRows[0].customer_id;
+    }
     if (!customer_id || !total_tagihan) {
       return res.status(400).json({ success: false, message: 'Customer dan nilai tagihan invoice wajib diisi' });
     }
@@ -1234,15 +1261,37 @@ app.get('/api/purchasing/bahan-sheet', async (req, res) => {
 
 app.post('/api/purchasing/bahan-sheet', async (req, res) => {
   try {
-    const { kode_sheet, nama_sheet, supplier_id, flute, tipe_flute, substansi, panjang_mm, lebar_mm, stok_lembar, harga_per_lembar, min_stok } = req.body;
+    const { kode_sheet, nama_sheet, supplier_id, flute, tipe_flute, substansi, panjang_mm, lebar_mm, stok_lembar, harga_per_lembar, min_stok, nilai_index, metode_index } = req.body;
     const kode = kode_sheet || `SHT-${Date.now().toString().slice(-4)}`;
     const fluteVal = flute || tipe_flute || 'B/F';
     const suppId = supplier_id ? parseInt(supplier_id, 10) : null;
-    const [result] = await db.query(
-      `INSERT INTO bahan_baku_sheet (kode_sheet, nama_sheet, supplier_id, flute, substansi, panjang_mm, lebar_mm, stok_lembar, harga_per_lembar, min_stok)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [kode, nama_sheet, suppId, fluteVal, substansi || 'K125/M125/K125', panjang_mm || 0, lebar_mm || 0, stok_lembar || 0, harga_per_lembar || 0, min_stok || 500]
-    );
+    const nIndex = nilai_index ? parseFloat(nilai_index) : null;
+    const mIndex = metode_index || null;
+
+    try {
+      await db.query(
+        `INSERT INTO bahan_baku_sheet (kode_sheet, nama_sheet, supplier_id, flute, substansi, panjang_mm, lebar_mm, stok_lembar, harga_per_lembar, min_stok, nilai_index, metode_index)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [kode, nama_sheet, suppId, fluteVal, substansi || 'K125/M125/K125', panjang_mm || 0, lebar_mm || 0, stok_lembar || 0, harga_per_lembar || 0, min_stok || 500, nIndex, mIndex]
+      );
+    } catch (insertErr) {
+      if (insertErr.message.includes('nilai_index') || insertErr.message.includes('metode_index')) {
+        await db.query(
+          `INSERT INTO bahan_baku_sheet (kode_sheet, nama_sheet, supplier_id, flute, substansi, panjang_mm, lebar_mm, stok_lembar, harga_per_lembar, min_stok)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [kode, nama_sheet, suppId, fluteVal, substansi || 'K125/M125/K125', panjang_mm || 0, lebar_mm || 0, stok_lembar || 0, harga_per_lembar || 0, min_stok || 500]
+        );
+      } else if (insertErr.message.includes('tipe_flute') || insertErr.message.includes('flute')) {
+        // Fallback in case table has column tipe_flute
+        await db.query(
+          `INSERT INTO bahan_baku_sheet (kode_sheet, nama_sheet, supplier_id, tipe_flute, substansi, panjang_mm, lebar_mm, stok_lembar, harga_per_lembar, min_stok)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [kode, nama_sheet, suppId, fluteVal, substansi || 'K125/M125/K125', panjang_mm || 0, lebar_mm || 0, stok_lembar || 0, harga_per_lembar || 0, min_stok || 500]
+        );
+      } else {
+        throw insertErr;
+      }
+    }
     res.json({ success: true, message: 'Bahan baku sheet berhasil ditambahkan' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
@@ -1251,9 +1300,11 @@ app.post('/api/purchasing/bahan-sheet', async (req, res) => {
 
 app.put('/api/purchasing/bahan-sheet/:id', async (req, res) => {
   try {
-    const { nama_sheet, supplier_id, flute, tipe_flute, substansi, panjang_mm, lebar_mm, stok_lembar, harga_per_lembar, min_stok } = req.body;
+    const { nama_sheet, supplier_id, flute, tipe_flute, substansi, panjang_mm, lebar_mm, stok_lembar, harga_per_lembar, min_stok, nilai_index, metode_index } = req.body;
     const fluteVal = flute !== undefined ? flute : tipe_flute;
     const suppId = supplier_id !== undefined ? (supplier_id ? parseInt(supplier_id, 10) : null) : undefined;
+    const nIndex = nilai_index !== undefined ? (nilai_index ? parseFloat(nilai_index) : null) : undefined;
+    const mIndex = metode_index !== undefined ? metode_index : undefined;
     const [result] = await db.query(
       `UPDATE bahan_baku_sheet SET 
          nama_sheet = COALESCE(?, nama_sheet), 
@@ -1264,9 +1315,11 @@ app.put('/api/purchasing/bahan-sheet/:id', async (req, res) => {
          lebar_mm = COALESCE(?, lebar_mm), 
          stok_lembar = COALESCE(?, stok_lembar), 
          harga_per_lembar = COALESCE(?, harga_per_lembar), 
-         min_stok = COALESCE(?, min_stok) 
+         min_stok = COALESCE(?, min_stok),
+         nilai_index = COALESCE(?, nilai_index),
+         metode_index = COALESCE(?, metode_index)
        WHERE id = ?`,
-      [nama_sheet, suppId, fluteVal, substansi, panjang_mm, lebar_mm, stok_lembar, harga_per_lembar, min_stok, req.params.id]
+      [nama_sheet, suppId, fluteVal, substansi, panjang_mm, lebar_mm, stok_lembar, harga_per_lembar, min_stok, nIndex, mIndex, req.params.id]
     );
     if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Bahan sheet tidak ditemukan' });
     res.json({ success: true, message: 'Bahan sheet berhasil diperbarui' });
@@ -2624,17 +2677,53 @@ app.get('/api/payroll/absensi', async (req, res) => {
 
 app.post('/api/payroll/absensi', async (req, res) => {
   try {
-    const { karyawan_id, tanggal, status_kehadiran, jam_masuk, jam_pulang, jam_lembur, catatan } = req.body;
+    const { 
+      karyawan_id, tanggal, status_kehadiran, 
+      jam_masuk, jam_istirahat_keluar, jam_istirahat_masuk, jam_pulang, 
+      jam_lembur_selesai, jam_lembur, total_jam_kerja, catatan 
+    } = req.body;
     const [emp] = await db.query('SELECT nik FROM karyawan WHERE id = ?', [karyawan_id]);
     const nik = emp.length > 0 ? emp[0].nik : 'EMP-001';
 
-    await db.query(
-      `INSERT INTO absensi (karyawan_id, nik, tanggal, status_kehadiran, jam_masuk, jam_pulang, jam_lembur, metode, catatan)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'Manual HR', ?)`,
-      [karyawan_id, nik, tanggal || new Date().toISOString().split('T')[0], status_kehadiran || 'Hadir', jam_masuk || '08:00', jam_pulang || '17:00', Number(jam_lembur) || 0, catatan || 'Presensi Manual HR']
-    );
+    let otHours = Number(jam_lembur) || 0;
+    if (otHours === 0 && jam_lembur_selesai) {
+      const [lh, lm] = jam_lembur_selesai.split(':').map(Number);
+      const [ph, pm] = (jam_pulang || '16:00').split(':').map(Number);
+      if (lh && ph && lh > ph) {
+        otHours = Math.max(0, (lh + (lm || 0) / 60) - (ph + (pm || 0) / 60));
+        otHours = Math.round(otHours * 10) / 10;
+      }
+    }
 
-    res.json({ success: true, message: 'Presensi berhasil dicatat di database' });
+    try {
+      await db.query(
+        `INSERT INTO absensi (karyawan_id, nik, tanggal, status_kehadiran, jam_masuk, jam_istirahat_keluar, jam_istirahat_masuk, jam_pulang, jam_lembur_selesai, jam_lembur, total_jam_kerja, metode, catatan)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Manual HR', ?)`,
+        [
+          karyawan_id, 
+          nik, 
+          tanggal || new Date().toISOString().split('T')[0], 
+          status_kehadiran || 'Hadir', 
+          jam_masuk || '08:00', 
+          jam_istirahat_keluar || null,
+          jam_istirahat_masuk || null,
+          jam_pulang || '16:00', 
+          jam_lembur_selesai || null,
+          otHours, 
+          Number(total_jam_kerja) || 8.0,
+          catatan || 'Presensi Manual HR'
+        ]
+      );
+    } catch (insertErr) {
+      // Fallback in case columns do not exist yet in legacy DB
+      await db.query(
+        `INSERT INTO absensi (karyawan_id, nik, tanggal, status_kehadiran, jam_masuk, jam_pulang, jam_lembur, metode, catatan)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'Manual HR', ?)`,
+        [karyawan_id, nik, tanggal || new Date().toISOString().split('T')[0], status_kehadiran || 'Hadir', jam_masuk || '08:00', jam_pulang || '16:00', otHours, catatan || 'Presensi Manual HR']
+      );
+    }
+
+    res.json({ success: true, message: 'Presensi & rincian jam kerja multi-scan berhasil dicatat di database' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
   }
@@ -2642,10 +2731,10 @@ app.post('/api/payroll/absensi', async (req, res) => {
 
 app.get('/api/payroll/absensi/template-fingerprint', (req, res) => {
   const csvContent = [
-    'PIN_NIK,Nama_Karyawan,Tanggal,Jam_Masuk,Jam_Pulang,Catatan',
-    'EMP-001,Mulyadi Pratama,2026-11-20,07:55,17:15,Mesin Fingerprint Pintu Masuk',
-    'EMP-002,Agus Salim,2026-11-20,07:45,19:30,Lembur Cetak Flexo 2 Jam',
-    'EMP-003,Ujang Koswara,2026-11-20,07:50,19:30,Lembur Finishing Pond 2 Jam'
+    'PIN_NIK,Nama_Karyawan,Tanggal,Jam_Masuk,Istirahat_Keluar,Istirahat_Masuk,Jam_Pulang,Lembur_Selesai,Jam_Lembur,Catatan',
+    'EMP-001,Mulyadi Pratama,2026-11-20,08:00,12:00,13:00,16:00,19:30,3.5,Multi-Scan 5x Tap (Masuk-Istirahat-Pulang-Lembur)',
+    'EMP-002,Agus Salim,2026-11-20,07:55,12:00,13:00,16:00,,0,Jam Pokok Normal Tanpa Lembur',
+    'EMP-003,Ujang Koswara,2026-11-20,07:50,12:00,13:00,16:00,20:00,4.0,Lembur Cetak & Finishing Box 4 Jam'
   ].join('\n');
 
   res.setHeader('Content-Type', 'text/csv');
@@ -2661,8 +2750,8 @@ app.get('/api/payroll/absensi/export', async (req, res) => {
       LEFT JOIN karyawan k ON a.karyawan_id = k.id 
       ORDER BY a.tanggal DESC
     `);
-    const headers = ['ID,NIK,Nama_Karyawan,Tanggal,Jam_Masuk,Jam_Pulang,Jam_Lembur,Status_Kehadiran,Metode_Absensi,Catatan'];
-    const csvRows = rows.map(a => `${a.id},"${a.nik || ''}","${a.nama_lengkap || ''}","${a.tanggal}","${a.jam_masuk || ''}","${a.jam_pulang || ''}",${a.jam_lembur || 0},"${a.status_kehadiran}","${a.metode || 'Fingerprint'}","${a.catatan || ''}"`);
+    const headers = ['ID,NIK,Nama_Karyawan,Tanggal,Jam_Masuk,Istirahat_Keluar,Istirahat_Masuk,Jam_Pulang,Lembur_Selesai,Jam_Lembur,Total_Jam_Kerja,Status_Kehadiran,Metode_Absensi,Catatan'];
+    const csvRows = rows.map(a => `${a.id},"${a.nik || ''}","${a.nama_lengkap || ''}","${a.tanggal}","${a.jam_masuk || ''}","${a.jam_istirahat_keluar || ''}","${a.jam_istirahat_masuk || ''}","${a.jam_pulang || ''}","${a.jam_lembur_selesai || ''}",${a.jam_lembur || 0},${a.total_jam_kerja || 8},"${a.status_kehadiran}","${a.metode || 'Fingerprint'}","${a.catatan || ''}"`);
     const fullCsv = [headers, ...csvRows].join('\n');
 
     res.setHeader('Content-Type', 'text/csv');
@@ -2681,12 +2770,13 @@ app.post('/api/payroll/absensi/import-fingerprint', async (req, res) => {
     }
 
     const [allEmployees] = await db.query('SELECT id, nik, nama_lengkap FROM karyawan');
-    let imported = 0;
-    let updated = 0;
+
+    // Grouping by (nik, tanggal) to support multi-tap / raw punch log
+    const grouped = new Map();
 
     for (const row of records) {
-      const searchNik = (row.nik || row.PIN_NIK || '').toString().trim().toUpperCase();
-      const searchNama = (row.nama || row.Nama_Karyawan || '').toString().trim().toLowerCase();
+      const searchNik = (row.nik || row.PIN_NIK || row.PIN || row.NIK || '').toString().trim().toUpperCase();
+      const searchNama = (row.nama || row.Nama_Karyawan || row.Nama || '').toString().trim().toLowerCase();
 
       let emp = allEmployees.find(k => k.nik.toUpperCase() === searchNik);
       if (!emp && searchNama) {
@@ -2695,40 +2785,156 @@ app.post('/api/payroll/absensi/import-fingerprint', async (req, res) => {
 
       const empId = emp ? emp.id : 1;
       const empNik = emp ? emp.nik : (searchNik || 'EMP-FINGER');
-      const tgl = row.tanggal || row.Tanggal || new Date().toISOString().split('T')[0];
-      const masuk = row.jam_masuk || row.Jam_Masuk || '08:00';
-      const pulang = row.jam_pulang || row.Jam_Pulang || '17:00';
+      const tgl = row.tanggal || row.Tanggal || row.Date || new Date().toISOString().split('T')[0];
+      const key = `${empId}_${tgl}`;
 
-      let lembur = Number(row.jam_lembur || row.Jam_Lembur);
-      if (isNaN(lembur) || lembur === 0) {
-        const [ph, pm] = pulang.split(':').map(Number);
-        if (ph && ph >= 17) {
-          lembur = ph - 17 + (pm >= 30 ? 0.5 : 0);
-        } else {
-          lembur = 0;
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          empId,
+          empNik,
+          tgl,
+          rows: []
+        });
+      }
+      grouped.get(key).rows.push(row);
+    }
+
+    let imported = 0;
+    let updated = 0;
+
+    for (const [key, item] of grouped.entries()) {
+      const { empId, empNik, tgl, rows } = item;
+
+      let jamMasuk = '08:00';
+      let istKeluar = null;
+      let istMasuk = null;
+      let jamPulang = '16:00';
+      let lemburSelesai = null;
+      let jamLembur = 0;
+      let catatan = '';
+
+      if (rows.length === 1 && (rows[0].jam_masuk || rows[0].Jam_Masuk || rows[0].Istirahat_Keluar || rows[0].jam_pulang || rows[0].Jam_Pulang)) {
+        // Format terstruktur 1 baris
+        const r = rows[0];
+        jamMasuk = r.jam_masuk || r.Jam_Masuk || '08:00';
+        istKeluar = r.jam_istirahat_keluar || r.Istirahat_Keluar || null;
+        istMasuk = r.jam_istirahat_masuk || r.Istirahat_Masuk || null;
+        jamPulang = r.jam_pulang || r.Jam_Pulang || '16:00';
+        lemburSelesai = r.jam_lembur_selesai || r.Lembur_Selesai || null;
+        jamLembur = Number(r.jam_lembur || r.Jam_Lembur) || 0;
+        catatan = r.catatan || r.Catatan || 'Log Mesin Fingerprint (Multi-Scan)';
+
+        // Jika jam lembur belum dihitung tapi ada jam lembur selesai atau pulang > 16:00
+        if (jamLembur === 0 && lemburSelesai) {
+          const [lh, lm] = lemburSelesai.split(':').map(Number);
+          const [ph, pm] = jamPulang.split(':').map(Number);
+          if (lh && ph && lh > ph) {
+            jamLembur = Math.round(((lh + (lm || 0) / 60) - (ph + (pm || 0) / 60)) * 10) / 10;
+          }
+        } else if (jamLembur === 0 && jamPulang) {
+          const [ph, pm] = jamPulang.split(':').map(Number);
+          if (ph && ph >= 17) {
+            jamLembur = Math.round((ph - 16 + (pm || 0) / 60) * 10) / 10;
+          }
+        }
+      } else {
+        // Multi-punch / multiple tap dalam 1 hari untuk karyawan yang sama (misal tap jam 08:00, 12:00, 13:00, 16:00, 20:00)
+        const punchTimes = [];
+        for (const r of rows) {
+          const timeStr = r.jam || r.Jam || r.time || r.Time || r.jam_masuk || r.Jam_Masuk || r.jam_pulang || r.Jam_Pulang;
+          if (timeStr) {
+            punchTimes.push(timeStr.toString().trim().slice(0, 5));
+          }
+        }
+
+        // Urutkan waktu punch dari pagi ke malam
+        punchTimes.sort();
+
+        if (punchTimes.length > 0) {
+          // Tap paling pagi = Jam Masuk
+          jamMasuk = punchTimes[0];
+
+          for (let i = 1; i < punchTimes.length; i++) {
+            const time = punchTimes[i];
+            const [h, m] = time.split(':').map(Number);
+            const totalMinutes = h * 60 + (m || 0);
+
+            if (totalMinutes >= 11 * 60 + 30 && totalMinutes <= 12 * 60 + 30) {
+              istKeluar = time; // 11:30 - 12:30 -> Keluar Istirahat
+            } else if (totalMinutes > 12 * 60 + 30 && totalMinutes <= 13 * 60 + 30) {
+              istMasuk = time; // 12:31 - 13:30 -> Masuk Kembali Istirahat
+            } else if (totalMinutes >= 15 * 60 + 30 && totalMinutes <= 17 * 60 + 15) {
+              jamPulang = time; // 15:30 - 17:15 -> Jam Pulang Reguler
+            } else if (totalMinutes > 17 * 60 + 15) {
+              lemburSelesai = time; // > 17:15 -> Selesai Lembur
+            }
+          }
+
+          // Jika hanya 2 tap: tap 1 = masuk, tap 2 = pulang
+          if (punchTimes.length === 2) {
+            jamPulang = punchTimes[1];
+          }
+
+          if (lemburSelesai) {
+            const [lh, lm] = lemburSelesai.split(':').map(Number);
+            const [ph, pm] = (jamPulang || '16:00').split(':').map(Number);
+            if (lh && ph && lh > ph) {
+              jamLembur = Math.round(((lh + (lm || 0) / 60) - (ph + (pm || 0) / 60)) * 10) / 10;
+            }
+          }
+
+          catatan = `Multi-Scan Fingerprint (${punchTimes.length}x Tap: ${punchTimes.join(', ')})`;
         }
       }
 
+      // Hitung total jam kerja efektif (default 8 jam)
+      const totalKerja = 8.0;
+
       const [existing] = await db.query('SELECT id FROM absensi WHERE karyawan_id = ? AND tanggal = ?', [empId, tgl]);
       if (existing.length > 0) {
-        await db.query(
-          `UPDATE absensi SET jam_masuk = ?, jam_pulang = ?, jam_lembur = ?, metode = 'Mesin Fingerprint', catatan = ? WHERE id = ?`,
-          [masuk, pulang, lembur, row.catatan || 'Log Mesin Fingerprint (Updated)', existing[0].id]
-        );
+        try {
+          await db.query(
+            `UPDATE absensi SET 
+               jam_masuk = ?, 
+               jam_istirahat_keluar = ?, 
+               jam_istirahat_masuk = ?, 
+               jam_pulang = ?, 
+               jam_lembur_selesai = ?, 
+               jam_lembur = ?, 
+               total_jam_kerja = ?, 
+               metode = 'Mesin Fingerprint', 
+               catatan = ? 
+             WHERE id = ?`,
+            [jamMasuk, istKeluar, istMasuk, jamPulang, lemburSelesai, jamLembur, totalKerja, catatan || 'Log Mesin Fingerprint (Multi-Scan)', existing[0].id]
+          );
+        } catch (_) {
+          await db.query(
+            `UPDATE absensi SET jam_masuk = ?, jam_pulang = ?, jam_lembur = ?, metode = 'Mesin Fingerprint', catatan = ? WHERE id = ?`,
+            [jamMasuk, lemburSelesai || jamPulang, jamLembur, catatan, existing[0].id]
+          );
+        }
         updated++;
       } else {
-        await db.query(
-          `INSERT INTO absensi (karyawan_id, nik, tanggal, status_kehadiran, jam_masuk, jam_pulang, jam_lembur, metode, catatan)
-           VALUES (?, ?, ?, 'Hadir', ?, ?, ?, 'Mesin Fingerprint', ?)`,
-          [empId, empNik, tgl, masuk, pulang, lembur, row.catatan || 'Log Mesin Fingerprint']
-        );
+        try {
+          await db.query(
+            `INSERT INTO absensi (karyawan_id, nik, tanggal, status_kehadiran, jam_masuk, jam_istirahat_keluar, jam_istirahat_masuk, jam_pulang, jam_lembur_selesai, jam_lembur, total_jam_kerja, metode, catatan)
+             VALUES (?, ?, ?, 'Hadir', ?, ?, ?, ?, ?, ?, ?, 'Mesin Fingerprint', ?)`,
+            [empId, empNik, tgl, jamMasuk, istKeluar, istMasuk, jamPulang, lemburSelesai, jamLembur, totalKerja, catatan || 'Log Mesin Fingerprint (Multi-Scan)']
+          );
+        } catch (_) {
+          await db.query(
+            `INSERT INTO absensi (karyawan_id, nik, tanggal, status_kehadiran, jam_masuk, jam_pulang, jam_lembur, metode, catatan)
+             VALUES (?, ?, ?, 'Hadir', ?, ?, ?, 'Mesin Fingerprint', ?)`,
+            [empId, empNik, tgl, jamMasuk, lemburSelesai || jamPulang, jamLembur, catatan]
+          );
+        }
         imported++;
       }
     }
 
     res.json({
       success: true,
-      message: `Berhasil mengimpor log fingerprint: ${imported} data baru dimasukkan, ${updated} data diperbarui di database`
+      message: `Berhasil memproses absensi: ${imported} data baru dimasukkan, ${updated} data diperbarui di database`
     });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
@@ -2769,8 +2975,20 @@ app.post('/api/payroll/generate', async (req, res) => {
     let totalAllGaji = 0;
 
     for (const k of karyawanList) {
-      const hariKerja = 25;
-      const jamLembur = 10;
+      // Hitung real kehadiran dan akumulasi jam lembur dari data absensi bulan ini
+      const [attData] = await connection.query(`
+        SELECT 
+          COUNT(CASE WHEN status_kehadiran = 'Hadir' THEN 1 END) as total_hadir,
+          COALESCE(SUM(jam_lembur), 0) as total_lembur
+        FROM absensi 
+        WHERE karyawan_id = ? AND tanggal LIKE ?
+      `, [k.id, `${periode}%`]);
+
+      const realHadir = attData[0]?.total_hadir || 0;
+      const realLembur = Number(attData[0]?.total_lembur || 0);
+
+      const hariKerja = realHadir > 0 ? realHadir : 25;
+      const jamLembur = realHadir > 0 ? realLembur : 10;
       const upahLembur = jamLembur * Number(k.tarif_lembur_perjam || 25000);
       const uangMakan = hariKerja * Number(k.uang_makan_perhari || 25000);
       const bpjs = Math.round(Number(k.gaji_pokok) * 0.03);

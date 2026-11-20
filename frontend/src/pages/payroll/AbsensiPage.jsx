@@ -38,10 +38,14 @@ export default function AbsensiPage() {
     karyawan_id: '',
     tanggal: new Date().toISOString().split('T')[0],
     status_kehadiran: 'Hadir',
-    jam_masuk: '07:45',
-    jam_pulang: '17:00',
+    jam_masuk: '08:00',
+    jam_istirahat_keluar: '12:00',
+    jam_istirahat_masuk: '13:00',
+    jam_pulang: '16:00',
+    jam_lembur_selesai: '',
     jam_lembur: 0,
-    catatan: 'Tepat waktu',
+    total_jam_kerja: 8.0,
+    catatan: 'Hadir jam kerja reguler',
   });
   const [formLoading, setFormLoading] = useState(false);
 
@@ -94,10 +98,14 @@ export default function AbsensiPage() {
       karyawan_id: karyawanList.length ? karyawanList[0].id : '',
       tanggal: new Date().toISOString().split('T')[0],
       status_kehadiran: 'Hadir',
-      jam_masuk: '07:45',
-      jam_pulang: '19:30',
-      jam_lembur: 2,
-      catatan: 'Lembur setting mesin cetak flexo',
+      jam_masuk: '08:00',
+      jam_istirahat_keluar: '12:00',
+      jam_istirahat_masuk: '13:00',
+      jam_pulang: '16:00',
+      jam_lembur_selesai: '19:30',
+      jam_lembur: 3.5,
+      total_jam_kerja: 8.0,
+      catatan: 'Lembur cetak & finishing karton flexo',
     });
     setIsModalOpen(true);
   };
@@ -134,23 +142,37 @@ export default function AbsensiPage() {
           obj[header] = currentline[index] || '';
         });
 
-        // Mapping standard names
+        // Mapping standard names & multi-scan columns
         const mapped = {
           nik: obj.PIN_NIK || obj.nik || obj.PIN || obj.NIK || obj.Id || '',
           nama: obj.Nama_Karyawan || obj.nama || obj.Nama || obj.Name || '',
           tanggal: obj.Tanggal || obj.tanggal || obj.Date || new Date().toISOString().split('T')[0],
           jam_masuk: obj.Jam_Masuk || obj.jam_masuk || obj.In || obj.ClockIn || '08:00',
-          jam_pulang: obj.Jam_Pulang || obj.jam_pulang || obj.Out || obj.ClockOut || '17:00',
+          jam_istirahat_keluar: obj.Istirahat_Keluar || obj.jam_istirahat_keluar || obj.BreakOut || '',
+          jam_istirahat_masuk: obj.Istirahat_Masuk || obj.jam_istirahat_masuk || obj.BreakIn || '',
+          jam_pulang: obj.Jam_Pulang || obj.jam_pulang || obj.Out || obj.ClockOut || '16:00',
+          jam_lembur_selesai: obj.Lembur_Selesai || obj.jam_lembur_selesai || obj.OTOut || '',
           jam_lembur: Number(obj.Jam_Lembur || obj.jam_lembur || obj.Overtime || 0),
           status_kehadiran: obj.Status_Kehadiran || obj.status || 'Hadir',
           catatan: obj.Catatan || obj.catatan || 'Log Tarikan Fingerprint'
         };
 
-        // Auto calculate overtime if checkout after 17:00
-        if (!mapped.jam_lembur && mapped.jam_pulang) {
+        // Raw single punch support (e.g. log baris mesin: jam / time)
+        if (obj.Jam || obj.Time || obj.Waktu) {
+          mapped.jam = obj.Jam || obj.Time || obj.Waktu;
+        }
+
+        // Auto calculate overtime if checkout after 16:00 or has lembur_selesai
+        if (!mapped.jam_lembur && mapped.jam_lembur_selesai) {
+          const [lh, lm] = mapped.jam_lembur_selesai.split(':').map(Number);
+          const [ph, pm] = (mapped.jam_pulang || '16:00').split(':').map(Number);
+          if (lh && ph && lh > ph) {
+            mapped.jam_lembur = Math.round(((lh + (lm || 0) / 60) - (ph + (pm || 0) / 60)) * 10) / 10;
+          }
+        } else if (!mapped.jam_lembur && mapped.jam_pulang) {
           const [h, m] = mapped.jam_pulang.split(':').map(Number);
           if (h && h >= 17) {
-            mapped.jam_lembur = h - 17 + (m >= 30 ? 0.5 : 0);
+            mapped.jam_lembur = Math.round((h - 16 + (m >= 30 ? 0.5 : 0)) * 10) / 10;
           }
         }
 
@@ -278,6 +300,48 @@ export default function AbsensiPage() {
         </div>
       </div>
 
+      {/* Infografis Alur Absensi Multi-Scan Pabrik */}
+      <div className="bg-gradient-to-r from-blue-50/80 via-indigo-50/40 to-white p-4 rounded-2xl border border-blue-200/70 shadow-sm">
+        <div className="flex items-center gap-2 mb-2.5">
+          <span className="p-1.5 bg-brand-600 text-white rounded-lg">
+            <Clock className="w-4 h-4" />
+          </span>
+          <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+            Alur Presensi Multi-Scan Harian (5x Tap Fingerprint Otomatis)
+          </span>
+          <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-800 font-semibold rounded-full">
+            Auto-Detect Sistem
+          </span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-xs">
+          <div className="p-2.5 bg-white border border-blue-100 rounded-xl">
+            <div className="text-[10px] text-slate-400 font-semibold uppercase">1. Jam Masuk</div>
+            <div className="text-sm font-bold text-emerald-700 font-mono">08:00</div>
+            <div className="text-[11px] text-slate-500">Mulai jam kerja pokok</div>
+          </div>
+          <div className="p-2.5 bg-white border border-blue-100 rounded-xl">
+            <div className="text-[10px] text-slate-400 font-semibold uppercase">2. Keluar Istirahat</div>
+            <div className="text-sm font-bold text-amber-700 font-mono">12:00</div>
+            <div className="text-[11px] text-slate-500">Break makan siang</div>
+          </div>
+          <div className="p-2.5 bg-white border border-blue-100 rounded-xl">
+            <div className="text-[10px] text-slate-400 font-semibold uppercase">3. Masuk Istirahat</div>
+            <div className="text-sm font-bold text-blue-700 font-mono">13:00</div>
+            <div className="text-[11px] text-slate-500">Kembali kerja (1 jam break)</div>
+          </div>
+          <div className="p-2.5 bg-white border border-blue-100 rounded-xl">
+            <div className="text-[10px] text-slate-400 font-semibold uppercase">4. Pulang Pokok</div>
+            <div className="text-sm font-bold text-slate-800 font-mono">16:00</div>
+            <div className="text-[11px] text-slate-500">Selesai 8 jam kerja</div>
+          </div>
+          <div className="p-2.5 bg-amber-50/80 border border-amber-200 rounded-xl">
+            <div className="text-[10px] text-amber-800 font-semibold uppercase">5. Pulang Lembur</div>
+            <div className="text-sm font-bold text-amber-800 font-mono">19:30 / 20:00</div>
+            <div className="text-[11px] text-amber-900 font-semibold">Otomatis dihitung Jam OT</div>
+          </div>
+        </div>
+      </div>
+
       {/* Filter & Search Bar */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
         <SearchInput
@@ -327,60 +391,77 @@ export default function AbsensiPage() {
             <table className="w-full text-left text-sm text-slate-600">
               <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
                 <tr>
-                  <th className="px-5 py-3.5">Tanggal</th>
-                  <th className="px-5 py-3.5">Tenaga Kerja</th>
-                  <th className="px-5 py-3.5 text-center">Status</th>
-                  <th className="px-5 py-3.5">Jam Masuk - Pulang</th>
-                  <th className="px-5 py-3.5 text-center">Jam Lembur (OT)</th>
-                  <th className="px-5 py-3.5">Metode Presensi</th>
-                  <th className="px-5 py-3.5">Keterangan / Aktivitas</th>
+                  <th className="px-4 py-3.5">Tanggal</th>
+                  <th className="px-4 py-3.5">Tenaga Kerja</th>
+                  <th className="px-4 py-3.5 text-center">Status</th>
+                  <th className="px-4 py-3.5">Jam Pokok (In - Out)</th>
+                  <th className="px-4 py-3.5">Istirahat Siang</th>
+                  <th className="px-4 py-3.5 text-center">Jam Lembur (OT)</th>
+                  <th className="px-4 py-3.5">Metode</th>
+                  <th className="px-4 py-3.5">Keterangan / Aktivitas</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {absensiList.map((a) => (
                   <tr key={a.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="px-5 py-3.5 font-mono font-medium text-slate-700 text-xs">
+                    <td className="px-4 py-3.5 font-mono font-medium text-slate-700 text-xs">
                       {a.tanggal}
                     </td>
-                    <td className="px-5 py-3.5">
+                    <td className="px-4 py-3.5">
                       <div className="font-semibold text-slate-900">{a.nama_lengkap}</div>
                       <div className="text-xs text-slate-400 font-mono">{a.nik || '-'}</div>
                     </td>
-                    <td className="px-5 py-3.5 text-center">
+                    <td className="px-4 py-3.5 text-center">
                       <Badge variant={a.status_kehadiran === 'Hadir' ? 'success' : a.status_kehadiran === 'Izin' ? 'warning' : 'danger'}>
                         {a.status_kehadiran}
                       </Badge>
                     </td>
-                    <td className="px-5 py-3.5">
+                    <td className="px-4 py-3.5">
                       <div className="inline-flex items-center gap-1.5 font-mono text-xs text-slate-700 bg-slate-100 px-2.5 py-1 rounded-md">
-                        <Clock className="w-3.5 h-3.5 text-slate-400" />
-                        <span>{a.jam_masuk || '--:--'}</span>
+                        <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                        <span className="font-semibold">{a.jam_masuk ? a.jam_masuk.slice(0, 5) : '08:00'}</span>
                         <span className="text-slate-400">s/d</span>
-                        <span className="font-semibold text-slate-900">{a.jam_pulang || '--:--'}</span>
+                        <span className="font-semibold">{a.jam_pulang ? a.jam_pulang.slice(0, 5) : '16:00'}</span>
                       </div>
                     </td>
-                    <td className="px-5 py-3.5 text-center">
+                    <td className="px-4 py-3.5 text-xs">
+                      {a.jam_istirahat_keluar ? (
+                        <div className="font-mono text-slate-600 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded inline-block">
+                          {a.jam_istirahat_keluar.slice(0, 5)} - {a.jam_istirahat_masuk ? a.jam_istirahat_masuk.slice(0, 5) : '13:00'} (1 Jam)
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 font-mono">12:00 - 13:00</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3.5 text-center">
                       {Number(a.jam_lembur) > 0 ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
-                          +{a.jam_lembur} Jam OT
-                        </span>
+                        <div className="space-y-0.5">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
+                            +{a.jam_lembur} Jam OT
+                          </span>
+                          {a.jam_lembur_selesai && (
+                            <div className="text-[10px] text-amber-700 font-mono font-medium">
+                              s/d {a.jam_lembur_selesai.slice(0, 5)}
+                            </div>
+                          )}
+                        </div>
                       ) : (
                         <span className="text-slate-400 text-xs">-</span>
                       )}
                     </td>
-                    <td className="px-5 py-3.5">
+                    <td className="px-4 py-3.5">
                       {a.metode === 'Mesin Fingerprint' ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 text-brand-700 border border-blue-200">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-semibold bg-blue-50 text-brand-700 border border-blue-200">
                           <Fingerprint className="w-3.5 h-3.5 text-brand-600" />
-                          Mesin Fingerprint
+                          Fingerprint
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-600">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-600">
                           Manual HR
                         </span>
                       )}
                     </td>
-                    <td className="px-5 py-3.5 text-xs text-slate-500 max-w-xs truncate">
+                    <td className="px-4 py-3.5 text-xs text-slate-500 max-w-xs truncate">
                       {a.catatan}
                     </td>
                   </tr>
@@ -434,8 +515,11 @@ export default function AbsensiPage() {
               </button>
             </div>
             <p className="text-slate-600 leading-relaxed">
-              Anda dapat mengimpor file ekspor (*.csv, *.txt, *.xlsx) dari software bawaan mesin presensi (seperti <strong>ZKTeco BioTime</strong>, <strong>Fingerspot Personnel</strong>, <strong>Solution Attendance</strong>) atau langsung dari tarikan Flashdisk USB mesin.
+              Anda dapat mengimpor file ekspor (*.csv, *.txt) dari software bawaan mesin presensi (seperti <strong>ZKTeco BioTime</strong>, <strong>Fingerspot Personnel</strong>, <strong>Solution Attendance</strong>) atau langsung dari tarikan Flashdisk USB mesin.
             </p>
+            <div className="p-2 bg-white/90 border border-blue-200 rounded-lg text-[11px] text-blue-900 font-medium">
+              💡 <strong>Dukungan Multi-Tap Harian:</strong> Jika karyawan scan 4 s/d 5 kali sehari (Masuk jam 8, Istirahat jam 12, Masuk jam 1, Pulang jam 4, dan Lembur malam), sistem otomatis mengelompokkan jam kerja pokok, mengabaikan istirahat 1 jam, dan menghitung selisih lembur secara akurat!
+            </div>
           </div>
 
           {/* Mode Switcher */}
@@ -624,41 +708,122 @@ export default function AbsensiPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                Jam Masuk
-              </label>
-              <input
-                type="time"
-                value={formData.jam_masuk}
-                onChange={(e) => setFormData({ ...formData, jam_masuk: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
-              />
+          {/* Multi-scan Timeline Form */}
+          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+            <div className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center justify-between">
+              <span>Rincian Jam Kerja Pokok & Istirahat (8 Jam Efektif)</span>
+              <span className="text-[11px] text-emerald-700 font-semibold font-mono">1 Hari Kerja Normal</span>
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                Jam Pulang
-              </label>
-              <input
-                type="time"
-                value={formData.jam_pulang}
-                onChange={(e) => setFormData({ ...formData, jam_pulang: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
-              />
+            
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Jam Masuk (Pagi)
+                </label>
+                <input
+                  type="time"
+                  value={formData.jam_masuk}
+                  onChange={(e) => setFormData({ ...formData, jam_masuk: e.target.value })}
+                  className="w-full px-3 py-1.5 border border-slate-300 rounded-xl text-sm bg-white font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Jam Pulang Pokok
+                </label>
+                <input
+                  type="time"
+                  value={formData.jam_pulang}
+                  onChange={(e) => {
+                    const newPulang = e.target.value;
+                    let ot = formData.jam_lembur;
+                    if (formData.jam_lembur_selesai) {
+                      const [lh, lm] = formData.jam_lembur_selesai.split(':').map(Number);
+                      const [ph, pm] = newPulang.split(':').map(Number);
+                      if (lh && ph && lh > ph) {
+                        ot = Math.round(((lh + (lm || 0) / 60) - (ph + (pm || 0) / 60)) * 10) / 10;
+                      }
+                    }
+                    setFormData({ ...formData, jam_pulang: newPulang, jam_lembur: ot });
+                  }}
+                  className="w-full px-3 py-1.5 border border-slate-300 rounded-xl text-sm bg-white font-mono"
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                Jam Lembur (OT)
-              </label>
-              <input
-                type="number"
-                step="0.5"
-                min="0"
-                value={formData.jam_lembur}
-                onChange={(e) => setFormData({ ...formData, jam_lembur: Number(e.target.value) })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none font-bold text-amber-600"
-              />
+
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200/80">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  Keluar Istirahat (Break Out)
+                </label>
+                <input
+                  type="time"
+                  value={formData.jam_istirahat_keluar}
+                  onChange={(e) => setFormData({ ...formData, jam_istirahat_keluar: e.target.value })}
+                  className="w-full px-3 py-1.5 border border-slate-300 rounded-xl text-xs bg-white font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  Masuk Kembali Istirahat (Break In)
+                </label>
+                <input
+                  type="time"
+                  value={formData.jam_istirahat_masuk}
+                  onChange={(e) => setFormData({ ...formData, jam_istirahat_masuk: e.target.value })}
+                  className="w-full px-3 py-1.5 border border-slate-300 rounded-xl text-xs bg-white font-mono"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Lembur Section */}
+          <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-xl space-y-3">
+            <div className="text-xs font-bold text-amber-900 uppercase tracking-wider flex items-center justify-between">
+              <span>Lembur Kerja (Overtime)</span>
+              <span className="text-[10px] text-amber-700 bg-amber-100 px-2 py-0.5 rounded font-semibold">
+                Kalkulasi Otomatis
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-amber-950 mb-1">
+                  Jam Selesai Lembur
+                </label>
+                <input
+                  type="time"
+                  value={formData.jam_lembur_selesai}
+                  onChange={(e) => {
+                    const newSelesai = e.target.value;
+                    let ot = formData.jam_lembur;
+                    if (newSelesai) {
+                      const [lh, lm] = newSelesai.split(':').map(Number);
+                      const [ph, pm] = (formData.jam_pulang || '16:00').split(':').map(Number);
+                      if (lh && ph && lh > ph) {
+                        ot = Math.round(((lh + (lm || 0) / 60) - (ph + (pm || 0) / 60)) * 10) / 10;
+                      }
+                    }
+                    setFormData({ ...formData, jam_lembur_selesai: newSelesai, jam_lembur: ot });
+                  }}
+                  className="w-full px-3 py-1.5 border border-amber-300 rounded-xl text-sm bg-white font-mono"
+                />
+                <span className="text-[10px] text-amber-700 italic">Contoh: 19:30 atau 20:00</span>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-amber-950 mb-1">
+                  Total Jam Lembur (OT)
+                </label>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  value={formData.jam_lembur}
+                  onChange={(e) => setFormData({ ...formData, jam_lembur: Number(e.target.value) })}
+                  className="w-full px-3 py-1.5 border border-amber-300 rounded-xl text-sm bg-white font-bold text-amber-700"
+                />
+                <span className="text-[10px] text-amber-700">Dihitung otomatis atau edit manual</span>
+              </div>
             </div>
           </div>
 

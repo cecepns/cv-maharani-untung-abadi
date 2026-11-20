@@ -242,6 +242,8 @@ CREATE TABLE bahan_baku_sheet (
   stok_lembar INT DEFAULT 0,
   satuan VARCHAR(20) DEFAULT 'Lembar',
   harga_per_lembar DECIMAL(15,2) DEFAULT 0,
+  nilai_index DECIMAL(10,2) DEFAULT NULL,
+  metode_index VARCHAR(30) DEFAULT NULL,
   min_stok INT DEFAULT 500,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL
@@ -566,8 +568,12 @@ CREATE TABLE absensi (
   tanggal DATE NOT NULL,
   status_kehadiran ENUM('Hadir', 'Izin', 'Sakit', 'Alpha') DEFAULT 'Hadir',
   jam_masuk TIME DEFAULT '08:00:00',
-  jam_pulang TIME DEFAULT '17:00:00',
+  jam_istirahat_keluar TIME DEFAULT NULL,
+  jam_istirahat_masuk TIME DEFAULT NULL,
+  jam_pulang TIME DEFAULT '16:00:00',
+  jam_lembur_selesai TIME DEFAULT NULL,
   jam_lembur DECIMAL(4,1) DEFAULT 0,
+  total_jam_kerja DECIMAL(4,1) DEFAULT 8.0,
   metode ENUM('Mesin Fingerprint', 'Manual HR') DEFAULT 'Mesin Fingerprint',
   catatan VARCHAR(200),
   FOREIGN KEY (karyawan_id) REFERENCES karyawan(id) ON DELETE CASCADE
