@@ -208,8 +208,19 @@ export default function CustomersPage() {
                   <tr key={c.id} className="hover:bg-slate-50/60 transition-colors">
                     <td className="px-6 py-4">
                       <div className="font-bold text-slate-900">{c.nama_customer}</div>
-                      <div className="text-xs font-mono text-brand-600 mt-0.5">{c.kode_customer}</div>
-                      {c.npwp && <div className="text-[11px] text-slate-400 mt-0.5">NPWP: {c.npwp}</div>}
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="text-xs font-mono text-brand-600 font-semibold">{c.kode_customer}</span>
+                        {c.npwp && c.npwp.trim() !== '' && c.npwp !== '-' ? (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                            PKP (Wajib PPN)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                            Non-Pajak (Non-PKP)
+                          </span>
+                        )}
+                      </div>
+                      {c.npwp && c.npwp !== '-' && <div className="text-[11px] text-slate-400 mt-0.5">NPWP: {c.npwp}</div>}
                     </td>
                     <td className="px-6 py-4">
                       <div className="font-medium text-slate-800">{c.pic || '-'}</div>
@@ -361,14 +372,22 @@ export default function CustomersPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Nomor NPWP</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-slate-700">Nomor NPWP & Pajak</label>
+                <span className="text-[10px] text-slate-400">Kosongkan jika Non-Pajak</span>
+              </div>
               <input
                 type="text"
                 value={formData.npwp}
                 onChange={(e) => setFormData({ ...formData, npwp: e.target.value })}
-                placeholder="01.234.567.8-011.000"
+                placeholder="01.234.567.8-011.000 (Kosongkan jika Non-PKP)"
                 className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500"
               />
+              <p className="text-[11px] text-slate-500 mt-1">
+                {formData.npwp && formData.npwp.trim() !== '' && formData.npwp !== '-'
+                  ? '✓ Customer PKP: Default transaksi akan dikenakan PPN 11% & berhak terbit Faktur Pajak.'
+                  : 'ℹ️ Customer Non-Pajak: Transaksi otomatis Non-PPN (0%) dan TIDAK akan masuk ke Faktur Pajak.'}
+              </p>
             </div>
           </div>
 

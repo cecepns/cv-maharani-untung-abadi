@@ -216,8 +216,21 @@ export default function InvoicesPage() {
                     <td className="px-6 py-4 font-semibold text-slate-700">
                       {inv.jatuh_tempo}
                     </td>
-                    <td className="px-6 py-4 font-bold text-slate-900">
-                      Rp {Number(inv.total_tagihan).toLocaleString('id-ID')}
+                    <td className="px-6 py-4">
+                      <div className="font-bold text-slate-900">
+                        Rp {Number(inv.total_tagihan).toLocaleString('id-ID')}
+                      </div>
+                      <div className="text-[11px] mt-0.5">
+                        {Number(inv.ppn) > 0 ? (
+                          <span className="inline-flex items-center px-1.5 py-0.2 rounded font-semibold bg-blue-50 text-blue-700 text-[10px]">
+                            PPN 11%: Rp {Number(inv.ppn).toLocaleString('id-ID')}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-1.5 py-0.2 rounded font-semibold bg-slate-100 text-slate-600 text-[10px]">
+                            Non-PPN (0%)
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 font-bold text-rose-600">
                       Rp {Number(inv.sisa_tagihan).toLocaleString('id-ID')}
