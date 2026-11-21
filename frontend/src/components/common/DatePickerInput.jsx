@@ -2,6 +2,17 @@ import React, { forwardRef } from 'react';
 import DatePicker from 'react-datepicker';
 import { Calendar as CalendarIcon } from 'lucide-react';
 
+// Ensure high z-index portal container exists in DOM
+if (typeof document !== 'undefined') {
+  if (!document.getElementById('datepicker-portal')) {
+    const portalDiv = document.createElement('div');
+    portalDiv.id = 'datepicker-portal';
+    portalDiv.style.position = 'relative';
+    portalDiv.style.zIndex = '99999';
+    document.body.appendChild(portalDiv);
+  }
+}
+
 export default function DatePickerInput({
   value,
   onChange,
@@ -84,8 +95,19 @@ export default function DatePickerInput({
         dateFormat={dateFormat}
         customInput={<CustomInput />}
         popperPlacement="bottom-start"
-        portalId="print-portal"
+        portalId="datepicker-portal"
         showPopperArrow={false}
+        popperProps={{
+          strategy: 'fixed',
+        }}
+        popperModifiers={[
+          {
+            name: 'preventOverflow',
+            options: {
+              boundary: 'viewport',
+            },
+          },
+        ]}
         {...props}
       />
     </div>
