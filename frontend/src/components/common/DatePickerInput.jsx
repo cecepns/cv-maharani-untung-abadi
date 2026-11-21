@@ -7,7 +7,6 @@ if (typeof document !== 'undefined') {
   if (!document.getElementById('datepicker-portal')) {
     const portalDiv = document.createElement('div');
     portalDiv.id = 'datepicker-portal';
-    portalDiv.style.position = 'relative';
     portalDiv.style.zIndex = '99999';
     document.body.appendChild(portalDiv);
   }
@@ -100,14 +99,6 @@ export default function DatePickerInput({
         popperProps={{
           strategy: 'fixed',
         }}
-        popperModifiers={[
-          {
-            name: 'preventOverflow',
-            options: {
-              boundary: 'viewport',
-            },
-          },
-        ]}
         {...props}
       />
     </div>
