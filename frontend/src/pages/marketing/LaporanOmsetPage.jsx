@@ -47,7 +47,7 @@ export default function LaporanOmsetPage() {
             Analisis kontribusi pendapatan pabrik per pelanggan industri dan pencapaian target sales marketing.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="no-print flex items-center gap-3">
           <button
             onClick={handlePrint}
             className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-semibold shadow-2xs transition-colors"
@@ -115,7 +115,7 @@ export default function LaporanOmsetPage() {
                     return (
                       <tr key={c.customer_id} className="hover:bg-slate-50/60 transition-colors">
                         <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
+                          <div className="no-print flex items-center gap-3">
                             <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 font-bold text-xs flex items-center justify-center">
                               {idx + 1}
                             </span>

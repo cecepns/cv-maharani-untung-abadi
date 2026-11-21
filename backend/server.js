@@ -796,7 +796,7 @@ app.get('/api/marketing/surat-jalan', async (req, res) => {
 
     const countSql = `SELECT COUNT(*) as total FROM surat_jalan sj LEFT JOIN sales_orders so ON sj.so_id = so.id LEFT JOIN customers c ON so.customer_id = c.id ${whereSql}`;
     const selectSql = `
-      SELECT sj.*, so.nomor_so, c.nama_customer, c.alamat as alamat_kirim 
+      SELECT sj.*, so.nomor_so, c.nama_customer, c.nama_customer as customer_nama, c.alamat as alamat_kirim 
       FROM surat_jalan sj 
       LEFT JOIN sales_orders so ON sj.so_id = so.id 
       LEFT JOIN customers c ON so.customer_id = c.id 
@@ -853,12 +853,41 @@ app.post('/api/marketing/surat-jalan', async (req, res) => {
           [sjId, it.product_id, it.qty_kirim || it.qty, it.keterangan || 'Siap kirim pabrik']
         );
       }
+    } else {
+      // Auto populate items from Sales Order if not explicitly passed
+      const [soItems] = await connection.query(
+        'SELECT product_id, qty FROM sales_order_items WHERE so_id = ?',
+        [so_id]
+      );
+      for (const it of soItems) {
+        await connection.query(
+          `INSERT INTO surat_jalan_items (sj_id, product_id, qty_kirim, keterangan) VALUES (?, ?, ?, ?)`,
+          [sjId, it.product_id, it.qty, 'Packing ikat rapih standar pabrik']
+        );
+      }
     }
 
     await connection.query("UPDATE sales_orders SET status = 'Selesai' WHERE id = ?", [so_id]);
 
     await connection.commit();
-    res.json({ success: true, message: `Surat Jalan ${nomor_sj} berhasil diterbitkan`, data: { id: sjId, nomor_sj } });
+
+    // Fetch full SJ to return complete data for immediate printing
+    const [newSj] = await db.query(`
+      SELECT sj.*, so.nomor_so, c.nama_customer, c.nama_customer as customer_nama, c.alamat as alamat_kirim 
+      FROM surat_jalan sj 
+      LEFT JOIN sales_orders so ON sj.so_id = so.id 
+      LEFT JOIN customers c ON so.customer_id = c.id 
+      WHERE sj.id = ?
+    `, [sjId]);
+    const [createdItems] = await db.query(`
+      SELECT sji.*, p.nama_barang, p.satuan 
+      FROM surat_jalan_items sji 
+      LEFT JOIN products p ON sji.product_id = p.id 
+      WHERE sji.sj_id = ?
+    `, [sjId]);
+    const fullSj = { ...(newSj[0] || {}), items: createdItems };
+
+    res.json({ success: true, message: `Surat Jalan ${nomor_sj} berhasil diterbitkan`, data: fullSj });
   } catch (err) {
     await connection.rollback();
     res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
@@ -904,7 +933,7 @@ app.get('/api/marketing/invoices', async (req, res) => {
 
     const countSql = `SELECT COUNT(*) as total FROM sales_invoices inv LEFT JOIN customers c ON inv.customer_id = c.id ${whereSql}`;
     const selectSql = `
-      SELECT inv.*, c.nama_customer, c.kode_customer, so.nomor_so 
+      SELECT inv.*, c.nama_customer, c.nama_customer as customer_nama, c.kode_customer, so.nomor_so 
       FROM sales_invoices inv 
       LEFT JOIN customers c ON inv.customer_id = c.id 
       LEFT JOIN sales_orders so ON inv.so_id = so.id 
@@ -937,7 +966,15 @@ app.post('/api/marketing/invoices', async (req, res) => {
       [nomor_invoice, so_id || null, customer_id, tanggal_invoice || new Date().toISOString().split('T')[0], jatuh_tempo || new Date().toISOString().split('T')[0], subtotal || 0, ppn || 0, total_tagihan, total_tagihan]
     );
 
-    res.json({ success: true, message: `Invoice ${nomor_invoice} berhasil diterbitkan`, data: { id: result.insertId, nomor_invoice } });
+    const [newInv] = await db.query(`
+      SELECT inv.*, c.nama_customer, c.nama_customer as customer_nama, c.kode_customer, so.nomor_so 
+      FROM sales_invoices inv 
+      LEFT JOIN customers c ON inv.customer_id = c.id 
+      LEFT JOIN sales_orders so ON inv.so_id = so.id 
+      WHERE inv.id = ?
+    `, [result.insertId]);
+
+    res.json({ success: true, message: `Invoice ${nomor_invoice} berhasil diterbitkan`, data: newInv[0] || { id: result.insertId, nomor_invoice } });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
   }

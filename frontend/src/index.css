@@ -26,22 +26,117 @@
 
 /* Print specific styles */
 @media print {
-  body * {
-    visibility: hidden;
+  @page {
+    size: A4 portrait;
+    margin: 8mm;
   }
-  .print-area, .print-area * {
-    visibility: visible;
+
+  html, body {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
-  .print-area {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    margin: 0;
-    padding: 20px;
-    background: white;
-  }
-  .no-print {
+
+  /* When printing from a modal (Surat Jalan, Invoice, SPK, Slip Gaji) */
+  body.print-modal-active #root {
     display: none !important;
+  }
+
+  body.print-modal-active .print-modal-backdrop {
+    position: static !important;
+    inset: auto !important;
+    z-index: auto !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  body.print-modal-active .print-modal-container {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  body.print-modal-active .print-area {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  /* When printing normal page reports directly without modal */
+  body:not(.print-modal-active) aside,
+  body:not(.print-modal-active) header,
+  body:not(.print-modal-active) footer,
+  body:not(.print-modal-active) nav,
+  body:not(.print-modal-active) .no-print {
+    display: none !important;
+  }
+
+  body:not(.print-modal-active) main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  body:not(.print-modal-active) .lg\:pl-72 {
+    padding-left: 0 !important;
+  }
+
+  /* Universal hide for buttons and print actions */
+  button,
+  .no-print,
+  .no-print * {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Table print optimization */
+  table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .print-area .grid {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 }

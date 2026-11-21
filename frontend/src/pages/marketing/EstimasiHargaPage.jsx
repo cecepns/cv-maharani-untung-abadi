@@ -356,7 +356,7 @@ Terima kasih telah mempercayakan kebutuhan packaging Anda kepada CV. Maharani Un
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="no-print flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={handleCopyWhatsApp}

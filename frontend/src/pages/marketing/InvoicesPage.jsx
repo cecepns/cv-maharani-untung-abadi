@@ -210,7 +210,7 @@ export default function InvoicesPage() {
                       <div className="text-xs text-slate-500 mt-0.5">{inv.tanggal_invoice}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="font-bold text-slate-800">{inv.customer_nama}</div>
+                      <div className="font-bold text-slate-800">{inv.nama_customer || inv.customer_nama || 'Customer'}</div>
                       <div className="text-xs font-mono text-brand-600 mt-0.5">{inv.nomor_so}</div>
                     </td>
                     <td className="px-6 py-4 font-semibold text-slate-700">

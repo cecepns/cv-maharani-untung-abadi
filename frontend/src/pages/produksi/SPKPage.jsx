@@ -237,7 +237,7 @@ export default function SPKPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="font-bold text-slate-800">{spk.nama_box}</div>
-                      <div className="text-xs text-brand-600 mt-0.5">{spk.customer_nama}</div>
+                      <div className="text-xs text-brand-600 mt-0.5">{spk.nama_customer || spk.customer_nama}</div>
                     </td>
                     <td className="px-6 py-4 font-mono font-bold text-xs text-slate-700">
                       {spk.ukuran_box}

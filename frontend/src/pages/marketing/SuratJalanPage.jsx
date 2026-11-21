@@ -206,7 +206,7 @@ export default function SuratJalanPage() {
                       <div className="text-xs text-slate-500 mt-0.5">{sj.tanggal_kirim}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="font-bold text-slate-800">{sj.customer_nama}</div>
+                      <div className="font-bold text-slate-800">{sj.nama_customer || sj.customer_nama || 'Customer'}</div>
                       <div className="text-xs font-mono text-brand-600 mt-0.5">{sj.nomor_so}</div>
                     </td>
                     <td className="px-6 py-4">
