@@ -104,6 +104,16 @@ async function initTipeBahanSheetTable() {
     try { await db.query(`ALTER TABLE absensi ADD COLUMN jam_lembur_selesai TIME DEFAULT NULL`); } catch (_) { }
     try { await db.query(`ALTER TABLE absensi ADD COLUMN total_jam_kerja DECIMAL(4,1) DEFAULT 8.0`); } catch (_) { }
 
+    // Pembayaran hutang columns sync
+    try { await db.query(`ALTER TABLE pembayaran_hutang ADD COLUMN faktur_beli_id INT DEFAULT NULL`); } catch (_) { }
+    try { await db.query(`ALTER TABLE pembayaran_hutang ADD COLUMN jumlah_bayar DECIMAL(15,2) DEFAULT 0`); } catch (_) { }
+    try {
+      await db.query(`UPDATE pembayaran_hutang SET faktur_beli_id = nota_id WHERE (faktur_beli_id IS NULL OR faktur_beli_id = 0) AND nota_id IS NOT NULL`);
+    } catch (_) { }
+    try {
+      await db.query(`UPDATE pembayaran_hutang SET jumlah_bayar = nominal_bayar WHERE (jumlah_bayar IS NULL OR jumlah_bayar = 0) AND nominal_bayar IS NOT NULL`);
+    } catch (_) { }
+
     const [rows] = await db.query('SELECT COUNT(*) as cnt FROM tipe_bahan_sheet');
     if (rows[0].cnt === 0) {
       const defaultTypes = [
@@ -128,6 +138,33 @@ async function initTipeBahanSheetTable() {
   }
 }
 checkDatabaseConnection();
+
+// Cache table columns to adapt dynamically to database schema differences
+let phColumnsCache = null;
+async function getPembayaranHutangColumns() {
+  if (!phColumnsCache) {
+    try {
+      const [cols] = await db.query('SHOW COLUMNS FROM pembayaran_hutang');
+      phColumnsCache = cols.map(c => c.Field);
+    } catch (e) {
+      phColumnsCache = ['faktur_beli_id', 'jumlah_bayar'];
+    }
+  }
+  return phColumnsCache;
+}
+
+let coaColumnsCache = null;
+async function getCoaColumns() {
+  if (!coaColumnsCache) {
+    try {
+      const [cols] = await db.query('SHOW COLUMNS FROM chart_of_accounts');
+      coaColumnsCache = cols.map(c => c.Field);
+    } catch (e) {
+      coaColumnsCache = ['kategori'];
+    }
+  }
+  return coaColumnsCache;
+}
 
 /**
  * Reusable SQL Pagination Helper
@@ -2084,6 +2121,10 @@ app.post('/api/finance/piutang/pembayaran', async (req, res) => {
 app.get('/api/finance/hutang/pembayaran', async (req, res) => {
   try {
     const search = (req.query.search || '').trim();
+    const phCols = await getPembayaranHutangColumns();
+    const joinField = phCols.includes('faktur_beli_id') ? 'ph.faktur_beli_id' : 'ph.nota_id';
+    const amountField = phCols.includes('jumlah_bayar') ? 'ph.jumlah_bayar' : 'ph.nominal_bayar';
+
     let whereSql = '';
     let params = [];
     if (search) {
@@ -2092,10 +2133,17 @@ app.get('/api/finance/hutang/pembayaran', async (req, res) => {
     }
     const countSql = `SELECT COUNT(*) as total FROM pembayaran_hutang ph LEFT JOIN suppliers s ON ph.supplier_id = s.id ${whereSql}`;
     const selectSql = `
-      SELECT ph.*, s.nama_supplier, np.nomor_nota 
+      SELECT 
+        ph.*, 
+        ${amountField} AS jumlah_bayar,
+        ${amountField} AS nominal_bayar,
+        s.nama_supplier, 
+        s.nama_supplier AS supplier_nama,
+        np.nomor_faktur_beli,
+        np.nomor_faktur_beli AS nomor_nota
       FROM pembayaran_hutang ph 
       LEFT JOIN suppliers s ON ph.supplier_id = s.id 
-      LEFT JOIN nota_pembelian np ON ph.nota_id = np.id 
+      LEFT JOIN nota_pembelian np ON ${joinField} = np.id 
       ${whereSql} 
       ORDER BY ph.id DESC
     `;
@@ -2111,18 +2159,29 @@ app.post('/api/finance/hutang/pembayaran', async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    const { nota_id, supplier_id, tanggal_bayar, nominal_bayar, metode_bayar, catatan } = req.body;
+    const { faktur_beli_id, nota_id, supplier_id, tanggal_bayar, jumlah_bayar, nominal_bayar, metode_bayar, catatan } = req.body;
+    const targetFakturId = faktur_beli_id || nota_id;
+    const bayar = Number(jumlah_bayar || nominal_bayar || 0);
     const nomor_bukti = `BKK-${Date.now().toString().slice(-6)}`;
-    const bayar = Number(nominal_bayar);
+
+    // Resolve supplier_id from nota_pembelian if not provided in body
+    let targetSupplierId = supplier_id;
+    const [notaRows] = await connection.query('SELECT supplier_id, total_tagihan, sudah_dibayar FROM nota_pembelian WHERE id = ?', [targetFakturId]);
+    if (notaRows.length > 0 && !targetSupplierId) {
+      targetSupplierId = notaRows[0].supplier_id;
+    }
+
+    const phCols = await getPembayaranHutangColumns();
+    const idCol = phCols.includes('faktur_beli_id') ? 'faktur_beli_id' : 'nota_id';
+    const amtCol = phCols.includes('jumlah_bayar') ? 'jumlah_bayar' : 'nominal_bayar';
 
     const [result] = await connection.query(
-      `INSERT INTO pembayaran_hutang (nomor_bukti, nota_id, supplier_id, tanggal_bayar, nominal_bayar, metode_bayar, catatan)
+      `INSERT INTO pembayaran_hutang (nomor_bukti, ${idCol}, supplier_id, tanggal_bayar, ${amtCol}, metode_bayar, catatan)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [nomor_bukti, nota_id, supplier_id, tanggal_bayar || new Date().toISOString().split('T')[0], bayar, metode_bayar || 'Transfer Bank BCA', catatan || 'Pembayaran bahan baku sheet']
+      [nomor_bukti, targetFakturId, targetSupplierId, tanggal_bayar || new Date().toISOString().split('T')[0], bayar, metode_bayar || 'Transfer BCA', catatan || 'Pembayaran hutang supplier']
     );
 
     // Update nota pembelian balance
-    const [notaRows] = await connection.query('SELECT total_tagihan, sudah_dibayar FROM nota_pembelian WHERE id = ?', [nota_id]);
     if (notaRows.length > 0) {
       const nota = notaRows[0];
       const newPaid = Number(nota.sudah_dibayar) + bayar;
@@ -2131,7 +2190,7 @@ app.post('/api/finance/hutang/pembayaran', async (req, res) => {
 
       await connection.query(
         'UPDATE nota_pembelian SET sudah_dibayar = ?, sisa_tagihan = ?, status_bayar = ? WHERE id = ?',
-        [newPaid, newSisa, newStatus, nota_id]
+        [newPaid, newSisa, newStatus, targetFakturId]
       );
     }
 
@@ -2223,14 +2282,16 @@ app.get('/api/finance/saldo-hutang-piutang', async (req, res) => {
 app.get('/api/accounting/coa', async (req, res) => {
   try {
     const search = (req.query.search || '').trim();
+    const coaCols = await getCoaColumns();
+    const catCol = coaCols.includes('kategori') ? 'kategori' : 'kategori_akun';
     let whereSql = '';
     let params = [];
     if (search) {
-      whereSql = 'WHERE kode_akun LIKE ? OR nama_akun LIKE ? OR kategori_akun LIKE ?';
+      whereSql = `WHERE kode_akun LIKE ? OR nama_akun LIKE ? OR ${catCol} LIKE ?`;
       params = [`%${search}%`, `%${search}%`, `%${search}%`];
     }
     const countSql = `SELECT COUNT(*) as total FROM chart_of_accounts ${whereSql}`;
-    const selectSql = `SELECT * FROM chart_of_accounts ${whereSql} ORDER BY kode_akun ASC`;
+    const selectSql = `SELECT *, ${catCol} AS kategori, ${catCol} AS kategori_akun FROM chart_of_accounts ${whereSql} ORDER BY kode_akun ASC`;
     const result = await getPaginatedData(selectSql, countSql, params, params, req);
     res.json(result);
   } catch (err) {
@@ -2240,11 +2301,17 @@ app.get('/api/accounting/coa', async (req, res) => {
 
 app.post('/api/accounting/coa', async (req, res) => {
   try {
-    const { kode_akun, nama_akun, kategori_akun, saldo_normal, saldo_awal } = req.body;
-    const [result] = await db.query(
-      `INSERT INTO chart_of_accounts (kode_akun, nama_akun, kategori_akun, saldo_normal, saldo_awal)
+    const { kode_akun, nama_akun, kategori, kategori_akun, saldo_normal, saldo_awal, saldo_berjalan } = req.body;
+    const catVal = kategori || kategori_akun || 'Kas & Bank';
+    const saldoVal = Number(saldo_berjalan || saldo_awal || 0);
+    const coaCols = await getCoaColumns();
+    const catCol = coaCols.includes('kategori') ? 'kategori' : 'kategori_akun';
+    const saldoCol = coaCols.includes('saldo_berjalan') ? 'saldo_berjalan' : 'saldo_awal';
+
+    await db.query(
+      `INSERT INTO chart_of_accounts (kode_akun, nama_akun, ${catCol}, saldo_normal, ${saldoCol})
        VALUES (?, ?, ?, ?, ?)`,
-      [kode_akun, nama_akun, kategori_akun, saldo_normal || 'Debet', saldo_awal || 0]
+      [kode_akun, nama_akun, catVal, saldo_normal || 'Debet', saldoVal]
     );
     res.json({ success: true, message: 'Akun COA berhasil ditambahkan ke database' });
   } catch (err) {
@@ -2380,18 +2447,24 @@ app.get('/api/accounting/laporan-bank-harian', async (req, res) => {
 // Buku Besar & Neraca Saldo (Trial Balance)
 app.get('/api/accounting/trial-balance', async (req, res) => {
   try {
+    const coaCols = await getCoaColumns();
+    const catCol = coaCols.includes('kategori') ? 'coa.kategori' : 'coa.kategori_akun';
+
     const [rows] = await db.query(`
       SELECT 
         coa.id,
         coa.kode_akun,
         coa.nama_akun,
-        coa.kategori_akun,
+        ${catCol} AS kategori,
+        ${catCol} AS kategori_akun,
         coa.saldo_normal,
         COALESCE(SUM(CASE WHEN ji.posisi = 'Debet' THEN ji.nominal ELSE 0 END), 0) as total_debet,
-        COALESCE(SUM(CASE WHEN ji.posisi = 'Kredit' THEN ji.nominal ELSE 0 END), 0) as total_kredit
+        COALESCE(SUM(CASE WHEN ji.posisi = 'Kredit' THEN ji.nominal ELSE 0 END), 0) as total_kredit,
+        COALESCE(SUM(CASE WHEN ji.posisi = 'Debet' THEN ji.nominal ELSE 0 END), 0) as debet,
+        COALESCE(SUM(CASE WHEN ji.posisi = 'Kredit' THEN ji.nominal ELSE 0 END), 0) as kredit
       FROM chart_of_accounts coa
       LEFT JOIN jurnal_items ji ON coa.id = ji.akun_id
-      GROUP BY coa.id, coa.kode_akun, coa.nama_akun, coa.kategori_akun, coa.saldo_normal
+      GROUP BY coa.id, coa.kode_akun, coa.nama_akun, ${catCol}, coa.saldo_normal
       ORDER BY coa.kode_akun ASC
     `);
     res.json({ success: true, data: rows });
@@ -2414,10 +2487,43 @@ app.get('/api/accounting/buku-besar', async (req, res) => {
       ORDER BY jt.tanggal ASC, jt.id ASC
     `);
 
-    const result = coas.map(c => ({
-      ...c,
-      mutasi: items.filter(it => it.akun_id === c.id)
-    }));
+    const result = coas.map(c => {
+      let runningSaldo = Number(c.saldo_berjalan || c.saldo_awal || 0);
+      const filtered = items.filter(it => it.akun_id === c.id).map(m => {
+        const debet = m.posisi === 'Debet' ? Number(m.nominal) : 0;
+        const kredit = m.posisi === 'Kredit' ? Number(m.nominal) : 0;
+        if (c.saldo_normal === 'Debet') {
+          runningSaldo += (debet - kredit);
+        } else {
+          runningSaldo += (kredit - debet);
+        }
+        return {
+          id: m.id,
+          tanggal: m.tanggal,
+          nomor_jurnal: m.nomor_jurnal,
+          keterangan: m.keterangan || m.ket_jurnal,
+          debet,
+          kredit,
+          saldo: runningSaldo
+        };
+      });
+
+      return {
+        ...c,
+        kategori: c.kategori || c.kategori_akun,
+        kategori_akun: c.kategori_akun || c.kategori,
+        akun: {
+          id: c.id,
+          kode_akun: c.kode_akun,
+          nama_akun: c.nama_akun,
+          kategori: c.kategori || c.kategori_akun,
+          kategori_akun: c.kategori_akun || c.kategori,
+          saldo_normal: c.saldo_normal,
+          saldo_berjalan: c.saldo_berjalan || c.saldo_awal || 0
+        },
+        mutasi: filtered
+      };
+    });
 
     res.json({ success: true, data: result });
   } catch (err) {
