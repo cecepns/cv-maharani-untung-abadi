@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Printer, Factory, CheckCircle2, Clock, AlertTriangle, Eye, ArrowRight, Trash2 } from 'lucide-react';
+import { Plus, Printer, Factory, CheckCircle2, Clock, AlertTriangle, Eye, ArrowRight, Trash2, Edit2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { request } from '../../utils/request';
 import { API_ENDPOINTS } from '../../utils/endpoints';
@@ -26,6 +26,8 @@ export default function SPKPage() {
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     customer_nama: '',
     nama_box: '',
@@ -88,6 +90,8 @@ export default function SPKPage() {
   }, [page, limit, search, tahapanFilter]);
 
   const handleOpenCreate = () => {
+    setIsEditing(false);
+    setEditingId(null);
     setFormData({
       customer_nama: 'PT. Indofood Sukses Makmur Tbk',
       nama_box: 'Master Box Indomie Special',
@@ -98,6 +102,23 @@ export default function SPKPage() {
       target_selesai: new Date(Date.now() + 5 * 86400000).toISOString().split('T')[0],
       desain_cetak: 'Flexo 2 Warna (Merah & Hitam)',
       pisau_pond: 'Rotary Slotter Indomie',
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (spk) => {
+    setIsEditing(true);
+    setEditingId(spk.id);
+    setFormData({
+      customer_nama: spk.customer_nama || '',
+      nama_box: spk.nama_box || '',
+      ukuran_box: spk.ukuran_box || '',
+      sheet_id: spk.sheet_id || (sheets.length ? sheets[0].id : ''),
+      qty_target: Number(spk.qty_target) || 1000,
+      tanggal_mulai: spk.tanggal_mulai || new Date().toISOString().split('T')[0],
+      target_selesai: spk.target_selesai || new Date().toISOString().split('T')[0],
+      desain_cetak: spk.desain_cetak || '',
+      pisau_pond: spk.pisau_pond || '',
     });
     setIsModalOpen(true);
   };
@@ -120,15 +141,20 @@ export default function SPKPage() {
     e.preventDefault();
     try {
       setFormLoading(true);
-      const res = await request.post(API_ENDPOINTS.PRODUKSI.SPK, formData);
-      toast.success('SPK Produksi berhasil diterbitkan ke lantai pabrik!');
+      if (isEditing) {
+        await request.put(API_ENDPOINTS.PRODUKSI.SPK_DETAIL(editingId), formData);
+        toast.success('SPK Produksi berhasil diperbarui!');
+      } else {
+        const res = await request.post(API_ENDPOINTS.PRODUKSI.SPK, formData);
+        toast.success('SPK Produksi berhasil diterbitkan ke lantai pabrik!');
+        if (res.data) {
+          setPrintData(res.data);
+        }
+      }
       setIsModalOpen(false);
       fetchSPK();
-      if (res.data) {
-        setPrintData(res.data);
-      }
     } catch (err) {
-      toast.error(err.message || 'Gagal menerbitkan SPK');
+      toast.error(err.message || 'Gagal menyimpan SPK');
     } finally {
       setFormLoading(false);
     }
@@ -286,6 +312,13 @@ export default function SPKPage() {
                           Cetak SPK
                         </button>
                         <button
+                          onClick={() => handleOpenEdit(spk)}
+                          className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+                          title="Edit SPK"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => setDeleteDialog({ isOpen: true, id: spk.id, name: spk.nomor_spk })}
                           className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                           title="Hapus SPK"
@@ -314,11 +347,11 @@ export default function SPKPage() {
         />
       </div>
 
-      {/* Modal Terbitkan SPK */}
+      {/* Modal Terbitkan / Edit SPK */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Terbitkan Surat Perintah Kerja (SPK) Baru"
+        title={isEditing ? 'Edit SPK Produksi Pabrik' : 'Terbitkan Surat Perintah Kerja (SPK) Baru'}
         size="lg"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -439,7 +472,7 @@ export default function SPKPage() {
               disabled={formLoading}
               className="px-5 py-2 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded-xl shadow-sm disabled:opacity-50"
             >
-              {formLoading ? 'Menerbitkan...' : 'Terbitkan SPK & Cetak'}
+              {formLoading ? 'Memproses...' : isEditing ? 'Simpan Perubahan' : 'Terbitkan SPK & Cetak'}
             </button>
           </div>
         </form>

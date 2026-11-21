@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, BadgePercent, CheckCircle2, FileText, Search, Info } from 'lucide-react';
+import { Plus, BadgePercent, CheckCircle2, FileText, Search, Info, Edit2, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { request } from '../../utils/request';
 import { API_ENDPOINTS } from '../../utils/endpoints';
 import SearchInput from '../../components/common/SearchInput';
 import Pagination from '../../components/common/Pagination';
 import Modal from '../../components/common/Modal';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 import Badge from '../../components/common/Badge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
@@ -21,6 +22,11 @@ export default function FakturPajakPage() {
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, id: null, name: '' });
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   const [formData, setFormData] = useState({
     invoice_id: '',
     dpp: 0,
@@ -69,6 +75,8 @@ export default function FakturPajakPage() {
   }, [page, limit, search]);
 
   const handleOpenCreate = () => {
+    setIsEditing(false);
+    setEditingId(null);
     const inv = invoices.length ? invoices[0] : null;
     setFormData({
       invoice_id: inv ? inv.id : '',
@@ -76,6 +84,31 @@ export default function FakturPajakPage() {
       ppn: inv ? inv.ppn : 1100000,
     });
     setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (f) => {
+    setIsEditing(true);
+    setEditingId(f.id);
+    setFormData({
+      invoice_id: f.invoice_id || '',
+      dpp: Number(f.dpp || 0),
+      ppn: Number(f.ppn || 0),
+    });
+    setIsModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      setDeleteLoading(true);
+      await request.delete(API_ENDPOINTS.MARKETING.FAKTUR_PAJAK_DETAIL(deleteDialog.id));
+      toast.success('Faktur pajak berhasil dihapus');
+      setDeleteDialog({ isOpen: false, id: null, name: '' });
+      fetchFakturPajak();
+    } catch (err) {
+      toast.error('Gagal menghapus: ' + err.message);
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   const handleInvoiceSelect = (invId) => {
@@ -93,12 +126,17 @@ export default function FakturPajakPage() {
     e.preventDefault();
     try {
       setFormLoading(true);
-      await request.post(API_ENDPOINTS.MARKETING.FAKTUR_PAJAK, formData);
-      toast.success('Faktur Pajak Seri e-Faktur berhasil diterbitkan!');
+      if (isEditing) {
+        await request.put(API_ENDPOINTS.MARKETING.FAKTUR_PAJAK_DETAIL(editingId), formData);
+        toast.success('Faktur Pajak berhasil diperbarui');
+      } else {
+        await request.post(API_ENDPOINTS.MARKETING.FAKTUR_PAJAK, formData);
+        toast.success('Faktur Pajak Seri e-Faktur berhasil diterbitkan!');
+      }
       setIsModalOpen(false);
       fetchFakturPajak();
     } catch (err) {
-      toast.error(err.message || 'Gagal menerbitkan faktur pajak');
+      toast.error(err.message || 'Gagal menyimpan faktur pajak');
     } finally {
       setFormLoading(false);
     }
@@ -183,6 +221,7 @@ export default function FakturPajakPage() {
                   <th className="px-6 py-4">Dasar Pengenaan Pajak (DPP)</th>
                   <th className="px-6 py-4">PPN Keluaran 11%</th>
                   <th className="px-6 py-4">Status Approval</th>
+                  <th className="px-6 py-4 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -209,6 +248,24 @@ export default function FakturPajakPage() {
                         {f.status} DJP
                       </Badge>
                     </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          onClick={() => handleOpenEdit(f)}
+                          className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+                          title="Edit Faktur Pajak"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteDialog({ isOpen: true, id: f.id, name: f.nomor_faktur })}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          title="Hapus Faktur Pajak"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -233,7 +290,7 @@ export default function FakturPajakPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Terbitkan Nomor Seri Faktur Pajak"
+        title={isEditing ? 'Edit Nomor Seri Faktur Pajak' : 'Terbitkan Nomor Seri Faktur Pajak'}
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -290,11 +347,23 @@ export default function FakturPajakPage() {
               disabled={formLoading}
               className="px-5 py-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-xl shadow-sm disabled:opacity-50"
             >
-              {formLoading ? 'Memproses...' : 'Terbitkan e-Faktur'}
+              {formLoading ? 'Memproses...' : (isEditing ? 'Simpan Perubahan' : 'Terbitkan e-Faktur')}
             </button>
           </div>
         </form>
       </Modal>
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        isOpen={deleteDialog.isOpen}
+        onClose={() => setDeleteDialog({ isOpen: false, id: null, name: '' })}
+        onConfirm={confirmDelete}
+        isLoading={deleteLoading}
+        title="Hapus Faktur Pajak"
+        message={`Apakah Anda yakin ingin menghapus data faktur pajak "${deleteDialog.name}"?`}
+        confirmText="Ya, Hapus"
+        confirmVariant="danger"
+      />
     </div>
   );
 }

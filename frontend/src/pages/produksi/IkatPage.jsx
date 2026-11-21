@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Layers, CheckCircle2, Box } from 'lucide-react';
+import { Plus, Layers, CheckCircle2, Box, Edit2, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { request } from '../../utils/request';
 import { API_ENDPOINTS } from '../../utils/endpoints';
 import SearchInput from '../../components/common/SearchInput';
 import Pagination from '../../components/common/Pagination';
 import Modal from '../../components/common/Modal';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 import Badge from '../../components/common/Badge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
@@ -22,6 +23,11 @@ export default function IkatPage() {
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, id: null, name: '' });
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   const [formData, setFormData] = useState({
     spk_id: '',
     tanggal_proses: new Date().toISOString().split('T')[0],
@@ -69,6 +75,8 @@ export default function IkatPage() {
   }, [page, limit, search]);
 
   const handleOpenCreate = () => {
+    setIsEditing(false);
+    setEditingId(null);
     const spk = spkList.length ? spkList[0] : null;
     const target = spk ? spk.qty_target : 3000;
     const isi = 25;
@@ -84,12 +92,50 @@ export default function IkatPage() {
     setIsModalOpen(true);
   };
 
+  const handleOpenEdit = (i) => {
+    setIsEditing(true);
+    setEditingId(i.id);
+    setFormData({
+      spk_id: i.spk_id || '',
+      tanggal_proses: i.tanggal_proses ? i.tanggal_proses.split('T')[0] : new Date().toISOString().split('T')[0],
+      operator_nama: i.operator_nama || '',
+      isi_per_ikat: Number(i.isi_per_ikat || 25),
+      jumlah_ikat: Number(i.jumlah_ikat || i.total_ikat || 0),
+      total_barang_jadi: Number(i.total_barang_jadi || i.total_pcs || 0),
+    });
+    setIsModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      setDeleteLoading(true);
+      await request.delete(API_ENDPOINTS.PRODUKSI.IKAT_DETAIL(deleteDialog.id));
+      toast.success('Data proses ikat packing berhasil dihapus');
+      setDeleteDialog({ isOpen: false, id: null, name: '' });
+      fetchIkat();
+    } catch (err) {
+      toast.error('Gagal menghapus: ' + err.message);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       setFormLoading(true);
-      await request.post(API_ENDPOINTS.PRODUKSI.IKAT, formData);
-      toast.success('Proses ikat strapping selesai! Dus resmi masuk Gudang FG & SPK Tuntas!');
+      const payload = {
+        ...formData,
+        total_ikat: formData.jumlah_ikat,
+        total_pcs: formData.total_barang_jadi,
+      };
+      if (isEditing) {
+        await request.put(API_ENDPOINTS.PRODUKSI.IKAT_DETAIL(editingId), payload);
+        toast.success('Proses ikat packing berhasil diperbarui');
+      } else {
+        await request.post(API_ENDPOINTS.PRODUKSI.IKAT, payload);
+        toast.success('Proses ikat strapping selesai! Dus resmi masuk Gudang FG & SPK Tuntas!');
+      }
       setIsModalOpen(false);
       fetchIkat();
     } catch (err) {
@@ -151,6 +197,7 @@ export default function IkatPage() {
                   <th className="px-6 py-4">Jumlah Ikat Strapping</th>
                   <th className="px-6 py-4">Total Unit Barang Jadi</th>
                   <th className="px-6 py-4">Serah Terima Gudang FG</th>
+                  <th className="px-6 py-4 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -178,6 +225,24 @@ export default function IkatPage() {
                         Diterima Gudang FG
                       </Badge>
                     </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          onClick={() => handleOpenEdit(i)}
+                          className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+                          title="Edit Hasil Ikat"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteDialog({ isOpen: true, id: i.id, name: `Ikat SPK ${i.nomor_spk}` })}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          title="Hapus Hasil Ikat"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -202,7 +267,7 @@ export default function IkatPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Input Hasil Ikat & Packing Barang Jadi"
+        title={isEditing ? 'Edit Hasil Ikat & Packing Barang Jadi' : 'Input Hasil Ikat & Packing Barang Jadi'}
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -295,11 +360,23 @@ export default function IkatPage() {
               disabled={formLoading}
               className="px-5 py-2 text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-xl shadow-sm disabled:opacity-50"
             >
-              {formLoading ? 'Memproses...' : 'Selesaikan Ikat & Masuk Gudang FG'}
+              {formLoading ? 'Memproses...' : (isEditing ? 'Simpan Perubahan' : 'Selesaikan Ikat & Masuk Gudang FG')}
             </button>
           </div>
         </form>
       </Modal>
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        isOpen={deleteDialog.isOpen}
+        onClose={() => setDeleteDialog({ isOpen: false, id: null, name: '' })}
+        onConfirm={confirmDelete}
+        isLoading={deleteLoading}
+        title="Hapus Hasil Ikat Strapping"
+        message={`Apakah Anda yakin ingin menghapus data laporan proses ikat "${deleteDialog.name}"?`}
+        confirmText="Ya, Hapus"
+        confirmVariant="danger"
+      />
     </div>
   );
 }

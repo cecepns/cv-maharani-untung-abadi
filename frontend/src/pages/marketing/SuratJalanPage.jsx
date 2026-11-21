@@ -25,6 +25,8 @@ export default function SuratJalanPage() {
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     so_id: '',
     tanggal_kirim: new Date().toISOString().split('T')[0],
@@ -78,12 +80,27 @@ export default function SuratJalanPage() {
   }, [page, limit, search]);
 
   const handleOpenCreate = () => {
+    setIsEditing(false);
+    setEditingId(null);
     setFormData({
       so_id: salesOrders.length ? salesOrders[0].id : '',
       tanggal_kirim: new Date().toISOString().split('T')[0],
       no_kendaraan: 'B 9123 MUA',
       nama_supir: 'Ahmad Kosasih',
       catatan: 'Pengiriman kardus gelombang lengkap dengan strapping',
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (sj) => {
+    setIsEditing(true);
+    setEditingId(sj.id);
+    setFormData({
+      so_id: sj.so_id,
+      tanggal_kirim: sj.tanggal_kirim,
+      no_kendaraan: sj.no_kendaraan || '',
+      nama_supir: sj.nama_supir || '',
+      catatan: sj.catatan || '',
     });
     setIsModalOpen(true);
   };
@@ -97,15 +114,20 @@ export default function SuratJalanPage() {
 
     try {
       setFormLoading(true);
-      const res = await request.post(API_ENDPOINTS.MARKETING.SURAT_JALAN, formData);
-      toast.success('Surat Jalan berhasil diterbitkan!');
+      if (isEditing) {
+        await request.put(API_ENDPOINTS.MARKETING.SURAT_JALAN_DETAIL(editingId), formData);
+        toast.success('Surat Jalan berhasil diperbarui!');
+      } else {
+        const res = await request.post(API_ENDPOINTS.MARKETING.SURAT_JALAN, formData);
+        toast.success('Surat Jalan berhasil diterbitkan!');
+        if (res.data) {
+          setPrintData(res.data);
+        }
+      }
       setIsModalOpen(false);
       fetchSuratJalan();
-      if (res.data) {
-        setPrintData(res.data);
-      }
     } catch (err) {
-      toast.error(err.message || 'Gagal membuat Surat Jalan');
+      toast.error(err.message || 'Gagal menyimpan Surat Jalan');
     } finally {
       setFormLoading(false);
     }
@@ -236,7 +258,7 @@ export default function SuratJalanPage() {
                       </Badge>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <div className="flex items-center justify-center gap-2">
+                      <div className="flex items-center justify-center gap-1.5">
                         <button
                           onClick={() => setPrintData(sj)}
                           className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg shadow-2xs transition-colors"
@@ -244,6 +266,13 @@ export default function SuratJalanPage() {
                         >
                           <Printer className="w-3.5 h-3.5 text-slate-600" />
                           Cetak SJ
+                        </button>
+                        <button
+                          onClick={() => handleOpenEdit(sj)}
+                          className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+                          title="Edit Surat Jalan"
+                        >
+                          <Edit2 className="w-4 h-4" />
                         </button>
                         {sj.status !== 'Diterima Customer' && (
                           <button
@@ -283,11 +312,11 @@ export default function SuratJalanPage() {
         />
       </div>
 
-      {/* Modal Terbitkan Surat Jalan */}
+      {/* Modal Terbitkan / Edit Surat Jalan */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Terbitkan Surat Jalan (DO) Pengiriman"
+        title={isEditing ? 'Edit Surat Jalan Pengiriman' : 'Terbitkan Surat Jalan (DO) Pengiriman'}
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -361,7 +390,7 @@ export default function SuratJalanPage() {
               disabled={formLoading}
               className="px-5 py-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-xl shadow-sm disabled:opacity-50"
             >
-              {formLoading ? 'Menerbitkan...' : 'Terbitkan & Buka Cetak'}
+              {formLoading ? 'Memproses...' : isEditing ? 'Simpan Perubahan' : 'Terbitkan & Buka Cetak'}
             </button>
           </div>
         </form>

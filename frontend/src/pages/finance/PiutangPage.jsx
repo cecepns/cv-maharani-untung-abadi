@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, CreditCard, CheckCircle2, ArrowDownLeft } from 'lucide-react';
+import { Plus, CreditCard, CheckCircle2, ArrowDownLeft, Edit2, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { request } from '../../utils/request';
 import { API_ENDPOINTS } from '../../utils/endpoints';
 import SearchInput from '../../components/common/SearchInput';
 import Pagination from '../../components/common/Pagination';
 import Modal from '../../components/common/Modal';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 import Badge from '../../components/common/Badge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
@@ -22,6 +23,11 @@ export default function PiutangPage() {
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, id: null, name: '' });
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   const [formData, setFormData] = useState({
     invoice_id: '',
     tanggal_bayar: new Date().toISOString().split('T')[0],
@@ -70,6 +76,8 @@ export default function PiutangPage() {
   }, [page, limit, search]);
 
   const handleOpenCreate = () => {
+    setIsEditing(false);
+    setEditingId(null);
     const inv = invoices.length ? invoices[0] : null;
     setFormData({
       invoice_id: inv ? inv.id : '',
@@ -79,6 +87,34 @@ export default function PiutangPage() {
       catatan: 'Pelunasan piutang customer',
     });
     setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (p) => {
+    setIsEditing(true);
+    setEditingId(p.id);
+    setFormData({
+      invoice_id: p.invoice_id || '',
+      tanggal_bayar: p.tanggal_bayar ? p.tanggal_bayar.split('T')[0] : new Date().toISOString().split('T')[0],
+      metode_bayar: p.metode_bayar || 'Transfer BCA',
+      jumlah_bayar: Number(p.nominal_bayar || p.jumlah_bayar || 0),
+      catatan: p.catatan || '',
+    });
+    setIsModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      setDeleteLoading(true);
+      await request.delete(API_ENDPOINTS.FINANCE.PIUTANG_BAYAR_DETAIL(deleteDialog.id));
+      toast.success('Data pembayaran piutang berhasil dihapus');
+      setDeleteDialog({ isOpen: false, id: null, name: '' });
+      fetchPayments();
+      fetchInvoices();
+    } catch (err) {
+      toast.error('Gagal menghapus: ' + err.message);
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   const handleInvoiceSelect = (invId) => {
@@ -96,8 +132,17 @@ export default function PiutangPage() {
     e.preventDefault();
     try {
       setFormLoading(true);
-      await request.post(API_ENDPOINTS.FINANCE.PIUTANG_BAYAR, formData);
-      toast.success('Penerimaan pembayaran piutang berhasil dicatat!');
+      const payload = {
+        ...formData,
+        nominal_bayar: formData.jumlah_bayar,
+      };
+      if (isEditing) {
+        await request.put(API_ENDPOINTS.FINANCE.PIUTANG_BAYAR_DETAIL(editingId), payload);
+        toast.success('Pembayaran piutang berhasil diperbarui!');
+      } else {
+        await request.post(API_ENDPOINTS.FINANCE.PIUTANG_BAYAR, payload);
+        toast.success('Penerimaan pembayaran piutang berhasil dicatat!');
+      }
       setIsModalOpen(false);
       fetchPayments();
       fetchInvoices();
@@ -160,6 +205,7 @@ export default function PiutangPage() {
                   <th className="px-6 py-4">Metode Pembayaran</th>
                   <th className="px-6 py-4 text-right">Jumlah Diterima (Rp)</th>
                   <th className="px-6 py-4">Catatan</th>
+                  <th className="px-6 py-4 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -183,6 +229,24 @@ export default function PiutangPage() {
                     </td>
                     <td className="px-6 py-4 text-xs text-slate-600">
                       {p.catatan}
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          onClick={() => handleOpenEdit(p)}
+                          className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                          title="Edit Pembayaran"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteDialog({ isOpen: true, id: p.id, name: p.nomor_bukti })}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          title="Hapus Pembayaran"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -208,7 +272,7 @@ export default function PiutangPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Penerimaan Pembayaran Piutang Customer"
+        title={isEditing ? 'Edit Pembayaran Piutang Customer' : 'Penerimaan Pembayaran Piutang Customer'}
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -287,11 +351,23 @@ export default function PiutangPage() {
               disabled={formLoading}
               className="px-5 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-sm disabled:opacity-50"
             >
-              {formLoading ? 'Memproses...' : 'Catat Pelunasan Piutang'}
+              {formLoading ? 'Memproses...' : (isEditing ? 'Simpan Perubahan' : 'Catat Pelunasan Piutang')}
             </button>
           </div>
         </form>
       </Modal>
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        isOpen={deleteDialog.isOpen}
+        onClose={() => setDeleteDialog({ isOpen: false, id: null, name: '' })}
+        onConfirm={confirmDelete}
+        isLoading={deleteLoading}
+        title="Hapus Pembayaran Piutang"
+        message={`Apakah Anda yakin ingin menghapus data bukti pembayaran "${deleteDialog.name}"? Saldo sisa tagihan pada invoice pelanggan akan dikembalikan otomatis.`}
+        confirmText="Ya, Hapus"
+        confirmVariant="danger"
+      />
     </div>
   );
 }

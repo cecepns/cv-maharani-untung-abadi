@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, CreditCard, CheckCircle2 } from 'lucide-react';
+import { Plus, CreditCard, CheckCircle2, Edit2, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { request } from '../../utils/request';
 import { API_ENDPOINTS } from '../../utils/endpoints';
 import SearchInput from '../../components/common/SearchInput';
 import Pagination from '../../components/common/Pagination';
 import Modal from '../../components/common/Modal';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 import Badge from '../../components/common/Badge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
@@ -22,6 +23,11 @@ export default function HutangPage() {
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, id: null, name: '' });
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   const [formData, setFormData] = useState({
     faktur_beli_id: '',
     tanggal_bayar: new Date().toISOString().split('T')[0],
@@ -70,6 +76,8 @@ export default function HutangPage() {
   }, [page, limit, search]);
 
   const handleOpenCreate = () => {
+    setIsEditing(false);
+    setEditingId(null);
     const fb = notaBeli.length ? notaBeli[0] : null;
     setFormData({
       faktur_beli_id: fb ? fb.id : '',
@@ -79,6 +87,34 @@ export default function HutangPage() {
       catatan: 'Pembayaran hutang supplier sheet/material',
     });
     setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (p) => {
+    setIsEditing(true);
+    setEditingId(p.id);
+    setFormData({
+      faktur_beli_id: p.faktur_beli_id || p.nota_id || '',
+      tanggal_bayar: p.tanggal_bayar ? p.tanggal_bayar.split('T')[0] : new Date().toISOString().split('T')[0],
+      metode_bayar: p.metode_bayar || 'Transfer BCA',
+      jumlah_bayar: Number(p.jumlah_bayar || p.nominal_bayar || 0),
+      catatan: p.catatan || '',
+    });
+    setIsModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      setDeleteLoading(true);
+      await request.delete(API_ENDPOINTS.FINANCE.HUTANG_BAYAR_DETAIL(deleteDialog.id));
+      toast.success('Data pembayaran hutang berhasil dihapus');
+      setDeleteDialog({ isOpen: false, id: null, name: '' });
+      fetchPayments();
+      fetchNotaBeli();
+    } catch (err) {
+      toast.error('Gagal menghapus: ' + err.message);
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   const handleFakturSelect = (fbId) => {
@@ -96,8 +132,13 @@ export default function HutangPage() {
     e.preventDefault();
     try {
       setFormLoading(true);
-      await request.post(API_ENDPOINTS.FINANCE.HUTANG_BAYAR, formData);
-      toast.success('Pengeluaran pembayaran hutang supplier berhasil dicatat!');
+      if (isEditing) {
+        await request.put(API_ENDPOINTS.FINANCE.HUTANG_BAYAR_DETAIL(editingId), formData);
+        toast.success('Pembayaran hutang supplier berhasil diperbarui!');
+      } else {
+        await request.post(API_ENDPOINTS.FINANCE.HUTANG_BAYAR, formData);
+        toast.success('Pengeluaran pembayaran hutang supplier berhasil dicatat!');
+      }
       setIsModalOpen(false);
       fetchPayments();
       fetchNotaBeli();
@@ -160,6 +201,7 @@ export default function HutangPage() {
                   <th className="px-6 py-4">Metode Bayar</th>
                   <th className="px-6 py-4 text-right">Jumlah Dibayar (Rp)</th>
                   <th className="px-6 py-4">Keterangan</th>
+                  <th className="px-6 py-4 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -183,6 +225,24 @@ export default function HutangPage() {
                     </td>
                     <td className="px-6 py-4 text-xs text-slate-600">
                       {p.catatan}
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          onClick={() => handleOpenEdit(p)}
+                          className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+                          title="Edit Pembayaran"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteDialog({ isOpen: true, id: p.id, name: p.nomor_bukti })}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          title="Hapus Pembayaran"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -208,7 +268,7 @@ export default function HutangPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Pembayaran Hutang ke Supplier"
+        title={isEditing ? 'Edit Pembayaran Hutang Supplier' : 'Pembayaran Hutang ke Supplier'}
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -285,11 +345,23 @@ export default function HutangPage() {
               disabled={formLoading}
               className="px-5 py-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-xl shadow-sm disabled:opacity-50"
             >
-              {formLoading ? 'Memproses...' : 'Simpan Pembayaran Hutang'}
+              {formLoading ? 'Memproses...' : (isEditing ? 'Simpan Perubahan' : 'Simpan Pembayaran Hutang')}
             </button>
           </div>
         </form>
       </Modal>
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        isOpen={deleteDialog.isOpen}
+        onClose={() => setDeleteDialog({ isOpen: false, id: null, name: '' })}
+        onConfirm={confirmDelete}
+        isLoading={deleteLoading}
+        title="Hapus Pembayaran Hutang"
+        message={`Apakah Anda yakin ingin menghapus data pembayaran bukti "${deleteDialog.name}"? Saldo sisa tagihan pada faktur pembelian akan dikembalikan otomatis.`}
+        confirmText="Ya, Hapus"
+        confirmVariant="danger"
+      />
     </div>
   );
 }

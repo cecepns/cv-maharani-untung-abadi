@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Truck, CheckCircle2, FileText, Check } from 'lucide-react';
+import { Plus, Truck, CheckCircle2, FileText, Check, Edit2, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { request } from '../../utils/request';
 import { API_ENDPOINTS } from '../../utils/endpoints';
 import SearchInput from '../../components/common/SearchInput';
 import Pagination from '../../components/common/Pagination';
 import Modal from '../../components/common/Modal';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 import Badge from '../../components/common/Badge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
@@ -22,6 +23,11 @@ export default function PenerimaanPage() {
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, id: null, name: '' });
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   const [formData, setFormData] = useState({
     po_id: '',
     tanggal_terima: new Date().toISOString().split('T')[0],
@@ -68,6 +74,8 @@ export default function PenerimaanPage() {
   }, [page, limit, search]);
 
   const handleOpenCreate = () => {
+    setIsEditing(false);
+    setEditingId(null);
     setFormData({
       po_id: orders.length ? orders[0].id : '',
       tanggal_terima: new Date().toISOString().split('T')[0],
@@ -78,12 +86,44 @@ export default function PenerimaanPage() {
     setIsModalOpen(true);
   };
 
+  const handleOpenEdit = (l) => {
+    setIsEditing(true);
+    setEditingId(l.id);
+    setFormData({
+      po_id: l.po_id || '',
+      tanggal_terima: l.tanggal_terima ? l.tanggal_terima.split('T')[0] : new Date().toISOString().split('T')[0],
+      no_sj_supplier: l.no_sj_supplier || l.nomor_sj_supplier || '',
+      nama_penerima: l.nama_penerima || l.penerima_nama || '',
+      catatan: l.catatan || '',
+    });
+    setIsModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      setDeleteLoading(true);
+      await request.delete(API_ENDPOINTS.PURCHASING.PENERIMAAN_DETAIL(deleteDialog.id));
+      toast.success('Data penerimaan barang berhasil dihapus');
+      setDeleteDialog({ isOpen: false, id: null, name: '' });
+      fetchLPB();
+    } catch (err) {
+      toast.error('Gagal menghapus: ' + err.message);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       setFormLoading(true);
-      await request.post(API_ENDPOINTS.PURCHASING.PENERIMAAN, formData);
-      toast.success('Penerimaan barang berhasil dicatat! Stok gudang telah bertambah');
+      if (isEditing) {
+        await request.put(API_ENDPOINTS.PURCHASING.PENERIMAAN_DETAIL(editingId), formData);
+        toast.success('Laporan penerimaan barang berhasil diperbarui');
+      } else {
+        await request.post(API_ENDPOINTS.PURCHASING.PENERIMAAN, formData);
+        toast.success('Penerimaan barang berhasil dicatat! Stok gudang telah bertambah');
+      }
       setIsModalOpen(false);
       fetchLPB();
     } catch (err) {
@@ -156,6 +196,7 @@ export default function PenerimaanPage() {
                   <th className="px-6 py-4">Item Diterima</th>
                   <th className="px-6 py-4">Penerima Gudang</th>
                   <th className="px-6 py-4">Status Verifikasi</th>
+                  <th className="px-6 py-4 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -188,6 +229,24 @@ export default function PenerimaanPage() {
                         Masuk Gudang
                       </Badge>
                     </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          onClick={() => handleOpenEdit(l)}
+                          className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                          title="Edit LPB"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteDialog({ isOpen: true, id: l.id, name: l.nomor_lpb })}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          title="Hapus LPB"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -212,7 +271,7 @@ export default function PenerimaanPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Input Laporan Penerimaan Barang (LPB)"
+        title={isEditing ? 'Edit Laporan Penerimaan Barang (LPB)' : 'Input Laporan Penerimaan Barang (LPB)'}
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -286,11 +345,23 @@ export default function PenerimaanPage() {
               disabled={formLoading}
               className="px-5 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-sm disabled:opacity-50"
             >
-              {formLoading ? 'Menyimpan...' : 'Simpan LPB & Tambah Stok'}
+              {formLoading ? 'Menyimpan...' : (isEditing ? 'Simpan Perubahan' : 'Simpan LPB & Tambah Stok')}
             </button>
           </div>
         </form>
       </Modal>
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        isOpen={deleteDialog.isOpen}
+        onClose={() => setDeleteDialog({ isOpen: false, id: null, name: '' })}
+        onConfirm={confirmDelete}
+        isLoading={deleteLoading}
+        title="Hapus Laporan Penerimaan Barang"
+        message={`Apakah Anda yakin ingin menghapus dokumen penerimaan "${deleteDialog.name}"?`}
+        confirmText="Ya, Hapus"
+        confirmVariant="danger"
+      />
     </div>
   );
 }

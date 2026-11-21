@@ -29,6 +29,7 @@ export const API_ENDPOINTS = {
     INVOICES: '/api/marketing/invoices',
     INVOICE_DETAIL: (id) => `/api/marketing/invoices/${id}`,
     FAKTUR_PAJAK: '/api/marketing/faktur-pajak',
+    FAKTUR_PAJAK_DETAIL: (id) => `/api/marketing/faktur-pajak/${id}`,
     RETUR_PENJUALAN: '/api/marketing/retur-penjualan',
     RETUR_PENJUALAN_DETAIL: (id) => `/api/marketing/retur-penjualan/${id}`,
     LAPORAN_OMSET_CUSTOMER: '/api/marketing/laporan-omset-customer',
@@ -47,9 +48,11 @@ export const API_ENDPOINTS = {
     ORDERS: '/api/purchasing/orders',
     ORDER_DETAIL: (id) => `/api/purchasing/orders/${id}`,
     PENERIMAAN: '/api/purchasing/penerimaan',
+    PENERIMAAN_DETAIL: (id) => `/api/purchasing/penerimaan/${id}`,
     NOTA_BELI: '/api/purchasing/nota-beli',
     NOTA_BELI_DETAIL: (id) => `/api/purchasing/nota-beli/${id}`,
     RETUR_BELI: '/api/purchasing/retur-beli',
+    RETUR_BELI_DETAIL: (id) => `/api/purchasing/retur-beli/${id}`,
   },
 
   GUDANG: {
@@ -58,6 +61,7 @@ export const API_ENDPOINTS = {
     STOCK_BARANG_JADI: '/api/gudang/stock-barang-jadi',
     WIP: '/api/gudang/wip',
     MUTASI: '/api/gudang/mutasi',
+    MUTASI_DETAIL: (id) => `/api/gudang/mutasi/${id}`,
     PENYESUAIAN_STOK: '/api/gudang/penyesuaian-stok',
   },
 
@@ -74,7 +78,9 @@ export const API_ENDPOINTS = {
 
   FINANCE: {
     PIUTANG_BAYAR: '/api/finance/piutang/pembayaran',
+    PIUTANG_BAYAR_DETAIL: (id) => `/api/finance/piutang/pembayaran/${id}`,
     HUTANG_BAYAR: '/api/finance/hutang/pembayaran',
+    HUTANG_BAYAR_DETAIL: (id) => `/api/finance/hutang/pembayaran/${id}`,
     AGING_PIUTANG_CUSTOMER: '/api/finance/aging-piutang-customer',
     AGING_PIUTANG_SALES: '/api/finance/aging-piutang-sales',
     SALDO_HUTANG_PIUTANG: '/api/finance/saldo-hutang-piutang',
@@ -82,7 +88,9 @@ export const API_ENDPOINTS = {
 
   ACCOUNTING: {
     COA: '/api/accounting/coa',
+    COA_DETAIL: (id) => `/api/accounting/coa/${id}`,
     JURNAL: '/api/accounting/jurnal',
+    JURNAL_DETAIL: (id) => `/api/accounting/jurnal/${id}`,
     LAPORAN_KAS_HARIAN: '/api/accounting/laporan-kas-harian',
     LAPORAN_BANK_HARIAN: '/api/accounting/laporan-bank-harian',
     BUKU_BESAR: '/api/accounting/buku-besar',

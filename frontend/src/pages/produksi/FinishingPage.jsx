@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Scissors, CheckCircle2 } from 'lucide-react';
+import { Plus, Scissors, CheckCircle2, Edit2, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { request } from '../../utils/request';
 import { API_ENDPOINTS } from '../../utils/endpoints';
 import SearchInput from '../../components/common/SearchInput';
 import Pagination from '../../components/common/Pagination';
 import Modal from '../../components/common/Modal';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 import Badge from '../../components/common/Badge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
@@ -22,6 +23,11 @@ export default function FinishingPage() {
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, id: null, name: '' });
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   const [formData, setFormData] = useState({
     spk_id: '',
     tanggal_proses: new Date().toISOString().split('T')[0],
@@ -72,6 +78,8 @@ export default function FinishingPage() {
   }, [page, limit, search]);
 
   const handleOpenCreate = () => {
+    setIsEditing(false);
+    setEditingId(null);
     const spk = spkList.length ? spkList[0] : null;
     const target = spk ? spk.qty_target : 3000;
     setFormData({
@@ -88,12 +96,48 @@ export default function FinishingPage() {
     setIsModalOpen(true);
   };
 
+  const handleOpenEdit = (f) => {
+    setIsEditing(true);
+    setEditingId(f.id);
+    setFormData({
+      spk_id: f.spk_id || '',
+      tanggal_proses: f.tanggal_proses ? f.tanggal_proses.split('T')[0] : new Date().toISOString().split('T')[0],
+      jenis_finishing: f.jenis_finishing || 'Stitching Kawat',
+      operator_nama: f.operator_nama || '',
+      mesin: f.mesin || '',
+      qty_masuk: Number(f.qty_masuk || 0),
+      qty_bagus: Number(f.qty_bagus || 0),
+      qty_reject: Number(f.qty_reject || 0),
+      catatan: f.catatan || '',
+    });
+    setIsModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      setDeleteLoading(true);
+      await request.delete(API_ENDPOINTS.PRODUKSI.FINISHING_DETAIL(deleteDialog.id));
+      toast.success('Data proses finishing berhasil dihapus');
+      setDeleteDialog({ isOpen: false, id: null, name: '' });
+      fetchFinishing();
+    } catch (err) {
+      toast.error('Gagal menghapus: ' + err.message);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       setFormLoading(true);
-      await request.post(API_ENDPOINTS.PRODUKSI.FINISHING, formData);
-      toast.success('Hasil finishing berhasil dicatat! SPK berpindah ke tahap Ikat Packing');
+      if (isEditing) {
+        await request.put(API_ENDPOINTS.PRODUKSI.FINISHING_DETAIL(editingId), formData);
+        toast.success('Hasil finishing berhasil diperbarui');
+      } else {
+        await request.post(API_ENDPOINTS.PRODUKSI.FINISHING, formData);
+        toast.success('Hasil finishing berhasil dicatat! SPK berpindah ke tahap Ikat Packing');
+      }
       setIsModalOpen(false);
       fetchFinishing();
     } catch (err) {
@@ -156,6 +200,7 @@ export default function FinishingPage() {
                   <th className="px-6 py-4">Hasil Bagus</th>
                   <th className="px-6 py-4">Reject</th>
                   <th className="px-6 py-4">Status</th>
+                  <th className="px-6 py-4 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -187,6 +232,24 @@ export default function FinishingPage() {
                         {f.status}
                       </Badge>
                     </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          onClick={() => handleOpenEdit(f)}
+                          className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+                          title="Edit Hasil Finishing"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteDialog({ isOpen: true, id: f.id, name: `Finishing SPK ${f.nomor_spk}` })}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          title="Hapus Hasil Finishing"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -211,7 +274,7 @@ export default function FinishingPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Catat Hasil Proses Finishing"
+        title={isEditing ? 'Edit Hasil Proses Finishing' : 'Catat Hasil Proses Finishing'}
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -308,11 +371,23 @@ export default function FinishingPage() {
               disabled={formLoading}
               className="px-5 py-2 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded-xl shadow-sm disabled:opacity-50"
             >
-              {formLoading ? 'Memproses...' : 'Simpan & Lanjutkan ke Ikat'}
+              {formLoading ? 'Memproses...' : (isEditing ? 'Simpan Perubahan' : 'Simpan & Lanjutkan ke Ikat')}
             </button>
           </div>
         </form>
       </Modal>
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        isOpen={deleteDialog.isOpen}
+        onClose={() => setDeleteDialog({ isOpen: false, id: null, name: '' })}
+        onConfirm={confirmDelete}
+        isLoading={deleteLoading}
+        title="Hapus Hasil Finishing"
+        message={`Apakah Anda yakin ingin menghapus data laporan proses finishing "${deleteDialog.name}"?`}
+        confirmText="Ya, Hapus"
+        confirmVariant="danger"
+      />
     </div>
   );
 }

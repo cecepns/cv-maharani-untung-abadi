@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Receipt, CheckCircle, Clock } from 'lucide-react';
+import { Plus, Receipt, CheckCircle, Clock, Edit2, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { request } from '../../utils/request';
 import { API_ENDPOINTS } from '../../utils/endpoints';
 import SearchInput from '../../components/common/SearchInput';
 import Pagination from '../../components/common/Pagination';
 import Modal from '../../components/common/Modal';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 import Badge from '../../components/common/Badge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
@@ -22,6 +23,11 @@ export default function NotaBeliPage() {
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, id: null, name: '' });
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   const [formData, setFormData] = useState({
     po_id: '',
     supplier_id: '',
@@ -68,6 +74,8 @@ export default function NotaBeliPage() {
   }, [page, limit, search]);
 
   const handleOpenCreate = () => {
+    setIsEditing(false);
+    setEditingId(null);
     const po = orders.length ? orders[0] : null;
     setFormData({
       po_id: po ? po.id : '',
@@ -77,6 +85,33 @@ export default function NotaBeliPage() {
       total_tagihan: po ? po.total_nilai : 10000000,
     });
     setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (n) => {
+    setIsEditing(true);
+    setEditingId(n.id);
+    setFormData({
+      po_id: n.po_id || '',
+      supplier_id: n.supplier_id || '',
+      tanggal_faktur: n.tanggal_faktur ? n.tanggal_faktur.split('T')[0] : new Date().toISOString().split('T')[0],
+      jatuh_tempo: n.jatuh_tempo ? n.jatuh_tempo.split('T')[0] : new Date().toISOString().split('T')[0],
+      total_tagihan: Number(n.total_tagihan || 0),
+    });
+    setIsModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      setDeleteLoading(true);
+      await request.delete(API_ENDPOINTS.PURCHASING.NOTA_BELI_DETAIL(deleteDialog.id));
+      toast.success('Nota pembelian berhasil dihapus');
+      setDeleteDialog({ isOpen: false, id: null, name: '' });
+      fetchNotaBeli();
+    } catch (err) {
+      toast.error('Gagal menghapus: ' + err.message);
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   const handlePOSelect = (poId) => {
@@ -95,8 +130,13 @@ export default function NotaBeliPage() {
     e.preventDefault();
     try {
       setFormLoading(true);
-      await request.post(API_ENDPOINTS.PURCHASING.NOTA_BELI, formData);
-      toast.success('Nota Pembelian supplier berhasil dicatat');
+      if (isEditing) {
+        await request.put(API_ENDPOINTS.PURCHASING.NOTA_BELI_DETAIL(editingId), formData);
+        toast.success('Nota Pembelian supplier berhasil diperbarui');
+      } else {
+        await request.post(API_ENDPOINTS.PURCHASING.NOTA_BELI, formData);
+        toast.success('Nota Pembelian supplier berhasil dicatat');
+      }
       setIsModalOpen(false);
       fetchNotaBeli();
     } catch (err) {
@@ -162,6 +202,7 @@ export default function NotaBeliPage() {
                   <th className="px-6 py-4">Total Tagihan</th>
                   <th className="px-6 py-4">Sisa Hutang</th>
                   <th className="px-6 py-4">Status Bayar</th>
+                  <th className="px-6 py-4 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -190,6 +231,24 @@ export default function NotaBeliPage() {
                         {n.status_bayar}
                       </Badge>
                     </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          onClick={() => handleOpenEdit(n)}
+                          className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+                          title="Edit Nota Beli"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteDialog({ isOpen: true, id: n.id, name: n.nomor_faktur_beli })}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          title="Hapus Nota Beli"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -214,7 +273,7 @@ export default function NotaBeliPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Catat Nota Pembelian / Faktur Supplier"
+        title={isEditing ? 'Edit Nota Pembelian / Faktur Supplier' : 'Catat Nota Pembelian / Faktur Supplier'}
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -274,11 +333,23 @@ export default function NotaBeliPage() {
               disabled={formLoading}
               className="px-5 py-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-xl shadow-sm disabled:opacity-50"
             >
-              {formLoading ? 'Menyimpan...' : 'Simpan Nota Beli'}
+              {formLoading ? 'Menyimpan...' : (isEditing ? 'Simpan Perubahan' : 'Simpan Nota Beli')}
             </button>
           </div>
         </form>
       </Modal>
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        isOpen={deleteDialog.isOpen}
+        onClose={() => setDeleteDialog({ isOpen: false, id: null, name: '' })}
+        onConfirm={confirmDelete}
+        isLoading={deleteLoading}
+        title="Hapus Nota Pembelian"
+        message={`Apakah Anda yakin ingin menghapus faktur pembelian "${deleteDialog.name}"?`}
+        confirmText="Ya, Hapus"
+        confirmVariant="danger"
+      />
     </div>
   );
 }

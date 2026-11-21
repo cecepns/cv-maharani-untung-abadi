@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, RotateCcw, CheckCircle } from 'lucide-react';
+import { Plus, RotateCcw, CheckCircle, Edit2, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { request } from '../../utils/request';
 import { API_ENDPOINTS } from '../../utils/endpoints';
 import SearchInput from '../../components/common/SearchInput';
 import Pagination from '../../components/common/Pagination';
 import Modal from '../../components/common/Modal';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 import Badge from '../../components/common/Badge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
@@ -21,6 +22,11 @@ export default function ReturBeliPage() {
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, id: null, name: '' });
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   const [formData, setFormData] = useState({
     supplier_nama: '',
     alasan: 'Sheet bergelombang lembek / cacat pabrik',
@@ -65,6 +71,8 @@ export default function ReturBeliPage() {
   }, [page, limit, search]);
 
   const handleOpenCreate = () => {
+    setIsEditing(false);
+    setEditingId(null);
     setFormData({
       supplier_nama: suppliers.length ? suppliers[0].nama_supplier : 'PT. Fajar Surya Wisesa Tbk',
       alasan: 'Sheet karton lembek dan bergelombang cacat 100 lembar',
@@ -73,16 +81,46 @@ export default function ReturBeliPage() {
     setIsModalOpen(true);
   };
 
+  const handleOpenEdit = (r) => {
+    setIsEditing(true);
+    setEditingId(r.id);
+    setFormData({
+      supplier_nama: r.supplier_nama || r.nama_supplier || '',
+      alasan: r.alasan || '',
+      total_nilai: Number(r.total_nilai || 0),
+    });
+    setIsModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      setDeleteLoading(true);
+      await request.delete(API_ENDPOINTS.PURCHASING.RETUR_BELI_DETAIL(deleteDialog.id));
+      toast.success('Data retur pembelian berhasil dihapus');
+      setDeleteDialog({ isOpen: false, id: null, name: '' });
+      fetchRetur();
+    } catch (err) {
+      toast.error('Gagal menghapus: ' + err.message);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       setFormLoading(true);
-      await request.post(API_ENDPOINTS.PURCHASING.RETUR_BELI, formData);
-      toast.success('Retur pembelian berhasil dibuat & diajukan ke supplier');
+      if (isEditing) {
+        await request.put(API_ENDPOINTS.PURCHASING.RETUR_BELI_DETAIL(editingId), formData);
+        toast.success('Retur pembelian berhasil diperbarui');
+      } else {
+        await request.post(API_ENDPOINTS.PURCHASING.RETUR_BELI, formData);
+        toast.success('Retur pembelian berhasil dibuat & diajukan ke supplier');
+      }
       setIsModalOpen(false);
       fetchRetur();
     } catch (err) {
-      toast.error(err.message || 'Gagal membuat retur');
+      toast.error(err.message || 'Gagal menyimpan retur');
     } finally {
       setFormLoading(false);
     }
@@ -142,6 +180,7 @@ export default function ReturBeliPage() {
                   <th className="px-6 py-4">Alasan Retur / Cacat Sheet</th>
                   <th className="px-6 py-4">Nilai Retur Potong Hutang</th>
                   <th className="px-6 py-4">Status Approval</th>
+                  <th className="px-6 py-4 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -165,6 +204,24 @@ export default function ReturBeliPage() {
                         <CheckCircle className="w-3 h-3 mr-1" />
                         {r.status}
                       </Badge>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          onClick={() => handleOpenEdit(r)}
+                          className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+                          title="Edit Retur Beli"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteDialog({ isOpen: true, id: r.id, name: r.nomor_retur_beli })}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          title="Hapus Retur Beli"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -190,7 +247,7 @@ export default function ReturBeliPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Ajukan Retur Bahan ke Supplier"
+        title={isEditing ? 'Edit Retur Bahan Pembelian' : 'Ajukan Retur Bahan ke Supplier'}
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -245,11 +302,23 @@ export default function ReturBeliPage() {
               disabled={formLoading}
               className="px-5 py-2 text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-sm disabled:opacity-50"
             >
-              {formLoading ? 'Memproses...' : 'Kirim Retur ke Supplier'}
+              {formLoading ? 'Memproses...' : (isEditing ? 'Simpan Perubahan' : 'Kirim Retur ke Supplier')}
             </button>
           </div>
         </form>
       </Modal>
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        isOpen={deleteDialog.isOpen}
+        onClose={() => setDeleteDialog({ isOpen: false, id: null, name: '' })}
+        onConfirm={confirmDelete}
+        isLoading={deleteLoading}
+        title="Hapus Retur Pembelian"
+        message={`Apakah Anda yakin ingin menghapus data retur pembelian "${deleteDialog.name}"?`}
+        confirmText="Ya, Hapus"
+        confirmVariant="danger"
+      />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, BookOpen, FileText } from 'lucide-react';
+import { Plus, BookOpen, FileText, Edit2, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { request } from '../../utils/request';
 import { API_ENDPOINTS } from '../../utils/endpoints';
@@ -11,6 +11,7 @@ import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
 import SearchableSelect from '../../components/common/SearchableSelect';
 import DatePickerInput from '../../components/common/DatePickerInput';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 
 export default function JurnalPage() {
   const [jurnalList, setJurnalList] = useState([]);
@@ -22,6 +23,11 @@ export default function JurnalPage() {
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, item: null });
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   const [formData, setFormData] = useState({
     tanggal: new Date().toISOString().split('T')[0],
     tipe_jurnal: 'Memorial',
@@ -70,6 +76,8 @@ export default function JurnalPage() {
   }, [page, limit, search]);
 
   const handleOpenCreate = () => {
+    setIsEditing(false);
+    setEditingId(null);
     setFormData({
       tanggal: new Date().toISOString().split('T')[0],
       tipe_jurnal: 'Memorial',
@@ -82,18 +90,59 @@ export default function JurnalPage() {
     setIsModalOpen(true);
   };
 
+  const handleOpenEdit = (j) => {
+    setIsEditing(true);
+    setEditingId(j.id);
+    setFormData({
+      tanggal: j.tanggal,
+      tipe_jurnal: j.tipe_jurnal,
+      keterangan: j.keterangan || '',
+      items: (j.items && j.items.length > 0)
+        ? j.items.map(it => ({
+            akun_id: it.akun_id,
+            posisi: it.posisi,
+            nominal: Number(it.nominal),
+            nama_akun: it.nama_akun
+          }))
+        : [
+            { akun_id: coaList.length ? coaList[0].id : '', posisi: 'Debet', nominal: 0 },
+            { akun_id: coaList.length > 1 ? coaList[1].id : '', posisi: 'Kredit', nominal: 0 },
+          ]
+    });
+    setIsModalOpen(true);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       setFormLoading(true);
-      await request.post(API_ENDPOINTS.ACCOUNTING.JURNAL, formData);
-      toast.success('Jurnal transaksi berhasil dibukukan!');
+      if (isEditing) {
+        await request.put(API_ENDPOINTS.ACCOUNTING.JURNAL_DETAIL(editingId), formData);
+        toast.success('Jurnal transaksi berhasil diperbarui!');
+      } else {
+        await request.post(API_ENDPOINTS.ACCOUNTING.JURNAL, formData);
+        toast.success('Jurnal transaksi berhasil dibukukan!');
+      }
       setIsModalOpen(false);
       fetchJurnal();
     } catch (err) {
       toast.error(err.message || 'Gagal menyimpan jurnal');
     } finally {
       setFormLoading(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    try {
+      setDeleteLoading(true);
+      await request.delete(API_ENDPOINTS.ACCOUNTING.JURNAL_DETAIL(deleteDialog.item.id));
+      toast.success('Jurnal transaksi berhasil dihapus');
+      setDeleteDialog({ isOpen: false, item: null });
+      fetchJurnal();
+    } catch (err) {
+      toast.error(err.message || 'Gagal menghapus jurnal');
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -149,6 +198,7 @@ export default function JurnalPage() {
                   <th className="px-6 py-4 text-right">Total Debet (Rp)</th>
                   <th className="px-6 py-4 text-right">Total Kredit (Rp)</th>
                   <th className="px-6 py-4">Status Balance</th>
+                  <th className="px-6 py-4 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -195,6 +245,24 @@ export default function JurnalPage() {
                     <td className="px-6 py-4">
                       <Badge variant="success">Balance</Badge>
                     </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          onClick={() => handleOpenEdit(j)}
+                          className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+                          title="Edit Jurnal"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteDialog({ isOpen: true, item: j })}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          title="Hapus Jurnal"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -215,11 +283,11 @@ export default function JurnalPage() {
         />
       </div>
 
-      {/* Modal Form Jurnal Manual */}
+      {/* Modal Form Jurnal Manual / Edit */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Input Jurnal Transaksi Manual"
+        title={isEditing ? 'Edit Jurnal Transaksi' : 'Input Jurnal Transaksi Manual'}
         size="lg"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -327,11 +395,21 @@ export default function JurnalPage() {
               disabled={formLoading}
               className="px-5 py-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-xl shadow-sm disabled:opacity-50"
             >
-              {formLoading ? 'Memproses...' : 'Bukukan Transaksi'}
+              {formLoading ? 'Memproses...' : isEditing ? 'Simpan Perubahan' : 'Bukukan Transaksi'}
             </button>
           </div>
         </form>
       </Modal>
+
+      {/* Confirm Dialog Hapus Jurnal */}
+      <ConfirmDialog
+        isOpen={deleteDialog.isOpen}
+        onClose={() => setDeleteDialog({ isOpen: false, item: null })}
+        onConfirm={confirmDelete}
+        loading={deleteLoading}
+        title="Hapus Entri Jurnal Umum"
+        message={`Apakah Anda yakin ingin menghapus jurnal "${deleteDialog.item?.nomor_jurnal}" (${deleteDialog.item?.keterangan})? Tindakan ini akan membatalkan penjurnalan debet dan kredit.`}
+      />
     </div>
   );
 }

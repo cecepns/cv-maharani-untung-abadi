@@ -935,10 +935,10 @@ app.post('/api/marketing/surat-jalan', async (req, res) => {
 
 app.put('/api/marketing/surat-jalan/:id', async (req, res) => {
   try {
-    const { status, no_kendaraan, nama_supir, catatan } = req.body;
+    const { status, tanggal_kirim, no_kendaraan, nama_supir, catatan } = req.body;
     const [result] = await db.query(
-      'UPDATE surat_jalan SET status = COALESCE(?, status), no_kendaraan = COALESCE(?, no_kendaraan), nama_supir = COALESCE(?, nama_supir), catatan = COALESCE(?, catatan) WHERE id = ?',
-      [status, no_kendaraan, nama_supir, catatan, req.params.id]
+      'UPDATE surat_jalan SET status = COALESCE(?, status), tanggal_kirim = COALESCE(?, tanggal_kirim), no_kendaraan = COALESCE(?, no_kendaraan), nama_supir = COALESCE(?, nama_supir), catatan = COALESCE(?, catatan) WHERE id = ?',
+      [status, tanggal_kirim, no_kendaraan, nama_supir, catatan, req.params.id]
     );
     if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Surat jalan tidak ditemukan' });
     res.json({ success: true, message: 'Surat jalan berhasil diperbarui' });
@@ -1019,10 +1019,19 @@ app.post('/api/marketing/invoices', async (req, res) => {
 
 app.put('/api/marketing/invoices/:id', async (req, res) => {
   try {
-    const { status_bayar, sudah_dibayar, sisa_tagihan } = req.body;
+    const { tanggal_invoice, jatuh_tempo, subtotal, ppn, total_tagihan, status_bayar, sudah_dibayar, sisa_tagihan } = req.body;
     const [result] = await db.query(
-      'UPDATE sales_invoices SET status_bayar = COALESCE(?, status_bayar), sudah_dibayar = COALESCE(?, sudah_dibayar), sisa_tagihan = COALESCE(?, sisa_tagihan) WHERE id = ?',
-      [status_bayar, sudah_dibayar, sisa_tagihan, req.params.id]
+      `UPDATE sales_invoices SET 
+        tanggal_invoice = COALESCE(?, tanggal_invoice),
+        jatuh_tempo = COALESCE(?, jatuh_tempo),
+        subtotal = COALESCE(?, subtotal),
+        ppn = COALESCE(?, ppn),
+        total_tagihan = COALESCE(?, total_tagihan),
+        status_bayar = COALESCE(?, status_bayar),
+        sudah_dibayar = COALESCE(?, sudah_dibayar),
+        sisa_tagihan = COALESCE(?, sisa_tagihan)
+      WHERE id = ?`,
+      [tanggal_invoice, jatuh_tempo, subtotal, ppn, total_tagihan, status_bayar, sudah_dibayar, sisa_tagihan, req.params.id]
     );
     if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Invoice tidak ditemukan' });
     res.json({ success: true, message: 'Invoice berhasil diperbarui' });
@@ -1081,6 +1090,38 @@ app.post('/api/marketing/faktur-pajak', async (req, res) => {
   }
 });
 
+app.put('/api/marketing/faktur-pajak/:id', async (req, res) => {
+  try {
+    const { nomor_faktur, invoice_id, customer_id, tanggal_faktur, dpp, ppn, status } = req.body;
+    const [result] = await db.query(
+      `UPDATE faktur_pajak 
+       SET nomor_faktur = COALESCE(?, nomor_faktur),
+           invoice_id = COALESCE(?, invoice_id),
+           customer_id = COALESCE(?, customer_id),
+           tanggal_faktur = COALESCE(?, tanggal_faktur),
+           dpp = COALESCE(?, dpp),
+           ppn = COALESCE(?, ppn),
+           status = COALESCE(?, status)
+       WHERE id = ?`,
+      [nomor_faktur, invoice_id, customer_id, tanggal_faktur, dpp, ppn, status, req.params.id]
+    );
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Faktur pajak tidak ditemukan' });
+    res.json({ success: true, message: 'Faktur pajak berhasil diperbarui' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
+app.delete('/api/marketing/faktur-pajak/:id', async (req, res) => {
+  try {
+    const [result] = await db.query('DELETE FROM faktur_pajak WHERE id = ?', [req.params.id]);
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Faktur pajak tidak ditemukan' });
+    res.json({ success: true, message: 'Faktur pajak berhasil dihapus' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
 // Retur Penjualan
 app.get('/api/marketing/retur-penjualan', async (req, res) => {
   try {
@@ -1118,6 +1159,38 @@ app.post('/api/marketing/retur-penjualan', async (req, res) => {
       [noRetur, invoice_id, customer_id, product_id, tanggal_retur || new Date().toISOString().split('T')[0], qty || 0, alasan || 'Barang cacat/afkir']
     );
     res.json({ success: true, message: 'Retur penjualan berhasil dicatat', data: { id: result.insertId, nomor_retur: noRetur } });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
+app.put('/api/marketing/retur-penjualan/:id', async (req, res) => {
+  try {
+    const { invoice_id, customer_id, product_id, tanggal_retur, qty, alasan, status } = req.body;
+    const [result] = await db.query(
+      `UPDATE retur_penjualan 
+       SET invoice_id = COALESCE(?, invoice_id),
+           customer_id = COALESCE(?, customer_id),
+           product_id = COALESCE(?, product_id),
+           tanggal_retur = COALESCE(?, tanggal_retur),
+           qty = COALESCE(?, qty),
+           alasan = COALESCE(?, alasan),
+           status = COALESCE(?, status)
+       WHERE id = ?`,
+      [invoice_id, customer_id, product_id, tanggal_retur, qty, alasan, status, req.params.id]
+    );
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Retur penjualan tidak ditemukan' });
+    res.json({ success: true, message: 'Retur penjualan berhasil diperbarui' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
+app.delete('/api/marketing/retur-penjualan/:id', async (req, res) => {
+  try {
+    const [result] = await db.query('DELETE FROM retur_penjualan WHERE id = ?', [req.params.id]);
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Retur penjualan tidak ditemukan' });
+    res.json({ success: true, message: 'Retur penjualan berhasil dihapus' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
   }
@@ -1554,6 +1627,57 @@ app.post('/api/purchasing/orders', async (req, res) => {
   }
 });
 
+app.put('/api/purchasing/orders/:id', async (req, res) => {
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    const { supplier_id, tanggal_po, status, catatan, items } = req.body;
+    let updateFields = [];
+    let updateParams = [];
+
+    if (supplier_id) { updateFields.push('supplier_id = ?'); updateParams.push(supplier_id); }
+    if (tanggal_po) { updateFields.push('tanggal_po = ?'); updateParams.push(tanggal_po); }
+    if (status) { updateFields.push('status = ?'); updateParams.push(status); }
+    if (catatan !== undefined) { updateFields.push('catatan = ?'); updateParams.push(catatan); }
+
+    if (items && items.length > 0) {
+      const total_nilai = items.reduce((sum, it) => sum + (Number(it.qty) * Number(it.harga_satuan)), 0);
+      updateFields.push('total_nilai = ?');
+      updateParams.push(total_nilai);
+
+      await connection.query('DELETE FROM purchase_order_items WHERE po_id = ?', [req.params.id]);
+      for (const it of items) {
+        await connection.query(
+          `INSERT INTO purchase_order_items (po_id, item_type, item_id, item_name, qty, harga_satuan, subtotal)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [
+            req.params.id,
+            it.item_type || it.tipe_barang || 'Sheet',
+            it.item_id || it.barang_id || 1,
+            it.item_name || it.deskripsi_barang || 'Bahan Baku',
+            it.qty,
+            it.harga_satuan,
+            Number(it.qty) * Number(it.harga_satuan)
+          ]
+        );
+      }
+    }
+
+    if (updateFields.length > 0) {
+      updateParams.push(req.params.id);
+      await connection.query(`UPDATE purchase_orders SET ${updateFields.join(', ')} WHERE id = ?`, updateParams);
+    }
+
+    await connection.commit();
+    res.json({ success: true, message: 'Purchase Order berhasil diperbarui' });
+  } catch (err) {
+    await connection.rollback();
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  } finally {
+    connection.release();
+  }
+});
+
 app.delete('/api/purchasing/orders/:id', async (req, res) => {
   try {
     const [result] = await db.query('DELETE FROM purchase_orders WHERE id = ?', [req.params.id]);
@@ -1620,6 +1744,39 @@ app.post('/api/purchasing/penerimaan', async (req, res) => {
   }
 });
 
+app.put('/api/purchasing/penerimaan/:id', async (req, res) => {
+  try {
+    const { po_id, supplier_id, tanggal_terima, no_sj_supplier, nomor_sj_supplier, nama_penerima, penerima_nama, catatan } = req.body;
+    const noSj = no_sj_supplier || nomor_sj_supplier;
+    const penerima = nama_penerima || penerima_nama;
+    const [result] = await db.query(
+      `UPDATE laporan_penerimaan_barang
+       SET po_id = COALESCE(?, po_id),
+           supplier_id = COALESCE(?, supplier_id),
+           tanggal_terima = COALESCE(?, tanggal_terima),
+           no_sj_supplier = COALESCE(?, no_sj_supplier),
+           nama_penerima = COALESCE(?, nama_penerima),
+           catatan = COALESCE(?, catatan)
+       WHERE id = ?`,
+      [po_id, supplier_id, tanggal_terima, noSj, penerima, catatan, req.params.id]
+    );
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Laporan penerimaan barang tidak ditemukan' });
+    res.json({ success: true, message: 'Laporan penerimaan barang berhasil diperbarui' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
+app.delete('/api/purchasing/penerimaan/:id', async (req, res) => {
+  try {
+    const [result] = await db.query('DELETE FROM laporan_penerimaan_barang WHERE id = ?', [req.params.id]);
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Laporan penerimaan barang tidak ditemukan' });
+    res.json({ success: true, message: 'Laporan penerimaan barang berhasil dihapus' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
 // Nota Pembelian
 app.get('/api/purchasing/nota-beli', async (req, res) => {
   try {
@@ -1674,6 +1831,48 @@ app.post('/api/purchasing/nota-beli', async (req, res) => {
   }
 });
 
+app.put('/api/purchasing/nota-beli/:id', async (req, res) => {
+  try {
+    let { po_id, supplier_id, tanggal_faktur, tanggal_nota, jatuh_tempo, total_tagihan } = req.body;
+    const tgl = tanggal_faktur || tanggal_nota;
+    const total = total_tagihan !== undefined ? parseFloat(total_tagihan) : null;
+
+    const [curRows] = await db.query('SELECT total_tagihan, sudah_dibayar FROM nota_pembelian WHERE id = ?', [req.params.id]);
+    if (curRows.length === 0) return res.status(404).json({ success: false, message: 'Nota pembelian tidak ditemukan' });
+
+    const cur = curRows[0];
+    const newTotal = total !== null ? total : Number(cur.total_tagihan);
+    const newSisa = Math.max(0, newTotal - Number(cur.sudah_dibayar));
+    const newStatus = newSisa === 0 ? 'Lunas' : 'Belum Lunas';
+
+    await db.query(
+      `UPDATE nota_pembelian 
+       SET po_id = COALESCE(?, po_id),
+           supplier_id = COALESCE(?, supplier_id),
+           tanggal_faktur = COALESCE(?, tanggal_faktur),
+           jatuh_tempo = COALESCE(?, jatuh_tempo),
+           total_tagihan = ?,
+           sisa_tagihan = ?,
+           status_bayar = ?
+       WHERE id = ?`,
+      [po_id, supplier_id, tgl, jatuh_tempo, newTotal, newSisa, newStatus, req.params.id]
+    );
+    res.json({ success: true, message: 'Nota pembelian berhasil diperbarui' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
+app.delete('/api/purchasing/nota-beli/:id', async (req, res) => {
+  try {
+    const [result] = await db.query('DELETE FROM nota_pembelian WHERE id = ?', [req.params.id]);
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Nota pembelian tidak ditemukan' });
+    res.json({ success: true, message: 'Nota pembelian berhasil dihapus' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
 // Retur Pembelian
 app.get('/api/purchasing/retur-beli', async (req, res) => {
   try {
@@ -1717,6 +1916,36 @@ app.post('/api/purchasing/retur-beli', async (req, res) => {
       [nomor_retur, po_id || null, supplier_id, tanggal_retur || new Date().toISOString().split('T')[0], alasan || 'Sheet cacat pabrik', total_nilai || 0]
     );
     res.json({ success: true, message: 'Retur pembelian berhasil dicatat', data: { id: result.insertId, nomor_retur_beli: nomor_retur } });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
+app.put('/api/purchasing/retur-beli/:id', async (req, res) => {
+  try {
+    const { supplier_id, tanggal_retur, alasan, total_nilai, status } = req.body;
+    const [result] = await db.query(
+      `UPDATE retur_pembelian
+       SET supplier_id = COALESCE(?, supplier_id),
+           tanggal_retur = COALESCE(?, tanggal_retur),
+           alasan = COALESCE(?, alasan),
+           total_nilai = COALESCE(?, total_nilai),
+           status = COALESCE(?, status)
+       WHERE id = ?`,
+      [supplier_id, tanggal_retur, alasan, total_nilai, status, req.params.id]
+    );
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Retur pembelian tidak ditemukan' });
+    res.json({ success: true, message: 'Retur pembelian berhasil diperbarui' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
+app.delete('/api/purchasing/retur-beli/:id', async (req, res) => {
+  try {
+    const [result] = await db.query('DELETE FROM retur_pembelian WHERE id = ?', [req.params.id]);
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Retur pembelian tidak ditemukan' });
+    res.json({ success: true, message: 'Retur pembelian berhasil dihapus' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
   }
@@ -1857,6 +2086,36 @@ app.post('/api/gudang/penyesuaian-stok', async (req, res) => {
   }
 });
 
+app.put('/api/gudang/mutasi/:id', async (req, res) => {
+  try {
+    const { tipe_barang, barang_id, jenis_mutasi, qty, keterangan } = req.body;
+    const [result] = await db.query(
+      `UPDATE mutasi_stok
+       SET tipe_barang = COALESCE(?, tipe_barang),
+           barang_id = COALESCE(?, barang_id),
+           jenis_mutasi = COALESCE(?, jenis_mutasi),
+           qty = COALESCE(?, qty),
+           keterangan = COALESCE(?, keterangan)
+       WHERE id = ?`,
+      [tipe_barang, barang_id, jenis_mutasi, qty, keterangan, req.params.id]
+    );
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Data mutasi stok tidak ditemukan' });
+    res.json({ success: true, message: 'Data mutasi stok berhasil diperbarui' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
+app.delete('/api/gudang/mutasi/:id', async (req, res) => {
+  try {
+    const [result] = await db.query('DELETE FROM mutasi_stok WHERE id = ?', [req.params.id]);
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Data mutasi stok tidak ditemukan' });
+    res.json({ success: true, message: 'Data mutasi stok berhasil dihapus' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
 // --------------------------------------------------------
 // 4. PPIC & PRODUKSI
 // --------------------------------------------------------
@@ -1905,10 +2164,36 @@ app.post('/api/produksi/spk', async (req, res) => {
 
 app.put('/api/produksi/spk/:id', async (req, res) => {
   try {
-    const { tahapan_sekarang, status, catatan } = req.body;
+    const {
+      customer_nama,
+      nama_box,
+      ukuran_box,
+      sheet_id,
+      qty_target,
+      tanggal_mulai,
+      target_selesai,
+      desain_cetak,
+      pisau_pond,
+      tahapan_sekarang,
+      status,
+      catatan
+    } = req.body;
     const [result] = await db.query(
-      'UPDATE spk_produksi SET tahapan_sekarang = COALESCE(?, tahapan_sekarang), status = COALESCE(?, status) WHERE id = ?',
-      [tahapan_sekarang, status, req.params.id]
+      `UPDATE spk_produksi SET 
+        customer_nama = COALESCE(?, customer_nama),
+        nama_box = COALESCE(?, nama_box),
+        ukuran_box = COALESCE(?, ukuran_box),
+        sheet_id = COALESCE(?, sheet_id),
+        qty_target = COALESCE(?, qty_target),
+        tanggal_mulai = COALESCE(?, tanggal_mulai),
+        target_selesai = COALESCE(?, target_selesai),
+        desain_cetak = COALESCE(?, desain_cetak),
+        pisau_pond = COALESCE(?, pisau_pond),
+        tahapan_sekarang = COALESCE(?, tahapan_sekarang),
+        status = COALESCE(?, status),
+        catatan = COALESCE(?, catatan)
+      WHERE id = ?`,
+      [customer_nama, nama_box, ukuran_box, sheet_id, qty_target, tanggal_mulai, target_selesai, desain_cetak, pisau_pond, tahapan_sekarang, status, catatan, req.params.id]
     );
     if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'SPK tidak ditemukan' });
     res.json({ success: true, message: 'SPK berhasil diperbarui' });
@@ -1967,6 +2252,40 @@ app.post('/api/produksi/cetak', async (req, res) => {
   }
 });
 
+app.put('/api/produksi/cetak/:id', async (req, res) => {
+  try {
+    const { spk_id, tanggal_proses, mesin_cetak, operator_nama, warna_tinta, qty_masuk, qty_bagus, qty_reject, catatan } = req.body;
+    const [result] = await db.query(
+      `UPDATE produksi_cetak 
+       SET spk_id = COALESCE(?, spk_id),
+           tanggal_proses = COALESCE(?, tanggal_proses),
+           mesin_cetak = COALESCE(?, mesin_cetak),
+           operator_nama = COALESCE(?, operator_nama),
+           warna_tinta = COALESCE(?, warna_tinta),
+           qty_masuk = COALESCE(?, qty_masuk),
+           qty_bagus = COALESCE(?, qty_bagus),
+           qty_reject = COALESCE(?, qty_reject),
+           catatan = COALESCE(?, catatan)
+       WHERE id = ?`,
+      [spk_id, tanggal_proses, mesin_cetak, operator_nama, warna_tinta, qty_masuk, qty_bagus, qty_reject, catatan, req.params.id]
+    );
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Data cetak tidak ditemukan' });
+    res.json({ success: true, message: 'Data cetak flexo berhasil diperbarui' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
+app.delete('/api/produksi/cetak/:id', async (req, res) => {
+  try {
+    const [result] = await db.query('DELETE FROM produksi_cetak WHERE id = ?', [req.params.id]);
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Data cetak tidak ditemukan' });
+    res.json({ success: true, message: 'Data cetak berhasil dihapus' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
 // Finishing (Pond, Stitching, Lem)
 app.get('/api/produksi/finishing', async (req, res) => {
   try {
@@ -2002,6 +2321,40 @@ app.post('/api/produksi/finishing', async (req, res) => {
     );
     await db.query("UPDATE spk_produksi SET tahapan_sekarang = 'Ikat' WHERE id = ?", [spk_id]);
     res.json({ success: true, message: 'Proses finishing berhasil dicatat' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
+app.put('/api/produksi/finishing/:id', async (req, res) => {
+  try {
+    const { spk_id, tanggal_proses, jenis_finishing, operator_nama, mesin, qty_masuk, qty_bagus, qty_reject, catatan } = req.body;
+    const [result] = await db.query(
+      `UPDATE produksi_finishing 
+       SET spk_id = COALESCE(?, spk_id),
+           tanggal_proses = COALESCE(?, tanggal_proses),
+           jenis_finishing = COALESCE(?, jenis_finishing),
+           operator_nama = COALESCE(?, operator_nama),
+           mesin = COALESCE(?, mesin),
+           qty_masuk = COALESCE(?, qty_masuk),
+           qty_bagus = COALESCE(?, qty_bagus),
+           qty_reject = COALESCE(?, qty_reject),
+           catatan = COALESCE(?, catatan)
+       WHERE id = ?`,
+      [spk_id, tanggal_proses, jenis_finishing, operator_nama, mesin, qty_masuk, qty_bagus, qty_reject, catatan, req.params.id]
+    );
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Data finishing tidak ditemukan' });
+    res.json({ success: true, message: 'Data finishing berhasil diperbarui' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
+app.delete('/api/produksi/finishing/:id', async (req, res) => {
+  try {
+    const [result] = await db.query('DELETE FROM produksi_finishing WHERE id = ?', [req.params.id]);
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Data finishing tidak ditemukan' });
+    res.json({ success: true, message: 'Data finishing berhasil dihapus' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
   }
@@ -2043,6 +2396,39 @@ app.post('/api/produksi/ikat', async (req, res) => {
     );
     await db.query("UPDATE spk_produksi SET tahapan_sekarang = 'Selesai', status = 'Selesai' WHERE id = ?", [spk_id]);
     res.json({ success: true, message: 'Proses ikat strapping selesai dicatat' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
+app.put('/api/produksi/ikat/:id', async (req, res) => {
+  try {
+    const { spk_id, tanggal_proses, nomor_ikat, isi_per_ikat, total_ikat, total_pcs, operator_nama, catatan } = req.body;
+    const [result] = await db.query(
+      `UPDATE produksi_ikat 
+       SET spk_id = COALESCE(?, spk_id),
+           tanggal_proses = COALESCE(?, tanggal_proses),
+           nomor_ikat = COALESCE(?, nomor_ikat),
+           isi_per_ikat = COALESCE(?, isi_per_ikat),
+           total_ikat = COALESCE(?, total_ikat),
+           total_pcs = COALESCE(?, total_pcs),
+           operator_nama = COALESCE(?, operator_nama),
+           catatan = COALESCE(?, catatan)
+       WHERE id = ?`,
+      [spk_id, tanggal_proses, nomor_ikat, isi_per_ikat, total_ikat, total_pcs, operator_nama, catatan, req.params.id]
+    );
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Data ikat tidak ditemukan' });
+    res.json({ success: true, message: 'Data ikat berhasil diperbarui' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
+app.delete('/api/produksi/ikat/:id', async (req, res) => {
+  try {
+    const [result] = await db.query('DELETE FROM produksi_ikat WHERE id = ?', [req.params.id]);
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Data ikat tidak ditemukan' });
+    res.json({ success: true, message: 'Data ikat berhasil dihapus' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
   }
@@ -2109,6 +2495,93 @@ app.post('/api/finance/piutang/pembayaran', async (req, res) => {
 
     await connection.commit();
     res.json({ success: true, message: `Pembayaran piutang ${nomor_bukti} berhasil disimpan`, data: { id: result.insertId, nomor_bukti } });
+  } catch (err) {
+    await connection.rollback();
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  } finally {
+    connection.release();
+  }
+});
+
+app.put('/api/finance/piutang/pembayaran/:id', async (req, res) => {
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [oldRows] = await connection.query('SELECT * FROM pembayaran_piutang WHERE id = ?', [req.params.id]);
+    if (oldRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, message: 'Pembayaran piutang tidak ditemukan' });
+    }
+    const old = oldRows[0];
+    const { tanggal_bayar, nominal_bayar, metode_bayar, catatan } = req.body;
+    const newNominal = nominal_bayar !== undefined ? Number(nominal_bayar) : Number(old.nominal_bayar);
+
+    // Revert old payment on invoice, apply new
+    const [invRows] = await connection.query('SELECT total_tagihan, sudah_dibayar FROM sales_invoices WHERE id = ?', [old.invoice_id]);
+    if (invRows.length > 0) {
+      const inv = invRows[0];
+      const revertedPaid = Math.max(0, Number(inv.sudah_dibayar) - Number(old.nominal_bayar));
+      const finalPaid = revertedPaid + newNominal;
+      const finalSisa = Math.max(0, Number(inv.total_tagihan) - finalPaid);
+      const finalStatus = finalSisa === 0 ? 'Lunas' : 'Belum Lunas';
+
+      await connection.query(
+        'UPDATE sales_invoices SET sudah_dibayar = ?, sisa_tagihan = ?, status_bayar = ? WHERE id = ?',
+        [finalPaid, finalSisa, finalStatus, old.invoice_id]
+      );
+    }
+
+    await connection.query(
+      `UPDATE pembayaran_piutang 
+       SET tanggal_bayar = COALESCE(?, tanggal_bayar),
+           nominal_bayar = ?,
+           metode_bayar = COALESCE(?, metode_bayar),
+           catatan = COALESCE(?, catatan)
+       WHERE id = ?`,
+      [tanggal_bayar, newNominal, metode_bayar, catatan, req.params.id]
+    );
+
+    await connection.commit();
+    res.json({ success: true, message: 'Pembayaran piutang berhasil diperbarui' });
+  } catch (err) {
+    await connection.rollback();
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  } finally {
+    connection.release();
+  }
+});
+
+app.delete('/api/finance/piutang/pembayaran/:id', async (req, res) => {
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [rows] = await connection.query('SELECT * FROM pembayaran_piutang WHERE id = ?', [req.params.id]);
+    if (rows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, message: 'Pembayaran piutang tidak ditemukan' });
+    }
+    const pay = rows[0];
+
+    // Revert balance on invoice
+    const [invRows] = await connection.query('SELECT total_tagihan, sudah_dibayar FROM sales_invoices WHERE id = ?', [pay.invoice_id]);
+    if (invRows.length > 0) {
+      const inv = invRows[0];
+      const newPaid = Math.max(0, Number(inv.sudah_dibayar) - Number(pay.nominal_bayar));
+      const newSisa = Math.max(0, Number(inv.total_tagihan) - newPaid);
+      const newStatus = newSisa === 0 ? 'Lunas' : 'Belum Lunas';
+
+      await connection.query(
+        'UPDATE sales_invoices SET sudah_dibayar = ?, sisa_tagihan = ?, status_bayar = ? WHERE id = ?',
+        [newPaid, newSisa, newStatus, pay.invoice_id]
+      );
+    }
+
+    await connection.query('DELETE FROM pembayaran_piutang WHERE id = ?', [req.params.id]);
+
+    await connection.commit();
+    res.json({ success: true, message: 'Pembayaran piutang berhasil dihapus' });
   } catch (err) {
     await connection.rollback();
     res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
@@ -2196,6 +2669,108 @@ app.post('/api/finance/hutang/pembayaran', async (req, res) => {
 
     await connection.commit();
     res.json({ success: true, message: `Pembayaran hutang ${nomor_bukti} berhasil disimpan`, data: { id: result.insertId, nomor_bukti } });
+  } catch (err) {
+    await connection.rollback();
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  } finally {
+    connection.release();
+  }
+});
+
+app.put('/api/finance/hutang/pembayaran/:id', async (req, res) => {
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const phCols = await getPembayaranHutangColumns();
+    const idCol = phCols.includes('faktur_beli_id') ? 'faktur_beli_id' : 'nota_id';
+    const amtCol = phCols.includes('jumlah_bayar') ? 'jumlah_bayar' : 'nominal_bayar';
+
+    const [oldRows] = await connection.query(`SELECT * FROM pembayaran_hutang WHERE id = ?`, [req.params.id]);
+    if (oldRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, message: 'Pembayaran hutang tidak ditemukan' });
+    }
+    const old = oldRows[0];
+    const targetFakturId = old[idCol] || old.faktur_beli_id || old.nota_id;
+    const oldAmt = Number(old[amtCol] || old.jumlah_bayar || old.nominal_bayar || 0);
+
+    const { tanggal_bayar, jumlah_bayar, nominal_bayar, metode_bayar, catatan } = req.body;
+    const newAmt = (jumlah_bayar !== undefined || nominal_bayar !== undefined)
+      ? Number(jumlah_bayar || nominal_bayar)
+      : oldAmt;
+
+    // Revert old payment on nota_pembelian, apply new
+    const [notaRows] = await connection.query('SELECT total_tagihan, sudah_dibayar FROM nota_pembelian WHERE id = ?', [targetFakturId]);
+    if (notaRows.length > 0) {
+      const nota = notaRows[0];
+      const revertedPaid = Math.max(0, Number(nota.sudah_dibayar) - oldAmt);
+      const finalPaid = revertedPaid + newAmt;
+      const finalSisa = Math.max(0, Number(nota.total_tagihan) - finalPaid);
+      const finalStatus = finalSisa === 0 ? 'Lunas' : 'Belum Lunas';
+
+      await connection.query(
+        'UPDATE nota_pembelian SET sudah_dibayar = ?, sisa_tagihan = ?, status_bayar = ? WHERE id = ?',
+        [finalPaid, finalSisa, finalStatus, targetFakturId]
+      );
+    }
+
+    await connection.query(
+      `UPDATE pembayaran_hutang 
+       SET tanggal_bayar = COALESCE(?, tanggal_bayar),
+           ${amtCol} = ?,
+           metode_bayar = COALESCE(?, metode_bayar),
+           catatan = COALESCE(?, catatan)
+       WHERE id = ?`,
+      [tanggal_bayar, newAmt, metode_bayar, catatan, req.params.id]
+    );
+
+    await connection.commit();
+    res.json({ success: true, message: 'Pembayaran hutang berhasil diperbarui' });
+  } catch (err) {
+    await connection.rollback();
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  } finally {
+    connection.release();
+  }
+});
+
+app.delete('/api/finance/hutang/pembayaran/:id', async (req, res) => {
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const phCols = await getPembayaranHutangColumns();
+    const idCol = phCols.includes('faktur_beli_id') ? 'faktur_beli_id' : 'nota_id';
+    const amtCol = phCols.includes('jumlah_bayar') ? 'jumlah_bayar' : 'nominal_bayar';
+
+    const [rows] = await connection.query(`SELECT * FROM pembayaran_hutang WHERE id = ?`, [req.params.id]);
+    if (rows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, message: 'Pembayaran hutang tidak ditemukan' });
+    }
+    const pay = rows[0];
+    const targetFakturId = pay[idCol] || pay.faktur_beli_id || pay.nota_id;
+    const payAmt = Number(pay[amtCol] || pay.jumlah_bayar || pay.nominal_bayar || 0);
+
+    // Revert balance on nota_pembelian
+    const [notaRows] = await connection.query('SELECT total_tagihan, sudah_dibayar FROM nota_pembelian WHERE id = ?', [targetFakturId]);
+    if (notaRows.length > 0) {
+      const nota = notaRows[0];
+      const newPaid = Math.max(0, Number(nota.sudah_dibayar) - payAmt);
+      const newSisa = Math.max(0, Number(nota.total_tagihan) - newPaid);
+      const newStatus = newSisa === 0 ? 'Lunas' : 'Belum Lunas';
+
+      await connection.query(
+        'UPDATE nota_pembelian SET sudah_dibayar = ?, sisa_tagihan = ?, status_bayar = ? WHERE id = ?',
+        [newPaid, newSisa, newStatus, targetFakturId]
+      );
+    }
+
+    await connection.query('DELETE FROM pembayaran_hutang WHERE id = ?', [req.params.id]);
+
+    await connection.commit();
+    res.json({ success: true, message: 'Pembayaran hutang berhasil dihapus' });
   } catch (err) {
     await connection.rollback();
     res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
@@ -2319,6 +2894,42 @@ app.post('/api/accounting/coa', async (req, res) => {
   }
 });
 
+app.put('/api/accounting/coa/:id', async (req, res) => {
+  try {
+    const { kode_akun, nama_akun, kategori, kategori_akun, saldo_normal, saldo_awal, saldo_berjalan } = req.body;
+    const catVal = kategori || kategori_akun;
+    const saldoVal = saldo_berjalan !== undefined ? Number(saldo_berjalan) : (saldo_awal !== undefined ? Number(saldo_awal) : undefined);
+    const coaCols = await getCoaColumns();
+    const catCol = coaCols.includes('kategori') ? 'kategori' : 'kategori_akun';
+    const saldoCol = coaCols.includes('saldo_berjalan') ? 'saldo_berjalan' : 'saldo_awal';
+
+    const [result] = await db.query(
+      `UPDATE chart_of_accounts
+       SET kode_akun = COALESCE(?, kode_akun),
+           nama_akun = COALESCE(?, nama_akun),
+           ${catCol} = COALESCE(?, ${catCol}),
+           saldo_normal = COALESCE(?, saldo_normal),
+           ${saldoCol} = COALESCE(?, ${saldoCol})
+       WHERE id = ?`,
+      [kode_akun, nama_akun, catVal, saldo_normal, saldoVal, req.params.id]
+    );
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Akun COA tidak ditemukan' });
+    res.json({ success: true, message: 'Akun COA berhasil diperbarui' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
+app.delete('/api/accounting/coa/:id', async (req, res) => {
+  try {
+    const [result] = await db.query('DELETE FROM chart_of_accounts WHERE id = ?', [req.params.id]);
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Akun COA tidak ditemukan' });
+    res.json({ success: true, message: 'Akun COA berhasil dihapus' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
 // Jurnal Umum
 app.get('/api/accounting/jurnal', async (req, res) => {
   try {
@@ -2391,6 +3002,78 @@ app.post('/api/accounting/jurnal', async (req, res) => {
 
     await connection.commit();
     res.json({ success: true, message: `Jurnal ${nomor_jurnal} berhasil disimpan dan balance`, data: { id: jId, nomor_jurnal } });
+  } catch (err) {
+    await connection.rollback();
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  } finally {
+    connection.release();
+  }
+});
+
+app.put('/api/accounting/jurnal/:id', async (req, res) => {
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const { tanggal, tipe_jurnal, keterangan, items } = req.body;
+    let updateFields = [];
+    let updateParams = [];
+
+    if (tanggal) { updateFields.push('tanggal = ?'); updateParams.push(tanggal); }
+    if (tipe_jurnal) { updateFields.push('tipe_jurnal = ?'); updateParams.push(tipe_jurnal); }
+    if (keterangan !== undefined) { updateFields.push('keterangan = ?'); updateParams.push(keterangan); }
+
+    if (items && items.length >= 2) {
+      const total_debet = items.filter(i => i.posisi === 'Debet').reduce((sum, i) => sum + Number(i.nominal), 0);
+      const total_kredit = items.filter(i => i.posisi === 'Kredit').reduce((sum, i) => sum + Number(i.nominal), 0);
+
+      if (total_debet !== total_kredit) {
+        await connection.rollback();
+        return res.status(400).json({ success: false, message: 'Total Debet dan Kredit tidak balance!' });
+      }
+
+      updateFields.push('total_debet = ?', 'total_kredit = ?');
+      updateParams.push(total_debet, total_kredit);
+
+      await connection.query('DELETE FROM jurnal_items WHERE jurnal_id = ?', [req.params.id]);
+      for (const it of items) {
+        await connection.query(
+          `INSERT INTO jurnal_items (jurnal_id, akun_id, posisi, nominal, keterangan)
+           VALUES (?, ?, ?, ?, ?)`,
+          [req.params.id, it.akun_id, it.posisi, it.nominal, it.keterangan || '']
+        );
+      }
+    }
+
+    if (updateFields.length > 0) {
+      updateParams.push(req.params.id);
+      await connection.query(`UPDATE jurnal_transaksi SET ${updateFields.join(', ')} WHERE id = ?`, updateParams);
+    }
+
+    await connection.commit();
+    res.json({ success: true, message: 'Jurnal berhasil diperbarui' });
+  } catch (err) {
+    await connection.rollback();
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  } finally {
+    connection.release();
+  }
+});
+
+app.delete('/api/accounting/jurnal/:id', async (req, res) => {
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    await connection.query('DELETE FROM jurnal_items WHERE jurnal_id = ?', [req.params.id]);
+    const [result] = await connection.query('DELETE FROM jurnal_transaksi WHERE id = ?', [req.params.id]);
+    if (result.affectedRows === 0) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, message: 'Jurnal tidak ditemukan' });
+    }
+
+    await connection.commit();
+    res.json({ success: true, message: 'Jurnal berhasil dihapus' });
   } catch (err) {
     await connection.rollback();
     res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });

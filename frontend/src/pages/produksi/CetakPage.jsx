@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Printer, CheckCircle2 } from 'lucide-react';
+import { Plus, Printer, CheckCircle2, Edit2, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { request } from '../../utils/request';
 import { API_ENDPOINTS } from '../../utils/endpoints';
 import SearchInput from '../../components/common/SearchInput';
 import Pagination from '../../components/common/Pagination';
 import Modal from '../../components/common/Modal';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 import Badge from '../../components/common/Badge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
@@ -22,6 +23,11 @@ export default function CetakPage() {
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, id: null, name: '' });
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   const [formData, setFormData] = useState({
     spk_id: '',
     tanggal_proses: new Date().toISOString().split('T')[0],
@@ -72,6 +78,8 @@ export default function CetakPage() {
   }, [page, limit, search]);
 
   const handleOpenCreate = () => {
+    setIsEditing(false);
+    setEditingId(null);
     const spk = spkList.length ? spkList[0] : null;
     const target = spk ? spk.qty_target : 3000;
     setFormData({
@@ -88,12 +96,48 @@ export default function CetakPage() {
     setIsModalOpen(true);
   };
 
+  const handleOpenEdit = (c) => {
+    setIsEditing(true);
+    setEditingId(c.id);
+    setFormData({
+      spk_id: c.spk_id || '',
+      tanggal_proses: c.tanggal_proses ? c.tanggal_proses.split('T')[0] : new Date().toISOString().split('T')[0],
+      mesin_cetak: c.mesin_cetak || '',
+      operator_nama: c.operator_nama || '',
+      warna_tinta: c.warna_tinta || '',
+      qty_masuk: Number(c.qty_masuk || 0),
+      qty_bagus: Number(c.qty_bagus || 0),
+      qty_reject: Number(c.qty_reject || 0),
+      catatan: c.catatan || '',
+    });
+    setIsModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      setDeleteLoading(true);
+      await request.delete(API_ENDPOINTS.PRODUKSI.CETAK_DETAIL(deleteDialog.id));
+      toast.success('Data proses cetak berhasil dihapus');
+      setDeleteDialog({ isOpen: false, id: null, name: '' });
+      fetchCetak();
+    } catch (err) {
+      toast.error('Gagal menghapus: ' + err.message);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       setFormLoading(true);
-      await request.post(API_ENDPOINTS.PRODUKSI.CETAK, formData);
-      toast.success('Hasil cetak flexo berhasil dicatat! SPK berpindah ke tahap Finishing');
+      if (isEditing) {
+        await request.put(API_ENDPOINTS.PRODUKSI.CETAK_DETAIL(editingId), formData);
+        toast.success('Hasil cetak flexo berhasil diperbarui');
+      } else {
+        await request.post(API_ENDPOINTS.PRODUKSI.CETAK, formData);
+        toast.success('Hasil cetak flexo berhasil dicatat! SPK berpindah ke tahap Finishing');
+      }
       setIsModalOpen(false);
       fetchCetak();
     } catch (err) {
@@ -156,6 +200,7 @@ export default function CetakPage() {
                   <th className="px-6 py-4">Hasil Baik</th>
                   <th className="px-6 py-4">Reject / Waste</th>
                   <th className="px-6 py-4">Status</th>
+                  <th className="px-6 py-4 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -187,6 +232,24 @@ export default function CetakPage() {
                         {c.status}
                       </Badge>
                     </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          onClick={() => handleOpenEdit(c)}
+                          className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+                          title="Edit Hasil Cetak"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteDialog({ isOpen: true, id: c.id, name: `Cetak SPK ${c.nomor_spk}` })}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          title="Hapus Hasil Cetak"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -211,7 +274,7 @@ export default function CetakPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Catat Hasil Proses Cetak Flexo"
+        title={isEditing ? 'Edit Hasil Proses Cetak Flexo' : 'Catat Hasil Proses Cetak Flexo'}
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -305,11 +368,23 @@ export default function CetakPage() {
               disabled={formLoading}
               className="px-5 py-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-xl shadow-sm disabled:opacity-50"
             >
-              {formLoading ? 'Memproses...' : 'Simpan & Lanjutkan ke Finishing'}
+              {formLoading ? 'Memproses...' : (isEditing ? 'Simpan Perubahan' : 'Simpan & Lanjutkan ke Finishing')}
             </button>
           </div>
         </form>
       </Modal>
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        isOpen={deleteDialog.isOpen}
+        onClose={() => setDeleteDialog({ isOpen: false, id: null, name: '' })}
+        onConfirm={confirmDelete}
+        isLoading={deleteLoading}
+        title="Hapus Hasil Cetak Flexo"
+        message={`Apakah Anda yakin ingin menghapus data laporan proses cetak "${deleteDialog.name}"?`}
+        confirmText="Ya, Hapus"
+        confirmVariant="danger"
+      />
     </div>
   );
 }

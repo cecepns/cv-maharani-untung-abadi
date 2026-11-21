@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, FileCheck, Layers, Eye, Printer } from 'lucide-react';
+import { Plus, Trash2, Edit2, FileCheck, Layers, Eye, Printer } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { request } from '../../utils/request';
 import { API_ENDPOINTS } from '../../utils/endpoints';
@@ -25,6 +25,8 @@ export default function PurchaseOrdersPage() {
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     supplier_id: '',
     tanggal_po: new Date().toISOString().split('T')[0],
@@ -80,6 +82,8 @@ export default function PurchaseOrdersPage() {
   }, [page, limit, search]);
 
   const handleOpenCreate = () => {
+    setIsEditing(false);
+    setEditingId(null);
     setFormData({
       supplier_id: suppliers.length ? suppliers[0].id : '',
       tanggal_po: new Date().toISOString().split('T')[0],
@@ -91,6 +95,26 @@ export default function PurchaseOrdersPage() {
           harga_satuan: sheets.length ? sheets[0].harga_per_lembar : 3100
         }
       ]
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (po) => {
+    setIsEditing(true);
+    setEditingId(po.id);
+    setFormData({
+      supplier_id: po.supplier_id,
+      tanggal_po: po.tanggal_po,
+      catatan: po.catatan || '',
+      items: (po.items && po.items.length > 0)
+        ? po.items.map(it => ({
+            item_name: it.item_name,
+            qty: Number(it.qty),
+            harga_satuan: Number(it.harga_satuan)
+          }))
+        : [
+            { item_name: '', qty: 1000, harga_satuan: 0 }
+          ]
     });
     setIsModalOpen(true);
   };
@@ -122,12 +146,17 @@ export default function PurchaseOrdersPage() {
 
     try {
       setFormLoading(true);
-      await request.post(API_ENDPOINTS.PURCHASING.ORDERS, formData);
-      toast.success('Purchase Order berhasil diterbitkan ke supplier');
+      if (isEditing) {
+        await request.put(API_ENDPOINTS.PURCHASING.ORDER_DETAIL(editingId), formData);
+        toast.success('Purchase Order berhasil diperbarui');
+      } else {
+        await request.post(API_ENDPOINTS.PURCHASING.ORDERS, formData);
+        toast.success('Purchase Order berhasil diterbitkan ke supplier');
+      }
       setIsModalOpen(false);
       fetchOrders();
     } catch (err) {
-      toast.error(err.message || 'Gagal membuat Purchase Order');
+      toast.error(err.message || 'Gagal menyimpan Purchase Order');
     } finally {
       setFormLoading(false);
     }
@@ -238,13 +267,22 @@ export default function PurchaseOrdersPage() {
                       </Badge>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <button
-                        onClick={() => setDeleteDialog({ isOpen: true, id: po.id, name: po.nomor_po })}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                        title="Hapus PO"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          onClick={() => handleOpenEdit(po)}
+                          className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+                          title="Edit PO"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteDialog({ isOpen: true, id: po.id, name: po.nomor_po })}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          title="Hapus PO"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -270,7 +308,7 @@ export default function PurchaseOrdersPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Buat Order Pembelian (PO) ke Supplier"
+        title={isEditing ? 'Edit Order Pembelian (PO)' : 'Buat Order Pembelian (PO) ke Supplier'}
         size="lg"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -394,7 +432,7 @@ export default function PurchaseOrdersPage() {
               disabled={formLoading}
               className="px-5 py-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-xl shadow-sm disabled:opacity-50"
             >
-              {formLoading ? 'Memproses...' : 'Kirim PO ke Supplier'}
+              {formLoading ? 'Memproses...' : isEditing ? 'Simpan Perubahan' : 'Kirim PO ke Supplier'}
             </button>
           </div>
         </form>

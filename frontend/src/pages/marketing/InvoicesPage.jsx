@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Printer, Receipt, CheckCircle, Clock, Trash2, FileText, Calendar, Building } from 'lucide-react';
+import { Plus, Printer, Receipt, CheckCircle, Clock, Trash2, Edit2, FileText, Calendar, Building } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { request } from '../../utils/request';
 import { API_ENDPOINTS } from '../../utils/endpoints';
@@ -25,6 +25,8 @@ export default function InvoicesPage() {
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     so_id: '',
     tanggal_invoice: new Date().toISOString().split('T')[0],
@@ -79,6 +81,8 @@ export default function InvoicesPage() {
   }, [page, limit, search]);
 
   const handleOpenCreate = () => {
+    setIsEditing(false);
+    setEditingId(null);
     const firstSO = salesOrders.length ? salesOrders[0] : null;
     const sub = firstSO ? Number(firstSO.subtotal || 0) : 10000000;
     const p = firstSO ? Number(firstSO.ppn || 0) : 1100000;
@@ -91,6 +95,21 @@ export default function InvoicesPage() {
       subtotal: sub,
       ppn: p,
       total_tagihan: total,
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (inv) => {
+    setIsEditing(true);
+    setEditingId(inv.id);
+    setFormData({
+      so_id: inv.so_id,
+      customer_id: inv.customer_id,
+      tanggal_invoice: inv.tanggal_invoice,
+      jatuh_tempo: inv.jatuh_tempo,
+      subtotal: Number(inv.subtotal || 0),
+      ppn: Number(inv.ppn || 0),
+      total_tagihan: Number(inv.total_tagihan || 0),
     });
     setIsModalOpen(true);
   };
@@ -126,15 +145,20 @@ export default function InvoicesPage() {
     };
     try {
       setFormLoading(true);
-      const res = await request.post(API_ENDPOINTS.MARKETING.INVOICES, payload);
-      toast.success('Nota Penjualan berhasil diterbitkan');
+      if (isEditing) {
+        await request.put(API_ENDPOINTS.MARKETING.INVOICE_DETAIL(editingId), payload);
+        toast.success('Invoice berhasil diperbarui');
+      } else {
+        const res = await request.post(API_ENDPOINTS.MARKETING.INVOICES, payload);
+        toast.success('Nota Penjualan berhasil diterbitkan');
+        if (res.data) {
+          setPrintData(res.data);
+        }
+      }
       setIsModalOpen(false);
       fetchInvoices();
-      if (res.data) {
-        setPrintData(res.data);
-      }
     } catch (err) {
-      toast.error(err.message || 'Gagal membuat Invoice');
+      toast.error(err.message || 'Gagal menyimpan Invoice');
     } finally {
       setFormLoading(false);
     }
@@ -259,7 +283,7 @@ export default function InvoicesPage() {
                       </Badge>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <div className="flex items-center justify-center gap-2">
+                      <div className="flex items-center justify-center gap-1.5">
                         <button
                           onClick={() => setPrintData(inv)}
                           className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-brand-50 hover:bg-brand-100 text-brand-700 text-xs font-semibold rounded-lg transition-colors"
@@ -267,6 +291,13 @@ export default function InvoicesPage() {
                         >
                           <Printer className="w-3.5 h-3.5" />
                           Cetak
+                        </button>
+                        <button
+                          onClick={() => handleOpenEdit(inv)}
+                          className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+                          title="Edit Invoice"
+                        >
+                          <Edit2 className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => setDeleteDialog({ isOpen: true, id: inv.id, name: inv.nomor_invoice })}
@@ -297,11 +328,11 @@ export default function InvoicesPage() {
         />
       </div>
 
-      {/* Modal Terbitkan Invoice */}
+      {/* Modal Terbitkan / Edit Invoice */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Terbitkan Nota Penjualan / Invoice"
+        title={isEditing ? 'Edit Nota Penjualan / Invoice' : 'Terbitkan Nota Penjualan / Invoice'}
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -365,7 +396,7 @@ export default function InvoicesPage() {
               disabled={formLoading}
               className="px-5 py-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-xl shadow-sm disabled:opacity-50"
             >
-              {formLoading ? 'Memproses...' : 'Terbitkan & Cetak Invoice'}
+              {formLoading ? 'Memproses...' : isEditing ? 'Simpan Perubahan' : 'Terbitkan & Cetak Invoice'}
             </button>
           </div>
         </form>

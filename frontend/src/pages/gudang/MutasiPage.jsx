@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, RotateCcw, ArrowDownRight, ArrowUpRight, CheckCircle2 } from 'lucide-react';
+import { Plus, RotateCcw, ArrowDownRight, ArrowUpRight, CheckCircle2, Edit2, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { request } from '../../utils/request';
 import { API_ENDPOINTS } from '../../utils/endpoints';
@@ -10,6 +10,7 @@ import Badge from '../../components/common/Badge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
 import SearchableSelect from '../../components/common/SearchableSelect';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 
 export default function MutasiPage() {
   const [mutasiList, setMutasiList] = useState([]);
@@ -20,6 +21,11 @@ export default function MutasiPage() {
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, item: null });
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   const [formData, setFormData] = useState({
     tipe_barang: 'Sheet',
     barang_id: 1,
@@ -52,18 +58,63 @@ export default function MutasiPage() {
     fetchMutasi();
   }, [page, limit, search]);
 
+  const handleOpenCreate = () => {
+    setIsEditing(false);
+    setEditingId(null);
+    setFormData({
+      tipe_barang: 'Sheet',
+      barang_id: 1,
+      jenis_mutasi: 'Masuk',
+      qty: 100,
+      keterangan: 'Stock opname / penyesuaian fisik gudang',
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (m) => {
+    setIsEditing(true);
+    setEditingId(m.id);
+    setFormData({
+      tipe_barang: m.tipe_barang || 'Sheet',
+      barang_id: m.barang_id || 1,
+      jenis_mutasi: m.jenis_mutasi || 'Masuk',
+      qty: Number(m.qty) || 0,
+      keterangan: m.keterangan || '',
+    });
+    setIsModalOpen(true);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       setFormLoading(true);
-      await request.post(API_ENDPOINTS.GUDANG.PENYESUAIAN_STOK, formData);
-      toast.success('Penyesuaian stok opname berhasil disimpan!');
+      if (isEditing) {
+        await request.put(API_ENDPOINTS.GUDANG.MUTASI_DETAIL(editingId), formData);
+        toast.success('Mutasi stok berhasil diperbarui!');
+      } else {
+        await request.post(API_ENDPOINTS.GUDANG.PENYESUAIAN_STOK, formData);
+        toast.success('Penyesuaian stok opname berhasil disimpan!');
+      }
       setIsModalOpen(false);
       fetchMutasi();
     } catch (err) {
       toast.error(err.message || 'Gagal menyimpan penyesuaian');
     } finally {
       setFormLoading(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    try {
+      setDeleteLoading(true);
+      await request.delete(API_ENDPOINTS.GUDANG.MUTASI_DETAIL(deleteDialog.item.id));
+      toast.success('Mutasi stok berhasil dihapus');
+      setDeleteDialog({ isOpen: false, item: null });
+      fetchMutasi();
+    } catch (err) {
+      toast.error(err.message || 'Gagal menghapus mutasi stok');
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -78,7 +129,7 @@ export default function MutasiPage() {
           </p>
         </div>
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={handleOpenCreate}
           className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-semibold shadow-sm transition-all self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
@@ -119,6 +170,7 @@ export default function MutasiPage() {
                   <th className="px-6 py-4">Jumlah (Qty)</th>
                   <th className="px-6 py-4">Referensi Dokumen</th>
                   <th className="px-6 py-4">Keterangan Aktivitas</th>
+                  <th className="px-6 py-4 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -150,6 +202,24 @@ export default function MutasiPage() {
                       <td className="px-6 py-4 text-xs text-slate-600">
                         {m.keterangan}
                       </td>
+                      <td className="px-6 py-4 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => handleOpenEdit(m)}
+                            className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+                            title="Edit Mutasi"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setDeleteDialog({ isOpen: true, item: m })}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            title="Hapus Mutasi"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   );
                 })}
@@ -171,11 +241,11 @@ export default function MutasiPage() {
         />
       </div>
 
-      {/* Modal Form Stock Opname */}
+      {/* Modal Form Stock Opname / Edit Mutasi */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Penyesuaian Stok Gudang (Stock Opname)"
+        title={isEditing ? 'Edit Mutasi Stok Gudang' : 'Penyesuaian Stok Gudang (Stock Opname)'}
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -242,11 +312,21 @@ export default function MutasiPage() {
               disabled={formLoading}
               className="px-5 py-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-xl shadow-sm disabled:opacity-50"
             >
-              {formLoading ? 'Memproses...' : 'Simpan Penyesuaian'}
+              {formLoading ? 'Memproses...' : isEditing ? 'Simpan Perubahan' : 'Simpan Penyesuaian'}
             </button>
           </div>
         </form>
       </Modal>
+
+      {/* Confirm Dialog Hapus Mutasi */}
+      <ConfirmDialog
+        isOpen={deleteDialog.isOpen}
+        onClose={() => setDeleteDialog({ isOpen: false, item: null })}
+        onConfirm={confirmDelete}
+        loading={deleteLoading}
+        title="Hapus Catatan Mutasi Stok"
+        message={`Apakah Anda yakin ingin menghapus mutasi stok untuk "${deleteDialog.item?.nama_barang}" (${deleteDialog.item?.referensi_dokumen})? Tindakan ini akan membatalkan efek pergerakan stok barang.`}
+      />
     </div>
   );
 }
