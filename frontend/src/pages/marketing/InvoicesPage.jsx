@@ -78,15 +78,17 @@ export default function InvoicesPage() {
 
   const handleOpenCreate = () => {
     const firstSO = salesOrders.length ? salesOrders[0] : null;
-    const sub = firstSO ? firstSO.subtotal : 10000000;
-    const p = firstSO ? firstSO.ppn : 1100000;
+    const sub = firstSO ? Number(firstSO.subtotal || 0) : 10000000;
+    const p = firstSO ? Number(firstSO.ppn || 0) : 1100000;
+    const total = firstSO ? Number(firstSO.total_nilai || (sub + p)) : (sub + p);
     setFormData({
       so_id: firstSO ? firstSO.id : '',
+      customer_id: firstSO ? firstSO.customer_id : '',
       tanggal_invoice: new Date().toISOString().split('T')[0],
       jatuh_tempo: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
       subtotal: sub,
       ppn: p,
-      total_tagihan: sub + p,
+      total_tagihan: total,
     });
     setIsModalOpen(true);
   };
@@ -94,21 +96,35 @@ export default function InvoicesPage() {
   const handleSOSelect = (soId) => {
     const so = salesOrders.find(s => s.id === parseInt(soId, 10));
     if (so) {
+      const sub = Number(so.subtotal || 0);
+      const p = Number(so.ppn || 0);
+      const total = Number(so.total_nilai || (sub + p));
       setFormData({
         ...formData,
         so_id: so.id,
-        subtotal: so.subtotal,
-        ppn: so.ppn,
-        total_tagihan: so.total_nilai,
+        customer_id: so.customer_id,
+        subtotal: sub,
+        ppn: p,
+        total_tagihan: total,
       });
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.so_id) {
+      toast.error('Pilih Sales Order terlebih dahulu!');
+      return;
+    }
+    const payload = {
+      ...formData,
+      subtotal: Number(formData.subtotal || 0),
+      ppn: Number(formData.ppn || 0),
+      total_tagihan: Number(formData.total_tagihan || 0),
+    };
     try {
       setFormLoading(true);
-      const res = await request.post(API_ENDPOINTS.MARKETING.INVOICES, formData);
+      const res = await request.post(API_ENDPOINTS.MARKETING.INVOICES, payload);
       toast.success('Nota Penjualan berhasil diterbitkan');
       setIsModalOpen(false);
       fetchInvoices();
@@ -297,7 +313,7 @@ export default function InvoicesPage() {
               <option value="">-- Pilih Sales Order --</option>
               {salesOrders.map((so) => (
                 <option key={so.id} value={so.id}>
-                  {so.nomor_so} - {so.customer_nama} (Rp {Number(so.total_nilai).toLocaleString('id-ID')})
+                  {so.nomor_so} - {so.nama_customer || so.customer_nama || 'Customer'} (Rp {Number(so.total_nilai || 0).toLocaleString('id-ID')})
                 </option>
               ))}
             </select>
@@ -327,15 +343,15 @@ export default function InvoicesPage() {
           <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs">
             <div className="flex justify-between">
               <span className="text-slate-600">Subtotal DPP:</span>
-              <span className="font-semibold text-slate-800">Rp {Number(formData.subtotal).toLocaleString('id-ID')}</span>
+              <span className="font-semibold text-slate-800">Rp {Number(formData.subtotal || 0).toLocaleString('id-ID')}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-600">PPN (11%):</span>
-              <span className="font-semibold text-slate-800">Rp {Number(formData.ppn).toLocaleString('id-ID')}</span>
+              <span className="font-semibold text-slate-800">Rp {Number(formData.ppn || 0).toLocaleString('id-ID')}</span>
             </div>
             <div className="flex justify-between border-t border-slate-200 pt-2 font-bold text-sm">
               <span className="text-slate-900">Total Tagihan Invoice:</span>
-              <span className="text-brand-700">Rp {Number(formData.total_tagihan).toLocaleString('id-ID')}</span>
+              <span className="text-brand-700">Rp {Number(formData.total_tagihan || 0).toLocaleString('id-ID')}</span>
             </div>
           </div>
 

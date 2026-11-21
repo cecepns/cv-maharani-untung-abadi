@@ -302,7 +302,7 @@ export default function SuratJalanPage() {
               <option value="">-- Pilih Sales Order --</option>
               {salesOrders.map((so) => (
                 <option key={so.id} value={so.id}>
-                  {so.nomor_so} - {so.customer_nama} (Rp {Number(so.total_nilai).toLocaleString('id-ID')})
+                  {so.nomor_so} - {so.nama_customer || so.customer_nama || 'Customer'} (Rp {Number(so.total_nilai || 0).toLocaleString('id-ID')})
                 </option>
               ))}
             </select>
