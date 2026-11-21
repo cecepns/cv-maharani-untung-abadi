@@ -12,21 +12,22 @@ export default function PrintSuratJalan({ data, onClose }) {
   return (
     <PrintModalWrapper onClose={onClose} isOpen={!!data} maxWidth="max-w-3xl">
       {/* Action Bar (hidden on print) */}
-      <div className="no-print flex items-center justify-between pb-4 mb-6 border-b border-slate-200">
+      <div className="no-print sticky top-0 z-20 flex items-center justify-between pb-3 mb-6 bg-white/95 backdrop-blur-xs border-b border-slate-200 pt-1">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-slate-700">Pratinjau Surat Jalan Resmi</span>
+          <span className="text-sm font-bold text-slate-800">Pratinjau Surat Jalan Resmi</span>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={handlePrint}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-semibold shadow-sm transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-semibold shadow-sm transition-colors cursor-pointer"
           >
             <Printer className="w-4 h-4" />
             Cetak Dokumen
           </button>
           <button
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl"
+            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+            title="Tutup Pratinjau"
           >
             <X className="w-5 h-5" />
           </button>

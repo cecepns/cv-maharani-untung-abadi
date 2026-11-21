@@ -48,7 +48,8 @@
     display: none !important;
   }
 
-  body.print-modal-active .print-modal-backdrop {
+  body.print-modal-active .print-modal-backdrop,
+  body.print-modal-active .print-modal-backdrop > div {
     position: static !important;
     inset: auto !important;
     z-index: auto !important;
@@ -60,6 +61,7 @@
     display: block !important;
     width: 100% !important;
     height: auto !important;
+    min-height: 0 !important;
   }
 
   body.print-modal-active .print-modal-container {
