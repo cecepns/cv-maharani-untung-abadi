@@ -9,6 +9,8 @@ import Modal from '../../components/common/Modal';
 import Badge from '../../components/common/Badge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
+import SearchableSelect from '../../components/common/SearchableSelect';
+import DatePickerInput from '../../components/common/DatePickerInput';
 
 export default function PiutangPage() {
   const [payments, setPayments] = useState([]);
@@ -214,43 +216,38 @@ export default function PiutangPage() {
             <label className="block text-xs font-semibold text-slate-700 mb-1">
               Pilih Nota Penjualan (Invoice Belum Lunas) <span className="text-rose-500">*</span>
             </label>
-            <select
-              required
+            <SearchableSelect
               value={formData.invoice_id}
-              onChange={(e) => handleInvoiceSelect(e.target.value)}
-              className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-            >
-              <option value="">-- Pilih Invoice --</option>
-              {invoices.map((inv) => (
-                <option key={inv.id} value={inv.id}>
-                  {inv.nomor_invoice} - {inv.customer_nama} (Sisa: Rp {Number(inv.sisa_tagihan).toLocaleString('id-ID')})
-                </option>
-              ))}
-            </select>
+              onChange={(val) => handleInvoiceSelect(val)}
+              options={invoices.map((inv) => ({
+                value: inv.id,
+                label: `${inv.nomor_invoice} - ${inv.nama_customer || inv.customer_nama} (Sisa: Rp ${Number(inv.sisa_tagihan).toLocaleString('id-ID')})`,
+              }))}
+              placeholder="Cari & pilih invoice..."
+            />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Tanggal Pembayaran</label>
-              <input
-                type="date"
+              <DatePickerInput
                 value={formData.tanggal_bayar}
-                onChange={(e) => setFormData({ ...formData, tanggal_bayar: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
+                onChange={(val) => setFormData({ ...formData, tanggal_bayar: val })}
               />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Metode Penerimaan</label>
-              <select
+              <SearchableSelect
                 value={formData.metode_bayar}
-                onChange={(e) => setFormData({ ...formData, metode_bayar: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-              >
-                <option value="Transfer BCA">Transfer BCA (CV. Maharani)</option>
-                <option value="Transfer Mandiri">Transfer Bank Mandiri</option>
-                <option value="Kas Tunai">Kas Tunai Kasir</option>
-                <option value="Giro">Giro / Cek Bilyet</option>
-              </select>
+                onChange={(val) => setFormData({ ...formData, metode_bayar: val })}
+                options={[
+                  { value: 'Transfer BCA', label: 'Transfer BCA (CV. Maharani)' },
+                  { value: 'Transfer Mandiri', label: 'Transfer Bank Mandiri' },
+                  { value: 'Kas Tunai', label: 'Kas Tunai Kasir' },
+                  { value: 'Giro', label: 'Giro / Cek Bilyet' },
+                ]}
+                placeholder="Pilih metode penerimaan..."
+              />
             </div>
           </div>
 

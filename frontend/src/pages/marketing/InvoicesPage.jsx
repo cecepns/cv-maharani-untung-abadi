@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Printer, Receipt, CheckCircle, Clock, Trash2 } from 'lucide-react';
+import { Plus, Printer, Receipt, CheckCircle, Clock, Trash2, FileText, Calendar, Building } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { request } from '../../utils/request';
 import { API_ENDPOINTS } from '../../utils/endpoints';
@@ -11,6 +11,8 @@ import Badge from '../../components/common/Badge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
 import PrintInvoice from '../../components/print/PrintInvoice';
+import SearchableSelect from '../../components/common/SearchableSelect';
+import DatePickerInput from '../../components/common/DatePickerInput';
 
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState([]);
@@ -304,38 +306,33 @@ export default function InvoicesPage() {
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Pilih Sales Order (SO)</label>
-            <select
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Pilih Sales Order (SO) <span className="text-rose-500">*</span>
+            </label>
+            <SearchableSelect
               value={formData.so_id}
-              onChange={(e) => handleSOSelect(e.target.value)}
-              className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-            >
-              <option value="">-- Pilih Sales Order --</option>
-              {salesOrders.map((so) => (
-                <option key={so.id} value={so.id}>
-                  {so.nomor_so} - {so.nama_customer || so.customer_nama || 'Customer'} (Rp {Number(so.total_nilai || 0).toLocaleString('id-ID')})
-                </option>
-              ))}
-            </select>
+              onChange={(val) => handleSOSelect(val)}
+              options={salesOrders.map((so) => ({
+                value: so.id,
+                label: `${so.nomor_so} - ${so.nama_customer || so.customer_nama || 'Customer'} (Rp ${Number(so.total_nilai || 0).toLocaleString('id-ID')})`,
+              }))}
+              placeholder="Cari & pilih nomor Sales Order..."
+            />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Tanggal Invoice</label>
-              <input
-                type="date"
+              <DatePickerInput
                 value={formData.tanggal_invoice}
-                onChange={(e) => setFormData({ ...formData, tanggal_invoice: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
+                onChange={(val) => setFormData({ ...formData, tanggal_invoice: val })}
               />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Jatuh Tempo Pembayaran</label>
-              <input
-                type="date"
+              <DatePickerInput
                 value={formData.jatuh_tempo}
-                onChange={(e) => setFormData({ ...formData, jatuh_tempo: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
+                onChange={(val) => setFormData({ ...formData, jatuh_tempo: val })}
               />
             </div>
           </div>

@@ -27,6 +27,7 @@ import Badge from '@/components/common/Badge';
 import StatCard from '@/components/common/StatCard';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import EmptyState from '@/components/common/EmptyState';
+import SearchableSelect from '@/components/common/SearchableSelect';
 
 const ROLES = [
   { value: 'Superadmin', label: 'Superadmin', dept: 'Manajemen', color: 'purple' },
@@ -140,8 +141,8 @@ export default function UsersPage() {
   };
 
   // Handle Role Change -> auto set default departemen
-  const handleRoleChange = (e) => {
-    const roleVal = e.target.value;
+  const handleRoleChange = (valOrEvent) => {
+    const roleVal = typeof valOrEvent === 'object' && valOrEvent?.target ? valOrEvent.target.value : valOrEvent;
     const match = ROLES.find(r => r.value === roleVal);
     setFormData(prev => ({
       ...prev,
@@ -328,33 +329,37 @@ export default function UsersPage() {
 
           <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
             {/* Filter Role */}
-            <select
-              value={selectedRole}
-              onChange={(e) => {
-                setSelectedRole(e.target.value);
-                setPage(1);
-              }}
-              className="px-3 py-2 border border-slate-300 rounded-xl text-xs font-medium text-slate-700 focus:ring-2 focus:ring-brand-500 focus:outline-none"
-            >
-              <option value="Semua">Semua Hak Akses (Role)</option>
-              {ROLES.map(r => (
-                <option key={r.value} value={r.value}>{r.label}</option>
-              ))}
-            </select>
+            <div className="w-48">
+              <SearchableSelect
+                options={[
+                  { value: 'Semua', label: 'Semua Hak Akses' },
+                  ...ROLES.map(r => ({ value: r.value, label: r.label }))
+                ]}
+                value={selectedRole}
+                onChange={(val) => {
+                  setSelectedRole(val || 'Semua');
+                  setPage(1);
+                }}
+                placeholder="Pilih Role"
+              />
+            </div>
 
             {/* Filter Status */}
-            <select
-              value={selectedStatus}
-              onChange={(e) => {
-                setSelectedStatus(e.target.value);
-                setPage(1);
-              }}
-              className="px-3 py-2 border border-slate-300 rounded-xl text-xs font-medium text-slate-700 focus:ring-2 focus:ring-brand-500 focus:outline-none"
-            >
-              <option value="Semua">Semua Status</option>
-              <option value="Aktif">Aktif</option>
-              <option value="Nonaktif">Nonaktif</option>
-            </select>
+            <div className="w-40">
+              <SearchableSelect
+                options={[
+                  { value: 'Semua', label: 'Semua Status' },
+                  { value: 'Aktif', label: 'Aktif' },
+                  { value: 'Nonaktif', label: 'Nonaktif' },
+                ]}
+                value={selectedStatus}
+                onChange={(val) => {
+                  setSelectedStatus(val || 'Semua');
+                  setPage(1);
+                }}
+                placeholder="Pilih Status"
+              />
+            </div>
 
             <button
               onClick={fetchData}
@@ -560,16 +565,12 @@ export default function UsersPage() {
               <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
                 Hak Akses (Role) *
               </label>
-              <select
+              <SearchableSelect
+                options={ROLES.map(r => ({ value: r.value, label: r.label }))}
                 value={formData.role}
                 onChange={handleRoleChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
-                required
-              >
-                {ROLES.map(r => (
-                  <option key={r.value} value={r.value}>{r.label}</option>
-                ))}
-              </select>
+                placeholder="Pilih Hak Akses"
+              />
             </div>
           </div>
 
@@ -591,14 +592,15 @@ export default function UsersPage() {
               <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
                 Status Akun *
               </label>
-              <select
+              <SearchableSelect
+                options={[
+                  { value: 'Aktif', label: 'Aktif (Dapat Login)' },
+                  { value: 'Nonaktif', label: 'Nonaktif (Akses Diblokir)' },
+                ]}
                 value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
-              >
-                <option value="Aktif">Aktif (Dapat Login)</option>
-                <option value="Nonaktif">Nonaktif (Akses Diblokir)</option>
-              </select>
+                onChange={(val) => setFormData({ ...formData, status: val })}
+                placeholder="Pilih Status"
+              />
             </div>
           </div>
 

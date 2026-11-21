@@ -11,6 +11,7 @@ import ConfirmDialog from '../../components/common/ConfirmDialog';
 import Badge from '../../components/common/Badge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
+import SearchableSelect from '../../components/common/SearchableSelect';
 
 const DEFAULT_TIPE = [
   { id: 1, kode: 'B/F', nama_tipe: 'B/F (B-Flute Single Wall ~3mm)', kategori: 'Corrugated', keterangan: 'Standard box packaging umum' },
@@ -558,17 +559,15 @@ export default function BahanSheetPage() {
                   + Kelola Tipe
                 </button>
               </div>
-              <select
+              <SearchableSelect
+                options={(tipeList.length > 0 ? tipeList : DEFAULT_TIPE).map((t) => ({
+                  value: t.kode,
+                  label: `${t.kode} - ${t.nama_tipe} (${t.kategori || 'Corrugated'})`,
+                }))}
                 value={formData.flute}
-                onChange={(e) => setFormData({ ...formData, flute: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500/20"
-              >
-                {(tipeList.length > 0 ? tipeList : DEFAULT_TIPE).map((t) => (
-                  <option key={t.id || t.kode} value={t.kode}>
-                    {t.kode} - {t.nama_tipe} ({t.kategori || 'Corrugated'})
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setFormData({ ...formData, flute: val })}
+                placeholder="-- Pilih Tipe / Flute --"
+              />
             </div>
           </div>
 
@@ -630,17 +629,15 @@ export default function BahanSheetPage() {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Supplier Sheet</label>
-              <select
+              <SearchableSelect
+                options={suppliers.map((s) => ({
+                  value: s.id,
+                  label: s.nama_supplier,
+                }))}
                 value={formData.supplier_id}
-                onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-              >
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.nama_supplier}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setFormData({ ...formData, supplier_id: val })}
+                placeholder="-- Pilih Supplier Sheet --"
+              />
             </div>
           </div>
 
@@ -673,14 +670,14 @@ export default function BahanSheetPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-[11px] font-semibold text-emerald-950 mb-1">Metode Index</label>
-                    <select
+                    <SearchableSelect
+                      options={[
+                        { value: 'm2', label: 'Index Luas (Rp / m²)' },
+                        { value: 'kg', label: 'Index Berat Tonase (Rp / kg)' },
+                      ]}
                       value={slotMetode}
-                      onChange={(e) => setSlotMetode(e.target.value)}
-                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-emerald-300 rounded-xl focus:ring-1 focus:ring-emerald-500"
-                    >
-                      <option value="m2">Index Luas (Rp / m²)</option>
-                      <option value="kg">Index Berat Tonase (Rp / kg)</option>
-                    </select>
+                      onChange={(val) => setSlotMetode(val)}
+                    />
                   </div>
                   <div>
                     <label className="block text-[11px] font-semibold text-emerald-950 mb-1">
@@ -865,15 +862,15 @@ export default function BahanSheetPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Kategori</label>
-                  <select
+                  <SearchableSelect
+                    options={[
+                      { value: 'Corrugated', label: 'Corrugated (Bergelombang)' },
+                      { value: 'Paperboard Solid', label: 'Paperboard Solid (Duplex/Ivory/Art Paper)' },
+                      { value: 'Lainnya', label: 'Lainnya' },
+                    ]}
                     value={tipeFormData.kategori}
-                    onChange={(e) => setTipeFormData({ ...tipeFormData, kategori: e.target.value })}
-                    className="w-full px-3 py-1.5 text-sm bg-white border border-slate-200 rounded-xl"
-                  >
-                    <option value="Corrugated">Corrugated (Bergelombang)</option>
-                    <option value="Paperboard Solid">Paperboard Solid (Duplex/Ivory/Art Paper)</option>
-                    <option value="Lainnya">Lainnya</option>
-                  </select>
+                    onChange={(val) => setTipeFormData({ ...tipeFormData, kategori: val })}
+                  />
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row items-center gap-3">
@@ -1083,32 +1080,29 @@ export default function BahanSheetPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Tipe Bahan / Flute</label>
-              <select
+              <SearchableSelect
+                options={(tipeList.length > 0 ? tipeList : DEFAULT_TIPE).map((t) => ({
+                  value: t.kode,
+                  label: `${t.kode} - ${t.nama_tipe}`,
+                }))}
                 value={calcForm.flute}
-                onChange={(e) => {
-                  const newFlute = e.target.value;
+                onChange={(val) => {
+                  const newFlute = val;
                   const newGsm = getGsmFromFlute(newFlute);
                   setCalcForm({ ...calcForm, flute: newFlute, gsm: newGsm });
                 }}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-              >
-                {(tipeList.length > 0 ? tipeList : DEFAULT_TIPE).map((t) => (
-                  <option key={t.id || t.kode} value={t.kode}>
-                    {t.kode} - {t.nama_tipe}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Metode Index Supplier</label>
-              <select
+              <SearchableSelect
+                options={[
+                  { value: 'm2', label: 'Index Luas (Rp / m²)' },
+                  { value: 'kg', label: 'Index Berat Tonase (Rp / kg)' },
+                ]}
                 value={calcForm.metode}
-                onChange={(e) => setCalcForm({ ...calcForm, metode: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl font-semibold text-slate-800"
-              >
-                <option value="m2">Index Luas (Rp / m²)</option>
-                <option value="kg">Index Berat Tonase (Rp / kg)</option>
-              </select>
+                onChange={(val) => setCalcForm({ ...calcForm, metode: val })}
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">

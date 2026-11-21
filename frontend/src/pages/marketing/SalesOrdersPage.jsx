@@ -11,6 +11,8 @@ import Badge from '../../components/common/Badge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
 import PrintSPK from '../../components/print/PrintSPK';
+import SearchableSelect from '../../components/common/SearchableSelect';
+import DatePickerInput from '../../components/common/DatePickerInput';
 
 export default function SalesOrdersPage() {
   const [salesOrders, setSalesOrders] = useState([]);
@@ -228,20 +230,23 @@ export default function SalesOrdersPage() {
             placeholder="Cari nomor SO, customer, catatan..."
             className="w-full sm:w-80"
           />
-          <select
+          <SearchableSelect
+            className="w-48 text-xs font-semibold"
             value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
+            onChange={(val) => {
+              setStatusFilter(val || '');
               setPage(1);
             }}
-            className="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-brand-500 font-medium"
-          >
-            <option value="">Semua Status</option>
-            <option value="Draft">Draft</option>
-            <option value="Disetujui/SPK">Disetujui / Siap SPK</option>
-            <option value="Diproses">Diproses di Pabrik</option>
-            <option value="Selesai">Selesai</option>
-          </select>
+            options={[
+              { value: '', label: 'Semua Status' },
+              { value: 'Draft', label: 'Draft' },
+              { value: 'Disetujui/SPK', label: 'Disetujui / Siap SPK' },
+              { value: 'Diproses', label: 'Diproses di Pabrik' },
+              { value: 'Selesai', label: 'Selesai' },
+            ]}
+            placeholder="Filter Status..."
+            isClearable
+          />
         </div>
         <div className="text-xs text-slate-400 font-medium">
           Total: <span className="text-slate-800 font-bold">{pagination.total}</span> Sales Order
@@ -376,56 +381,49 @@ export default function SalesOrdersPage() {
               <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Pilih Customer <span className="text-rose-500">*</span>
               </label>
-              <select
-                required
+              <SearchableSelect
                 value={formData.customer_id}
-                onChange={(e) => handleCustomerChange(e.target.value)}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-              >
-                <option value="">-- Pilih Customer --</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nama_customer} ({c.kode_customer}) {c.npwp ? '• PKP' : '• Non-PKP'}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => handleCustomerChange(val)}
+                options={customers.map((c) => ({
+                  value: c.id,
+                  label: `${c.nama_customer} (${c.kode_customer}) ${c.npwp ? '• PKP' : '• Non-PKP'}`,
+                }))}
+                placeholder="Cari & pilih customer..."
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Sales Person</label>
-              <select
+              <SearchableSelect
                 value={formData.sales_id}
-                onChange={(e) => setFormData({ ...formData, sales_id: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-              >
-                {salesPersons.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.nama_sales}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setFormData({ ...formData, sales_id: val })}
+                options={salesPersons.map((s) => ({
+                  value: s.id,
+                  label: s.nama_sales,
+                }))}
+                placeholder="Pilih sales..."
+              />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Tanggal Pesanan</label>
-              <input
-                type="date"
+              <DatePickerInput
                 value={formData.tanggal_so}
-                onChange={(e) => setFormData({ ...formData, tanggal_so: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
+                onChange={(val) => setFormData({ ...formData, tanggal_so: val })}
               />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Jenis Pajak Transaksi</label>
-              <select
+              <SearchableSelect
                 value={formData.tipe_pajak || 'Non-PPN'}
-                onChange={(e) => setFormData({ ...formData, tipe_pajak: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl font-medium"
-              >
-                <option value="Non-PPN">Non-PPN (0% - Non-PKP / UMKM)</option>
-                <option value="PPN 11%">PPN 11% (Customer PKP / Faktur Pajak)</option>
-              </select>
+                onChange={(val) => setFormData({ ...formData, tipe_pajak: val })}
+                options={[
+                  { value: 'Non-PPN', label: 'Non-PPN (0% - Non-PKP / UMKM)' },
+                  { value: 'PPN 11%', label: 'PPN 11% (Customer PKP / Faktur Pajak)' },
+                ]}
+                placeholder="Pilih jenis pajak..."
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Catatan Tambahan</label>
@@ -460,18 +458,15 @@ export default function SalesOrdersPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <div className="sm:col-span-2">
                       <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Produk Dus</label>
-                      <select
+                      <SearchableSelect
                         value={it.product_id}
-                        onChange={(e) => handleProductSelect(idx, e.target.value)}
-                        className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg"
-                      >
-                        <option value="">-- Pilih Box / Sheet --</option>
-                        {products.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.nama_barang} ({p.tipe_flute}) - Rp {Number(p.harga_jual).toLocaleString('id-ID')}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(val) => handleProductSelect(idx, val)}
+                        options={products.map((p) => ({
+                          value: p.id,
+                          label: `${p.nama_barang} (${p.tipe_flute}) - Rp ${Number(p.harga_jual).toLocaleString('id-ID')}`,
+                        }))}
+                        placeholder="Cari box / sheet..."
+                      />
                     </div>
                     <div>
                       <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Qty Order (Pcs)</label>

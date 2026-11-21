@@ -10,6 +10,8 @@ import ConfirmDialog from '../../components/common/ConfirmDialog';
 import Badge from '../../components/common/Badge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
+import SearchableSelect from '../../components/common/SearchableSelect';
+import DatePickerInput from '../../components/common/DatePickerInput';
 
 export default function AktivaListPage() {
   const [aktivaList, setAktivaList] = useState([]);
@@ -269,24 +271,22 @@ export default function AktivaListPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Kategori Aktiva</label>
-              <select
+              <SearchableSelect
+                options={[
+                  { value: 'Mesin Pabrik', label: 'Mesin Pabrik' },
+                  { value: 'Kendaraan Operasional', label: 'Kendaraan Operasional' },
+                  { value: 'Kendaraan Pabrik', label: 'Kendaraan Pabrik (Forklift)' },
+                  { value: 'Peralatan Kantor', label: 'Peralatan Kantor & Komputer' },
+                ]}
                 value={formData.kategori}
-                onChange={(e) => setFormData({ ...formData, kategori: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-              >
-                <option value="Mesin Pabrik">Mesin Pabrik</option>
-                <option value="Kendaraan Operasional">Kendaraan Operasional</option>
-                <option value="Kendaraan Pabrik">Kendaraan Pabrik (Forklift)</option>
-                <option value="Peralatan Kantor">Peralatan Kantor & Komputer</option>
-              </select>
+                onChange={(val) => setFormData({ ...formData, kategori: val })}
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Tanggal Perolehan</label>
-              <input
-                type="date"
+              <DatePickerInput
                 value={formData.tanggal_perolehan}
-                onChange={(e) => setFormData({ ...formData, tanggal_perolehan: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
+                onChange={(val) => setFormData({ ...formData, tanggal_perolehan: val })}
               />
             </div>
           </div>

@@ -10,6 +10,7 @@ import ConfirmDialog from '../../components/common/ConfirmDialog';
 import Badge from '../../components/common/Badge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
+import SearchableSelect from '../../components/common/SearchableSelect';
 
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState([]);
@@ -289,16 +290,16 @@ export default function SuppliersPage() {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Kategori Bahan</label>
-              <select
+              <SearchableSelect
+                options={[
+                  { value: 'Sheet Kertas', label: 'Sheet Kertas Corrugated' },
+                  { value: 'Tinta Flexo', label: 'Tinta Flexo Waterbased' },
+                  { value: 'Lem & Kawat', label: 'Lem Poly & Kawat Stitching' },
+                  { value: 'Packaging & Logistik', label: 'Packaging & Logistik' },
+                ]}
                 value={formData.kategori}
-                onChange={(e) => setFormData({ ...formData, kategori: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-              >
-                <option value="Sheet Kertas">Sheet Kertas Corrugated</option>
-                <option value="Tinta Flexo">Tinta Flexo Waterbased</option>
-                <option value="Lem & Kawat">Lem Poly & Kawat Stitching</option>
-                <option value="Packaging & Logistik">Packaging & Logistik</option>
-              </select>
+                onChange={(val) => setFormData({ ...formData, kategori: val })}
+              />
             </div>
           </div>
 
@@ -352,17 +353,17 @@ export default function SuppliersPage() {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Termin Pembayaran</label>
-              <select
+              <SearchableSelect
+                options={[
+                  { value: 'Cash', label: 'Cash On Delivery (COD)' },
+                  { value: '14 Hari', label: '14 Hari' },
+                  { value: '30 Hari', label: '30 Hari' },
+                  { value: '45 Hari', label: '45 Hari' },
+                  { value: '60 Hari', label: '60 Hari' },
+                ]}
                 value={formData.termin_bayar}
-                onChange={(e) => setFormData({ ...formData, termin_bayar: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-              >
-                <option value="Cash">Cash On Delivery (COD)</option>
-                <option value="14 Hari">14 Hari</option>
-                <option value="30 Hari">30 Hari</option>
-                <option value="45 Hari">45 Hari</option>
-                <option value="60 Hari">60 Hari</option>
-              </select>
+                onChange={(val) => setFormData({ ...formData, termin_bayar: val })}
+              />
             </div>
           </div>
 

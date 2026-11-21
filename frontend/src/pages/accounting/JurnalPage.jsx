@@ -9,6 +9,8 @@ import Modal from '../../components/common/Modal';
 import Badge from '../../components/common/Badge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
+import SearchableSelect from '../../components/common/SearchableSelect';
+import DatePickerInput from '../../components/common/DatePickerInput';
 
 export default function JurnalPage() {
   const [jurnalList, setJurnalList] = useState([]);
@@ -224,26 +226,24 @@ export default function JurnalPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Tanggal Transaksi</label>
-              <input
-                type="date"
+              <DatePickerInput
                 value={formData.tanggal}
-                onChange={(e) => setFormData({ ...formData, tanggal: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
+                onChange={(val) => setFormData({ ...formData, tanggal: val })}
               />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Tipe Jurnal</label>
-              <select
+              <SearchableSelect
+                options={[
+                  { value: 'Memorial', label: 'Jurnal Memorial (Penyesuaian)' },
+                  { value: 'Kas Masuk', label: 'Jurnal Kas Masuk (KM)' },
+                  { value: 'Kas Keluar', label: 'Jurnal Kas Keluar (KK)' },
+                  { value: 'Bank Masuk', label: 'Jurnal Bank Masuk (BM)' },
+                  { value: 'Bank Keluar', label: 'Jurnal Bank Keluar (BK)' },
+                ]}
                 value={formData.tipe_jurnal}
-                onChange={(e) => setFormData({ ...formData, tipe_jurnal: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-              >
-                <option value="Memorial">Jurnal Memorial (Penyesuaian)</option>
-                <option value="Kas Masuk">Jurnal Kas Masuk (KM)</option>
-                <option value="Kas Keluar">Jurnal Kas Keluar (KK)</option>
-                <option value="Bank Masuk">Jurnal Bank Masuk (BM)</option>
-                <option value="Bank Keluar">Jurnal Bank Keluar (BK)</option>
-              </select>
+                onChange={(val) => setFormData({ ...formData, tipe_jurnal: val })}
+              />
             </div>
           </div>
 
@@ -262,42 +262,39 @@ export default function JurnalPage() {
           <div className="space-y-3 pt-2">
             <p className="text-xs font-bold text-slate-800 uppercase tracking-wider">Pasangan Akun Debet & Kredit</p>
             {formData.items.map((it, idx) => (
-              <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl grid grid-cols-1 sm:grid-cols-12 gap-3">
+              <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
                 <div className="sm:col-span-6">
                   <label className="block text-[11px] font-semibold text-slate-600 mb-1">Akun Perkiraan</label>
-                  <select
+                  <SearchableSelect
+                    options={coaList.map((c) => ({
+                      value: c.id,
+                      label: `${c.kode_akun} - ${c.nama_akun}`,
+                    }))}
                     value={it.akun_id}
-                    onChange={(e) => {
+                    onChange={(val) => {
                       const newItems = [...formData.items];
-                      newItems[idx].akun_id = e.target.value;
-                      const ac = coaList.find(c => c.id === parseInt(e.target.value, 10));
+                      newItems[idx].akun_id = val;
+                      const ac = coaList.find(c => c.id === parseInt(val, 10));
                       if (ac) newItems[idx].nama_akun = ac.nama_akun;
                       setFormData({ ...formData, items: newItems });
                     }}
-                    className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg"
-                  >
-                    <option value="">-- Pilih Akun --</option>
-                    {coaList.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.kode_akun} - {c.nama_akun}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="-- Pilih Akun --"
+                  />
                 </div>
                 <div className="sm:col-span-3">
                   <label className="block text-[11px] font-semibold text-slate-600 mb-1">Posisi</label>
-                  <select
+                  <SearchableSelect
+                    options={[
+                      { value: 'Debet', label: 'Debet' },
+                      { value: 'Kredit', label: 'Kredit' },
+                    ]}
                     value={it.posisi}
-                    onChange={(e) => {
+                    onChange={(val) => {
                       const newItems = [...formData.items];
-                      newItems[idx].posisi = e.target.value;
+                      newItems[idx].posisi = val;
                       setFormData({ ...formData, items: newItems });
                     }}
-                    className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg font-bold"
-                  >
-                    <option value="Debet">Debet</option>
-                    <option value="Kredit">Kredit</option>
-                  </select>
+                  />
                 </div>
                 <div className="sm:col-span-3">
                   <label className="block text-[11px] font-semibold text-slate-600 mb-1">Nominal (Rp)</label>
@@ -310,7 +307,7 @@ export default function JurnalPage() {
                       newItems[idx].nominal = Number(e.target.value);
                       setFormData({ ...formData, items: newItems });
                     }}
-                    className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg font-bold"
+                    className="w-full px-2.5 py-2 text-xs bg-white border border-slate-200 rounded-xl font-bold"
                   />
                 </div>
               </div>

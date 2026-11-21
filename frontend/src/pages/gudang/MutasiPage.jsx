@@ -9,6 +9,7 @@ import Modal from '../../components/common/Modal';
 import Badge from '../../components/common/Badge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
+import SearchableSelect from '../../components/common/SearchableSelect';
 
 export default function MutasiPage() {
   const [mutasiList, setMutasiList] = useState([]);
@@ -181,26 +182,26 @@ export default function MutasiPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Tipe Kategori Barang</label>
-              <select
+              <SearchableSelect
+                options={[
+                  { value: 'Sheet', label: 'Karton Sheet Lembaran' },
+                  { value: 'BahanPembantu', label: 'Bahan Pembantu (Tinta/Lem/Kawat)' },
+                  { value: 'BarangJadi', label: 'Barang Jadi (Karton Box FG)' },
+                ]}
                 value={formData.tipe_barang}
-                onChange={(e) => setFormData({ ...formData, tipe_barang: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-              >
-                <option value="Sheet">Karton Sheet Lembaran</option>
-                <option value="BahanPembantu">Bahan Pembantu (Tinta/Lem/Kawat)</option>
-                <option value="BarangJadi">Barang Jadi (Karton Box FG)</option>
-              </select>
+                onChange={(val) => setFormData({ ...formData, tipe_barang: val })}
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Jenis Penyesuaian</label>
-              <select
+              <SearchableSelect
+                options={[
+                  { value: 'Masuk', label: 'Tambah Stok (+ Masuk Fisik)' },
+                  { value: 'Keluar', label: 'Kurang Stok (- Selisih / Rusak)' },
+                ]}
                 value={formData.jenis_mutasi}
-                onChange={(e) => setFormData({ ...formData, jenis_mutasi: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-              >
-                <option value="Masuk">Tambah Stok (+ Masuk Fisik)</option>
-                <option value="Keluar">Kurang Stok (- Selisih / Rusak)</option>
-              </select>
+                onChange={(val) => setFormData({ ...formData, jenis_mutasi: val })}
+              />
             </div>
           </div>
 

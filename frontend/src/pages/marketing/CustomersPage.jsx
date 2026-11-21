@@ -10,6 +10,7 @@ import ConfirmDialog from '../../components/common/ConfirmDialog';
 import Badge from '../../components/common/Badge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
+import SearchableSelect from '../../components/common/SearchableSelect';
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState([]);
@@ -349,17 +350,18 @@ export default function CustomersPage() {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Termin Pembayaran</label>
-              <select
+              <SearchableSelect
                 value={formData.termin_bayar}
-                onChange={(e) => setFormData({ ...formData, termin_bayar: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500"
-              >
-                <option value="Cash">Cash / Tunai</option>
-                <option value="14 Hari">14 Hari</option>
-                <option value="30 Hari">30 Hari</option>
-                <option value="45 Hari">45 Hari</option>
-                <option value="60 Hari">60 Hari</option>
-              </select>
+                onChange={(val) => setFormData({ ...formData, termin_bayar: val })}
+                options={[
+                  { value: 'Cash', label: 'Cash / Tunai' },
+                  { value: '14 Hari', label: '14 Hari' },
+                  { value: '30 Hari', label: '30 Hari' },
+                  { value: '45 Hari', label: '45 Hari' },
+                  { value: '60 Hari', label: '60 Hari' },
+                ]}
+                placeholder="Pilih termin..."
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Plafon Kredit (Rp)</label>

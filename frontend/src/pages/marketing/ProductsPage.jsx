@@ -10,6 +10,7 @@ import ConfirmDialog from '../../components/common/ConfirmDialog';
 import Badge from '../../components/common/Badge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
+import SearchableSelect from '../../components/common/SearchableSelect';
 
 export default function ProductsPage() {
   const [products, setProducts] = useState([]);
@@ -184,33 +185,39 @@ export default function ProductsPage() {
             className="w-full sm:w-72"
           />
 
-          <select
+          <SearchableSelect
+            className="w-full sm:w-56 text-xs font-semibold"
             value={filterJenis}
-            onChange={(e) => {
-              setFilterJenis(e.target.value);
+            onChange={(val) => {
+              setFilterJenis(val || '');
               setPage(1);
             }}
-            className="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-amber-500 w-full sm:w-auto font-medium"
-          >
-            <option value="">Semua Jenis (Box & Sheet)</option>
-            <option value="Box">Box Jadi (Karton Box)</option>
-            <option value="Sheet">Sheet Lembaran (Karton Lembar)</option>
-          </select>
+            options={[
+              { value: '', label: 'Semua Jenis (Box & Sheet)' },
+              { value: 'Box', label: 'Box Jadi (Karton Box)' },
+              { value: 'Sheet', label: 'Sheet Lembaran (Karton Lembar)' },
+            ]}
+            placeholder="Pilih Jenis..."
+            isClearable
+          />
 
-          <select
+          <SearchableSelect
+            className="w-full sm:w-52 text-xs font-semibold"
             value={filterFlute}
-            onChange={(e) => {
-              setFilterFlute(e.target.value);
+            onChange={(val) => {
+              setFilterFlute(val || '');
               setPage(1);
             }}
-            className="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-amber-500 w-full sm:w-auto font-medium"
-          >
-            <option value="">Semua Flute</option>
-            <option value="B/F">B/F (B Flute ~3mm)</option>
-            <option value="C/F">C/F (C Flute ~4mm)</option>
-            <option value="E/F">E/F (E Flute ~1.5mm Micro)</option>
-            <option value="B/C Double Wall">B/C Double Wall (~7mm)</option>
-          </select>
+            options={[
+              { value: '', label: 'Semua Flute' },
+              { value: 'B/F', label: 'B/F (B Flute ~3mm)' },
+              { value: 'C/F', label: 'C/F (C Flute ~4mm)' },
+              { value: 'E/F', label: 'E/F (E Flute ~1.5mm Micro)' },
+              { value: 'B/C Double Wall', label: 'B/C Double Wall (~7mm)' },
+            ]}
+            placeholder="Pilih Flute..."
+            isClearable
+          />
         </div>
 
         <div className="text-xs text-slate-400 font-medium">
@@ -362,27 +369,29 @@ export default function ProductsPage() {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Jenis Kemasan</label>
-              <select
+              <SearchableSelect
                 value={formData.jenis_barang}
-                onChange={(e) => setFormData({ ...formData, jenis_barang: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-              >
-                <option value="Box">Karton Box Jadi (Dus)</option>
-                <option value="Sheet">Sheet Lembaran (Karton Lembar)</option>
-              </select>
+                onChange={(val) => setFormData({ ...formData, jenis_barang: val })}
+                options={[
+                  { value: 'Box', label: 'Karton Box Jadi (Dus)' },
+                  { value: 'Sheet', label: 'Sheet Lembaran (Karton Lembar)' },
+                ]}
+                placeholder="Pilih jenis kemasan..."
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Tipe Flute Corrugated</label>
-              <select
+              <SearchableSelect
                 value={formData.tipe_flute}
-                onChange={(e) => setFormData({ ...formData, tipe_flute: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-              >
-                <option value="B/F">B/F (B-Flute standard ~3mm)</option>
-                <option value="C/F">C/F (C-Flute tebal ~4mm)</option>
-                <option value="E/F">E/F (E-Flute mikro tipis ~1.5mm)</option>
-                <option value="B/C Double Wall">B/C Double Wall (Kuat & Tebal ~7mm)</option>
-              </select>
+                onChange={(val) => setFormData({ ...formData, tipe_flute: val })}
+                options={[
+                  { value: 'B/F', label: 'B/F (B-Flute standard ~3mm)' },
+                  { value: 'C/F', label: 'C/F (C-Flute tebal ~4mm)' },
+                  { value: 'E/F', label: 'E/F (E-Flute mikro tipis ~1.5mm)' },
+                  { value: 'B/C Double Wall', label: 'B/C Double Wall (Kuat & Tebal ~7mm)' },
+                ]}
+                placeholder="Pilih tipe flute..."
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Substansi Kertas</label>
@@ -396,16 +405,17 @@ export default function ProductsPage() {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Jenis Sambungan</label>
-              <select
+              <SearchableSelect
                 value={formData.jenis_sambungan}
-                onChange={(e) => setFormData({ ...formData, jenis_sambungan: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-              >
-                <option value="Stitching">Stitching (Jahit Kawat Kencang)</option>
-                <option value="Glue">Glue (Lem Lipat / Folder Gluer)</option>
-                <option value="Die-cut">Die-cut (Klip / Kunci Tanpa Lem)</option>
-                <option value="Tanpa Sambungan">Tanpa Sambungan (Lembaran)</option>
-              </select>
+                onChange={(val) => setFormData({ ...formData, jenis_sambungan: val })}
+                options={[
+                  { value: 'Stitching', label: 'Stitching (Jahit Kawat Kencang)' },
+                  { value: 'Glue', label: 'Glue (Lem Lipat / Folder Gluer)' },
+                  { value: 'Die-cut', label: 'Die-cut (Klip / Kunci Tanpa Lem)' },
+                  { value: 'Tanpa Sambungan', label: 'Tanpa Sambungan (Lembaran)' },
+                ]}
+                placeholder="Pilih jenis sambungan..."
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Dimensi Panjang (mm)</label>

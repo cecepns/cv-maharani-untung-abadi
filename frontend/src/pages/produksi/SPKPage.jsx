@@ -11,6 +11,8 @@ import Badge from '../../components/common/Badge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
 import PrintSPK from '../../components/print/PrintSPK';
+import SearchableSelect from '../../components/common/SearchableSelect';
+import DatePickerInput from '../../components/common/DatePickerInput';
 
 export default function SPKPage() {
   const [spkList, setSpkList] = useState([]);
@@ -177,20 +179,23 @@ export default function SPKPage() {
             placeholder="Cari no SPK, nama dus, customer..."
             className="w-full sm:w-80"
           />
-          <select
+          <SearchableSelect
+            className="w-52 text-xs font-semibold"
             value={tahapanFilter}
-            onChange={(e) => {
-              setTahapanFilter(e.target.value);
+            onChange={(val) => {
+              setTahapanFilter(val || '');
               setPage(1);
             }}
-            className="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-amber-500 font-medium"
-          >
-            <option value="">Semua Tahapan</option>
-            <option value="Cetak">1. Proses Cetak Flexo</option>
-            <option value="Finishing">2. Proses Finishing (Pond/Stitching)</option>
-            <option value="Ikat">3. Proses Ikat Strapping</option>
-            <option value="Selesai">4. Selesai (Masuk Gudang)</option>
-          </select>
+            options={[
+              { value: '', label: 'Semua Tahapan' },
+              { value: 'Cetak', label: '1. Proses Cetak Flexo' },
+              { value: 'Finishing', label: '2. Proses Finishing' },
+              { value: 'Ikat', label: '3. Proses Ikat Strapping' },
+              { value: 'Selesai', label: '4. Selesai (Masuk Gudang)' },
+            ]}
+            placeholder="Filter Tahapan..."
+            isClearable
+          />
         </div>
         <div className="text-xs text-slate-400 font-medium">
           Total: <span className="text-slate-800 font-bold">{pagination.total}</span> SPK Produksi
@@ -358,18 +363,15 @@ export default function SPKPage() {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Bahan Sheet Karton</label>
-              <select
+              <SearchableSelect
                 value={formData.sheet_id}
-                onChange={(e) => setFormData({ ...formData, sheet_id: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-              >
-                <option value="">-- Pilih Lembaran Sheet --</option>
-                {sheets.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.nama_sheet} ({s.flute})
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setFormData({ ...formData, sheet_id: val })}
+                options={sheets.map((s) => ({
+                  value: s.id,
+                  label: `${s.nama_sheet} (${s.flute})`,
+                }))}
+                placeholder="Pilih Lembaran Sheet..."
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Target Produksi (Pcs)</label>
@@ -410,20 +412,16 @@ export default function SPKPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Tanggal Mulai Produksi</label>
-              <input
-                type="date"
+              <DatePickerInput
                 value={formData.tanggal_mulai}
-                onChange={(e) => setFormData({ ...formData, tanggal_mulai: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
+                onChange={(val) => setFormData({ ...formData, tanggal_mulai: val })}
               />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Target Selesai Gudang FG</label>
-              <input
-                type="date"
+              <DatePickerInput
                 value={formData.target_selesai}
-                onChange={(e) => setFormData({ ...formData, target_selesai: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
+                onChange={(val) => setFormData({ ...formData, target_selesai: val })}
               />
             </div>
           </div>

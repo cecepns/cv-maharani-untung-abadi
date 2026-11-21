@@ -9,6 +9,8 @@ import Modal from '../../components/common/Modal';
 import Badge from '../../components/common/Badge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
+import SearchableSelect from '../../components/common/SearchableSelect';
+import DatePickerInput from '../../components/common/DatePickerInput';
 
 export default function CetakPage() {
   const [cetakList, setCetakList] = useState([]);
@@ -217,19 +219,15 @@ export default function CetakPage() {
             <label className="block text-xs font-semibold text-slate-700 mb-1">
               Pilih SPK Produksi <span className="text-rose-500">*</span>
             </label>
-            <select
-              required
+            <SearchableSelect
+              options={spkList.map((s) => ({
+                value: s.id,
+                label: `${s.nomor_spk} - ${s.nama_box} (${s.customer_nama})`,
+              }))}
               value={formData.spk_id}
-              onChange={(e) => setFormData({ ...formData, spk_id: e.target.value })}
-              className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-            >
-              <option value="">-- Pilih SPK --</option>
-              {spkList.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.nomor_spk} - {s.nama_box} ({s.customer_nama})
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setFormData({ ...formData, spk_id: val })}
+              placeholder="-- Cari SPK Produksi --"
+            />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

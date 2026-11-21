@@ -23,6 +23,8 @@ import Pagination from '@/components/common/Pagination';
 import Modal from '@/components/common/Modal';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
 import Badge from '@/components/common/Badge';
+import SearchableSelect from '@/components/common/SearchableSelect';
+import DatePickerInput from '@/components/common/DatePickerInput';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import EmptyState from '@/components/common/EmptyState';
 
@@ -818,18 +820,15 @@ export default function AbsensiPage() {
             <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
               Nama Karyawan / Operator *
             </label>
-            <select
+            <SearchableSelect
               value={formData.karyawan_id}
-              onChange={(e) => setFormData({ ...formData, karyawan_id: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
-              required
-            >
-              {karyawanList.map((k) => (
-                <option key={k.id} value={k.id}>
-                  {k.nik} - {k.nama_lengkap} ({k.jabatan})
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setFormData({ ...formData, karyawan_id: val })}
+              options={karyawanList.map((k) => ({
+                value: k.id,
+                label: `${k.nik} - ${k.nama_lengkap} (${k.jabatan})`,
+              }))}
+              placeholder="Cari NIK / Nama Karyawan..."
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -837,28 +836,26 @@ export default function AbsensiPage() {
               <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
                 Tanggal Kehadiran *
               </label>
-              <input
-                type="date"
+              <DatePickerInput
                 value={formData.tanggal}
-                onChange={(e) => setFormData({ ...formData, tanggal: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
-                required
+                onChange={(val) => setFormData({ ...formData, tanggal: val })}
               />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
                 Status Kehadiran *
               </label>
-              <select
+              <SearchableSelect
                 value={formData.status_kehadiran}
-                onChange={(e) => setFormData({ ...formData, status_kehadiran: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
-              >
-                <option value="Hadir">Hadir Bekerja</option>
-                <option value="Izin">Izin Tidak Masuk</option>
-                <option value="Sakit">Sakit (SKD)</option>
-                <option value="Alfa">Tanpa Keterangan (Alfa)</option>
-              </select>
+                onChange={(val) => setFormData({ ...formData, status_kehadiran: val })}
+                options={[
+                  { value: 'Hadir', label: 'Hadir Bekerja' },
+                  { value: 'Izin', label: 'Izin Tidak Masuk' },
+                  { value: 'Sakit', label: 'Sakit (SKD)' },
+                  { value: 'Alfa', label: 'Tanpa Keterangan (Alfa)' },
+                ]}
+                placeholder="Pilih status..."
+              />
             </div>
           </div>
 

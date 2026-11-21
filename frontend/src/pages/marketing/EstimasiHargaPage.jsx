@@ -27,6 +27,7 @@ import { request } from '@/utils/request';
 import { API_ENDPOINTS } from '@/utils/endpoints';
 import Modal from '@/components/common/Modal';
 import Badge from '@/components/common/Badge';
+import SearchableSelect from '@/components/common/SearchableSelect';
 
 // Spesifikasi standar industri & rumus toleransi karton gelombang CV. Maharani
 export const FLUTE_SPECS = {
@@ -541,18 +542,18 @@ Terima kasih telah mempercayakan kebutuhan packaging Anda kepada CV. Maharani Un
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Ambil Cepat dari Master Bahan Baku Sheet (Opsional):
                 </label>
-                <select
+                <SearchableSelect
+                  options={[
+                    { value: '', label: '-- Input Bebas / Kustom Sendiri --' },
+                    ...masterSheets.map((s) => ({
+                      value: s.id,
+                      label: `${s.kode_sheet} - ${s.nama_sheet} (${s.flute} ${s.substansi}) - Rp ${Number(s.harga_per_lembar || 0).toLocaleString('id-ID')}/lbr`,
+                    })),
+                  ]}
                   value={selectedSheetId}
-                  onChange={(e) => handleSelectMasterSheet(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl"
-                >
-                  <option value="">-- Input Bebas / Kustom Sendiri --</option>
-                  {masterSheets.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.kode_sheet} - {s.nama_sheet} ({s.flute} {s.substansi}) - Rp {Number(s.harga_per_lembar || 0).toLocaleString('id-ID')}/lbr
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => handleSelectMasterSheet(val)}
+                  placeholder="-- Cari Bahan Baku Sheet --"
+                />
               </div>
             )}
 
@@ -561,14 +562,14 @@ Terima kasih telah mempercayakan kebutuhan packaging Anda kepada CV. Maharani Un
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Metode Index
                 </label>
-                <select
+                <SearchableSelect
+                  options={[
+                    { value: 'm2', label: 'Index Luas (Rp / m²)' },
+                    { value: 'kg', label: 'Index Tonase (Rp / kg)' },
+                  ]}
                   value={metodeIndex}
-                  onChange={(e) => setMetodeIndex(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl font-bold text-slate-800"
-                >
-                  <option value="m2">Index Luas (Rp / m²)</option>
-                  <option value="kg">Index Tonase (Rp / kg)</option>
-                </select>
+                  onChange={(val) => setMetodeIndex(val)}
+                />
               </div>
 
               <div>
@@ -974,15 +975,15 @@ Terima kasih telah mempercayakan kebutuhan packaging Anda kepada CV. Maharani Un
             <label className="block text-xs font-semibold text-slate-700 mb-1">
               Jenis Sambungan Box
             </label>
-            <select
+            <SearchableSelect
+              options={[
+                { value: 'Stitching', label: 'Stitching (Kawat Jahit)' },
+                { value: 'Lem Glue', label: 'Lem Glue (Dextrin)' },
+                { value: 'Die Cut Lock', label: 'Die Cut Lock (Tanpa Sambungan)' },
+              ]}
               value={saveFormData.jenis_sambungan}
-              onChange={(e) => setSaveFormData({ ...saveFormData, jenis_sambungan: e.target.value })}
-              className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl"
-            >
-              <option value="Stitching">Stitching (Kawat Jahit)</option>
-              <option value="Lem Glue">Lem Glue (Dextrin)</option>
-              <option value="Die Cut Lock">Die Cut Lock (Tanpa Sambungan)</option>
-            </select>
+              onChange={(val) => setSaveFormData({ ...saveFormData, jenis_sambungan: val })}
+            />
           </div>
 
           <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">

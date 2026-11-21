@@ -10,6 +10,7 @@ import ConfirmDialog from '../../components/common/ConfirmDialog';
 import Badge from '../../components/common/Badge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
+import SearchableSelect from '../../components/common/SearchableSelect';
 
 export default function BahanPembantuPage() {
   const [bahanList, setBahanList] = useState([]);
@@ -291,17 +292,17 @@ export default function BahanPembantuPage() {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Kategori Bahan</label>
-              <select
+              <SearchableSelect
+                options={[
+                  { value: 'Tinta Flexo', label: 'Tinta Flexo Waterbased' },
+                  { value: 'Lem Karton', label: 'Lem Karton / Dextrin / Poly' },
+                  { value: 'Kawat Stitching', label: 'Kawat Stitching Galvanized' },
+                  { value: 'Tali Strapping', label: 'Tali Strapping Ikat Dus' },
+                  { value: 'Lakban/Isolasi', label: 'Lakban / Isolasi Opp Tape' },
+                ]}
                 value={formData.kategori}
-                onChange={(e) => setFormData({ ...formData, kategori: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-              >
-                <option value="Tinta Flexo">Tinta Flexo Waterbased</option>
-                <option value="Lem Karton">Lem Karton / Dextrin / Poly</option>
-                <option value="Kawat Stitching">Kawat Stitching Galvanized</option>
-                <option value="Tali Strapping">Tali Strapping Ikat Dus</option>
-                <option value="Lakban/Isolasi">Lakban / Isolasi Opp Tape</option>
-              </select>
+                onChange={(val) => setFormData({ ...formData, kategori: val })}
+              />
             </div>
           </div>
 
@@ -322,16 +323,16 @@ export default function BahanPembantuPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Satuan Ukur</label>
-              <select
+              <SearchableSelect
+                options={[
+                  { value: 'Kg', label: 'Kg (Kilogram)' },
+                  { value: 'Roll', label: 'Roll (Gulungan)' },
+                  { value: 'Galon', label: 'Galon / Pail' },
+                  { value: 'Pcs', label: 'Pcs / Batang' },
+                ]}
                 value={formData.satuan}
-                onChange={(e) => setFormData({ ...formData, satuan: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-              >
-                <option value="Kg">Kg (Kilogram)</option>
-                <option value="Roll">Roll (Gulungan)</option>
-                <option value="Galon">Galon / Pail</option>
-                <option value="Pcs">Pcs / Batang</option>
-              </select>
+                onChange={(val) => setFormData({ ...formData, satuan: val })}
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Harga Satuan (Rp)</label>

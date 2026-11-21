@@ -9,6 +9,8 @@ import Modal from '../../components/common/Modal';
 import Badge from '../../components/common/Badge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
+import SearchableSelect from '../../components/common/SearchableSelect';
+import DatePickerInput from '../../components/common/DatePickerInput';
 
 export default function NotaBeliPage() {
   const [notaList, setNotaList] = useState([]);
@@ -220,38 +222,30 @@ export default function NotaBeliPage() {
             <label className="block text-xs font-semibold text-slate-700 mb-1">
               Pilih Purchase Order (PO) <span className="text-rose-500">*</span>
             </label>
-            <select
-              required
+            <SearchableSelect
               value={formData.po_id}
-              onChange={(e) => handlePOSelect(e.target.value)}
-              className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-            >
-              <option value="">-- Pilih Purchase Order --</option>
-              {orders.map((po) => (
-                <option key={po.id} value={po.id}>
-                  {po.nomor_po} - {po.supplier_nama} (Rp {Number(po.total_nilai).toLocaleString('id-ID')})
-                </option>
-              ))}
-            </select>
+              onChange={(val) => handlePOSelect(val)}
+              options={orders.map((po) => ({
+                value: po.id,
+                label: `${po.nomor_po} - ${po.supplier_nama} (Rp ${Number(po.total_nilai).toLocaleString('id-ID')})`,
+              }))}
+              placeholder="Cari & pilih Purchase Order..."
+            />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Tanggal Faktur</label>
-              <input
-                type="date"
+              <DatePickerInput
                 value={formData.tanggal_faktur}
-                onChange={(e) => setFormData({ ...formData, tanggal_faktur: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
+                onChange={(val) => setFormData({ ...formData, tanggal_faktur: val })}
               />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Jatuh Tempo Pembayaran</label>
-              <input
-                type="date"
+              <DatePickerInput
                 value={formData.jatuh_tempo}
-                onChange={(e) => setFormData({ ...formData, jatuh_tempo: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
+                onChange={(val) => setFormData({ ...formData, jatuh_tempo: val })}
               />
             </div>
           </div>

@@ -10,6 +10,7 @@ import ConfirmDialog from '../../components/common/ConfirmDialog';
 import Badge from '../../components/common/Badge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
+import SearchableSelect from '../../components/common/SearchableSelect';
 
 export default function KaryawanPage() {
   const [karyawanList, setKaryawanList] = useState([]);
@@ -318,29 +319,29 @@ export default function KaryawanPage() {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Departemen Kerja</label>
-              <select
+              <SearchableSelect
+                options={[
+                  { value: 'Produksi', label: 'Produksi (Lantai Pabrik)' },
+                  { value: 'Gudang', label: 'Gudang & Logistik' },
+                  { value: 'Marketing', label: 'Marketing & Penjualan' },
+                  { value: 'Purchasing', label: 'Purchasing & Pengadaan' },
+                  { value: 'Finance & Accounting', label: 'Finance & Accounting' },
+                  { value: 'HRD & Umum', label: 'HRD & Umum' },
+                ]}
                 value={formData.departemen}
-                onChange={(e) => setFormData({ ...formData, departemen: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-              >
-                <option value="Produksi">Produksi (Lantai Pabrik)</option>
-                <option value="Gudang">Gudang & Logistik</option>
-                <option value="Marketing">Marketing & Penjualan</option>
-                <option value="Purchasing">Purchasing & Pengadaan</option>
-                <option value="Finance & Accounting">Finance & Accounting</option>
-                <option value="HRD & Umum">HRD & Umum</option>
-              </select>
+                onChange={(val) => setFormData({ ...formData, departemen: val })}
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Status Kepegawaian</label>
-              <select
+              <SearchableSelect
+                options={[
+                  { value: 'Tetap', label: 'Karyawan Tetap' },
+                  { value: 'Kontrak', label: 'Karyawan Kontrak' },
+                ]}
                 value={formData.status_karyawan}
-                onChange={(e) => setFormData({ ...formData, status_karyawan: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-              >
-                <option value="Tetap">Karyawan Tetap</option>
-                <option value="Kontrak">Karyawan Kontrak</option>
-              </select>
+                onChange={(val) => setFormData({ ...formData, status_karyawan: val })}
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Nomor Handphone / WhatsApp</label>

@@ -9,6 +9,8 @@ import Modal from '../../components/common/Modal';
 import Badge from '../../components/common/Badge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
+import SearchableSelect from '../../components/common/SearchableSelect';
+import DatePickerInput from '../../components/common/DatePickerInput';
 
 export default function FinishingPage() {
   const [finishingList, setFinishingList] = useState([]);
@@ -217,34 +219,30 @@ export default function FinishingPage() {
             <label className="block text-xs font-semibold text-slate-700 mb-1">
               Pilih SPK Produksi <span className="text-rose-500">*</span>
             </label>
-            <select
-              required
+            <SearchableSelect
+              options={spkList.map((s) => ({
+                value: s.id,
+                label: `${s.nomor_spk} - ${s.nama_box} (${s.customer_nama})`,
+              }))}
               value={formData.spk_id}
-              onChange={(e) => setFormData({ ...formData, spk_id: e.target.value })}
-              className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-            >
-              <option value="">-- Pilih SPK --</option>
-              {spkList.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.nomor_spk} - {s.nama_box} ({s.customer_nama})
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setFormData({ ...formData, spk_id: val })}
+              placeholder="-- Cari SPK Produksi --"
+            />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Jenis Pekerjaan Finishing</label>
-              <select
+              <SearchableSelect
+                options={[
+                  { value: 'Stitching Kawat', label: 'Stitching Kawat (Jahit Kawat 2/4 Titik)' },
+                  { value: 'Gluing / Lem', label: 'Gluing (Lem Folder Gluer)' },
+                  { value: 'Rotary Die-Cut / Pond', label: 'Rotary Die-Cut / Pond Cutting' },
+                  { value: 'Slitter & Creasing', label: 'Slitter & Creasing Potong Garis' },
+                ]}
                 value={formData.jenis_finishing}
-                onChange={(e) => setFormData({ ...formData, jenis_finishing: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-              >
-                <option value="Stitching Kawat">Stitching Kawat (Jahit Kawat 2/4 Titik)</option>
-                <option value="Gluing / Lem">Gluing (Lem Folder Gluer)</option>
-                <option value="Rotary Die-Cut / Pond">Rotary Die-Cut / Pond Cutting</option>
-                <option value="Slitter & Creasing">Slitter & Creasing Potong Garis</option>
-              </select>
+                onChange={(val) => setFormData({ ...formData, jenis_finishing: val })}
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Operator Finishing</label>
