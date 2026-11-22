@@ -68,7 +68,7 @@ export default function AgingSalesPage() {
                 {salesAging.map((s, idx) => (
                   <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
                     <td className="px-6 py-4 font-bold text-slate-900">
-                      {s.sales_nama}
+                      {s.nama_sales || s.sales_nama || '-'}
                     </td>
                     <td className="px-6 py-4 text-right font-black text-brand-700">
                       Rp {Number(s.total_piutang).toLocaleString('id-ID')}

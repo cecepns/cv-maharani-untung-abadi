@@ -744,7 +744,9 @@ app.get('/api/marketing/sales-orders', async (req, res) => {
 
     const countSql = `SELECT COUNT(*) as total FROM sales_orders so LEFT JOIN customers c ON so.customer_id = c.id LEFT JOIN sales_persons s ON so.sales_id = s.id ${whereSql}`;
     const selectSql = `
-      SELECT so.*, c.nama_customer, c.kode_customer, s.nama_sales 
+      SELECT so.*, 
+             c.nama_customer, c.nama_customer as customer_nama, c.kode_customer, 
+             s.nama_sales, s.nama_sales as sales_nama, s.kode_sales 
       FROM sales_orders so 
       LEFT JOIN customers c ON so.customer_id = c.id 
       LEFT JOIN sales_persons s ON so.sales_id = s.id 
@@ -778,7 +780,9 @@ app.get('/api/marketing/sales-orders', async (req, res) => {
 app.get('/api/marketing/sales-orders/:id', async (req, res) => {
   try {
     const [orders] = await db.query(
-      `SELECT so.*, c.nama_customer, c.kode_customer, c.alamat as customer_alamat, c.telepon as customer_telepon, s.nama_sales 
+      `SELECT so.*, 
+              c.nama_customer, c.nama_customer as customer_nama, c.kode_customer, c.alamat as customer_alamat, c.telepon as customer_telepon, 
+              s.nama_sales, s.nama_sales as sales_nama, s.kode_sales 
        FROM sales_orders so 
        LEFT JOIN customers c ON so.customer_id = c.id 
        LEFT JOIN sales_persons s ON so.sales_id = s.id 

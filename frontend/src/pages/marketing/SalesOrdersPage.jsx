@@ -341,8 +341,8 @@ export default function SalesOrdersPage() {
                       <div className="text-xs text-slate-500 mt-0.5">{so.tanggal_so}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="font-bold text-slate-800">{so.customer_nama}</div>
-                      <div className="text-xs text-brand-600 mt-0.5">Sales: {so.sales_nama || 'Budi'}</div>
+                      <div className="font-bold text-slate-800">{so.nama_customer || so.customer_nama || 'Customer'}</div>
+                      <div className="text-xs text-brand-600 mt-0.5 font-medium">Sales: {so.nama_sales || so.sales_nama || '-'}</div>
                     </td>
                     <td className="px-6 py-4">
                       {(so.items || []).map((it, idx) => (
