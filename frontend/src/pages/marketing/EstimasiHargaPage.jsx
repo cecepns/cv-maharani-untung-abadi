@@ -522,10 +522,10 @@ CV. Maharani Untung Abadi • Spesialis Packaging Industri`;
             type="button"
             onClick={applyClientExample}
             className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition-colors shadow-2xs"
-            title="Klik untuk memuat contoh hitungan dari coretan client"
+            title="Klik untuk memuat contoh box tepung standar Maspion"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-            Muat Contoh Client (Box Tepung)
+            Contoh Box Tepung (B/C Maspion)
           </button>
           <button
             type="button"
@@ -905,7 +905,6 @@ CV. Maharani Untung Abadi • Spesialis Packaging Industri`;
                   3. Posisi Beli Supplier (+ / - %) & Margin Jual
                 </h2>
               </div>
-              <span className="text-xs font-semibold text-amber-700">Revisi Catatan Client</span>
             </div>
 
             {/* Bagian A: Posisi Harga Beli Supplier (+ / - %) */}
@@ -916,7 +915,7 @@ CV. Maharani Untung Abadi • Spesialis Packaging Industri`;
                     Posisi Harga Beli di Supplier (+ / - %)
                   </span>
                   <span className="text-[11px] text-amber-800">
-                    Sesuai chat client: "Skg beli di supplier posisi +" (contoh: +10% dari pricelist Maspion)
+                    Penyesuaian posisi harga pasar dari pricelist supplier (contoh: +10% dari pricelist Maspion)
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
