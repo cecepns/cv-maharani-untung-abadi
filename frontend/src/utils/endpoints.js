@@ -19,6 +19,7 @@ export const API_ENDPOINTS = {
     CUSTOMERS: '/api/marketing/customers',
     CUSTOMER_DETAIL: (id) => `/api/marketing/customers/${id}`,
     SALES_PERSONS: '/api/marketing/sales-persons',
+    SALES_PERSON_DETAIL: (id) => `/api/marketing/sales-persons/${id}`,
     PRODUCTS: '/api/marketing/products',
     PRODUCT_DETAIL: (id) => `/api/marketing/products/${id}`,
     SALES_ORDERS: '/api/marketing/sales-orders',

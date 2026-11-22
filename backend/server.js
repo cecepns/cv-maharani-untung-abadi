@@ -539,8 +539,93 @@ app.delete('/api/marketing/customers/:id', async (req, res) => {
 // Sales Persons
 app.get('/api/marketing/sales-persons', async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT * FROM sales_persons ORDER BY id ASC');
+    const search = (req.query.search || '').trim();
+    let whereSql = '';
+    let params = [];
+    if (search) {
+      whereSql = 'WHERE kode_sales LIKE ? OR nama_sales LIKE ? OR telepon LIKE ?';
+      params = [`%${search}%`, `%${search}%`, `%${search}%`];
+    }
+
+    if (req.query.page || req.query.limit) {
+      const countSql = `SELECT COUNT(*) as total FROM sales_persons ${whereSql}`;
+      const selectSql = `SELECT * FROM sales_persons ${whereSql} ORDER BY id ASC`;
+      const result = await getPaginatedData(selectSql, countSql, params, params, req);
+      return res.json(result);
+    }
+
+    const [rows] = await db.query(`SELECT * FROM sales_persons ${whereSql} ORDER BY id ASC`, params);
     res.json({ success: true, data: rows });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
+app.get('/api/marketing/sales-persons/:id', async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT * FROM sales_persons WHERE id = ?', [req.params.id]);
+    if (rows.length === 0) return res.status(404).json({ success: false, message: 'Sales Person tidak ditemukan' });
+    res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
+app.post('/api/marketing/sales-persons', async (req, res) => {
+  try {
+    const { kode_sales, nama_sales, telepon, target_omset } = req.body;
+    if (!nama_sales) return res.status(400).json({ success: false, message: 'Nama sales wajib diisi' });
+
+    let kode = kode_sales;
+    if (!kode) {
+      const [last] = await db.query('SELECT kode_sales FROM sales_persons ORDER BY id DESC LIMIT 1');
+      if (last.length > 0 && last[0].kode_sales.startsWith('SLS-')) {
+        const num = parseInt(last[0].kode_sales.replace('SLS-', ''), 10) + 1;
+        kode = `SLS-${String(num).padStart(3, '0')}`;
+      } else {
+        kode = `SLS-001`;
+      }
+    }
+
+    const [result] = await db.query(
+      'INSERT INTO sales_persons (kode_sales, nama_sales, telepon, target_omset) VALUES (?, ?, ?, ?)',
+      [kode, nama_sales, telepon || '', target_omset || 0]
+    );
+
+    const [newSales] = await db.query('SELECT * FROM sales_persons WHERE id = ?', [result.insertId]);
+    res.json({ success: true, message: 'Data Sales Person berhasil ditambahkan', data: newSales[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
+app.put('/api/marketing/sales-persons/:id', async (req, res) => {
+  try {
+    const { kode_sales, nama_sales, telepon, target_omset } = req.body;
+    const [result] = await db.query(
+      'UPDATE sales_persons SET kode_sales = COALESCE(?, kode_sales), nama_sales = COALESCE(?, nama_sales), telepon = COALESCE(?, telepon), target_omset = COALESCE(?, target_omset) WHERE id = ?',
+      [kode_sales, nama_sales, telepon, target_omset, req.params.id]
+    );
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Sales Person tidak ditemukan' });
+    res.json({ success: true, message: 'Data Sales Person berhasil diperbarui' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
+app.delete('/api/marketing/sales-persons/:id', async (req, res) => {
+  try {
+    const [check] = await db.query('SELECT COUNT(*) as count FROM sales_orders WHERE sales_id = ?', [req.params.id]);
+    if (check[0]?.count > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Tidak dapat menghapus Sales Person karena masih terhubung dengan ${check[0].count} Sales Order.`
+      });
+    }
+
+    const [result] = await db.query('DELETE FROM sales_persons WHERE id = ?', [req.params.id]);
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Sales Person tidak ditemukan' });
+    res.json({ success: true, message: 'Data Sales Person berhasil dihapus' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
   }
@@ -765,13 +850,26 @@ app.post('/api/marketing/sales-orders', async (req, res) => {
 
 app.put('/api/marketing/sales-orders/:id', async (req, res) => {
   try {
-    const { status, catatan } = req.body;
+    const { status, catatan, sales_id, customer_id, tanggal_so } = req.body;
     const [result] = await db.query(
-      'UPDATE sales_orders SET status = COALESCE(?, status), catatan = COALESCE(?, catatan) WHERE id = ?',
-      [status, catatan, req.params.id]
+      `UPDATE sales_orders SET 
+        status = COALESCE(?, status), 
+        catatan = COALESCE(?, catatan),
+        sales_id = COALESCE(?, sales_id),
+        customer_id = COALESCE(?, customer_id),
+        tanggal_so = COALESCE(?, tanggal_so)
+       WHERE id = ?`,
+      [
+        status !== undefined ? status : null,
+        catatan !== undefined ? catatan : null,
+        sales_id !== undefined ? sales_id : null,
+        customer_id !== undefined ? customer_id : null,
+        tanggal_so !== undefined ? tanggal_so : null,
+        req.params.id
+      ]
     );
     if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'SO tidak ditemukan' });
-    res.json({ success: true, message: 'Status Sales Order berhasil diperbarui' });
+    res.json({ success: true, message: 'Data Sales Order berhasil diperbarui' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
   }

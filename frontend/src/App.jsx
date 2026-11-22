@@ -13,6 +13,7 @@ import Dashboard from '@/pages/Dashboard';
 
 // Marketing
 import CustomersPage from '@/pages/marketing/CustomersPage';
+import SalesPersonsPage from '@/pages/marketing/SalesPersonsPage';
 import ProductsPage from '@/pages/marketing/ProductsPage';
 import SalesOrdersPage from '@/pages/marketing/SalesOrdersPage';
 import SuratJalanPage from '@/pages/marketing/SuratJalanPage';
@@ -127,6 +128,7 @@ export default function App() {
             {/* Marketing & Sales */}
             <Route path="/marketing/estimasi-harga" element={<EstimasiHargaPage />} />
             <Route path="/marketing/customers" element={<CustomersPage />} />
+            <Route path="/marketing/sales-persons" element={<SalesPersonsPage />} />
             <Route path="/marketing/products" element={<ProductsPage />} />
             <Route path="/marketing/sales-orders" element={<SalesOrdersPage />} />
             <Route path="/marketing/surat-jalan" element={<SuratJalanPage />} />

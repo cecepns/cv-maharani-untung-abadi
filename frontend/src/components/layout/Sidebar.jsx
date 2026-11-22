@@ -12,6 +12,7 @@ import {
   BookOpen,
   Landmark,
   Users,
+  UserCheck,
   ChevronDown,
   Box,
   Layers,
@@ -59,6 +60,7 @@ export default function Sidebar({ isOpen, onClose }) {
       items: [
         { name: 'Kalkulator Estimasi Box', path: '/marketing/estimasi-harga', icon: Calculator },
         { name: 'Data Customer Industri', path: '/marketing/customers', icon: Users },
+        { name: 'Data Tim Sales', path: '/marketing/sales-persons', icon: UserCheck },
         { name: 'Katalog Box & Sheet', path: '/marketing/products', icon: Box },
         { name: 'Sales Order (SO)', path: '/marketing/sales-orders', icon: FileCheck },
         { name: 'Surat Jalan (DO)', path: '/marketing/surat-jalan', icon: Truck },
