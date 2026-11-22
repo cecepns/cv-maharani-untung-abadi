@@ -4,19 +4,30 @@ import toast from 'react-hot-toast';
 import { request } from '../../utils/request';
 import { API_ENDPOINTS } from '../../utils/endpoints';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
+import DateRangeFilter from '../../components/common/DateRangeFilter';
+import ReportPrintHeader from '../../components/common/ReportPrintHeader';
+import ReportPrintFooter from '../../components/common/ReportPrintFooter';
 
 export default function LabaRugiPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
-    fetchLabaRugi();
+    fetchLabaRugi(startDate, endDate);
   }, []);
 
-  const fetchLabaRugi = async () => {
+  const fetchLabaRugi = async (start, end) => {
     try {
       setLoading(true);
-      const res = await request.get(API_ENDPOINTS.ACCOUNTING.LABA_RUGI);
+      const s = start !== undefined ? start : startDate;
+      const e = end !== undefined ? end : endDate;
+      const query = s && e ? `?startDate=${s}&endDate=${e}` : '';
+      const res = await request.get(`${API_ENDPOINTS.ACCOUNTING.LABA_RUGI}${query}`);
       if (res.success) {
         setData(res.data);
       }
@@ -30,7 +41,7 @@ export default function LabaRugiPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Laporan Laba Rugi (Income Statement)</h1>
           <p className="text-sm text-slate-500">
@@ -46,16 +57,33 @@ export default function LabaRugiPage() {
         </button>
       </div>
 
+      {/* Date Filter */}
+      <DateRangeFilter
+        startDate={startDate}
+        endDate={endDate}
+        onStartDateChange={setStartDate}
+        onEndDateChange={setEndDate}
+        onApply={(s, e) => fetchLabaRugi(s, e)}
+        onReset={() => {
+          const d = new Date();
+          const first = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
+          const today = d.toISOString().split('T')[0];
+          setStartDate(first);
+          setEndDate(today);
+          fetchLabaRugi(first, today);
+        }}
+        loading={loading}
+      />
+
       {loading ? (
         <LoadingSpinner text="Mengkalkulasi laba rugi pabrik..." />
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 sm:p-8 max-w-4xl mx-auto space-y-6 font-sans">
+        <div className="report-print-container bg-white rounded-2xl border border-slate-100 shadow-sm p-6 sm:p-8 max-w-4xl mx-auto space-y-6 font-sans">
           {/* Header Report */}
-          <div className="text-center border-b border-slate-200 pb-4">
-            <h2 className="text-xl font-black text-slate-900">CV. MAHARANI UNTUNG ABADI</h2>
-            <p className="text-sm font-bold text-slate-600">LAPORAN LABA RUGI KOMPREHENSIF</p>
-            <p className="text-xs text-slate-500">Periode: {data?.periode}</p>
-          </div>
+          <ReportPrintHeader
+            title="LAPORAN LABA RUGI KOMPREHENSIF"
+            periode={data?.periode || `${startDate} s/d ${endDate}`}
+          />
 
           <div className="space-y-6 text-sm">
             {/* 1. Pendapatan */}
@@ -132,6 +160,13 @@ export default function LabaRugiPage() {
               </span>
             </div>
           </div>
+
+          {/* Official Signatures */}
+          <ReportPrintFooter
+            preparer="Staff Accounting"
+            reviewer="Manager Keuangan"
+            approver="Direktur Utama"
+          />
         </div>
       )}
     </div>

@@ -4,19 +4,27 @@ import toast from 'react-hot-toast';
 import { request } from '../../utils/request';
 import { API_ENDPOINTS } from '../../utils/endpoints';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
+import DateRangeFilter from '../../components/common/DateRangeFilter';
+import ReportPrintHeader from '../../components/common/ReportPrintHeader';
+import ReportPrintFooter from '../../components/common/ReportPrintFooter';
 
 export default function NeracaPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [asOfDate, setAsOfDate] = useState(() => new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
-    fetchNeraca();
+    fetchNeraca(asOfDate);
   }, []);
 
-  const fetchNeraca = async () => {
+  const fetchNeraca = async (date) => {
     try {
       setLoading(true);
-      const res = await request.get(API_ENDPOINTS.ACCOUNTING.NERACA);
+      const targetDate = date !== undefined ? date : asOfDate;
+      const url = targetDate 
+        ? `${API_ENDPOINTS.ACCOUNTING.NERACA}?endDate=${targetDate}` 
+        : API_ENDPOINTS.ACCOUNTING.NERACA;
+      const res = await request.get(url);
       if (res.success) {
         setData(res.data);
       }
@@ -30,7 +38,7 @@ export default function NeracaPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Laporan Neraca (Balance Sheet)</h1>
           <p className="text-sm text-slate-500">
@@ -46,17 +54,31 @@ export default function NeracaPage() {
         </button>
       </div>
 
+      {/* Date Filter (Point-in-Time) */}
+      <DateRangeFilter
+        singleDate={true}
+        endDate={asOfDate}
+        onEndDateChange={setAsOfDate}
+        onApply={(_, end) => fetchNeraca(end)}
+        onReset={() => {
+          const today = new Date().toISOString().split('T')[0];
+          setAsOfDate(today);
+          fetchNeraca(today);
+        }}
+        loading={loading}
+      />
+
       {loading ? (
         <LoadingSpinner text="Memproses neraca keuangan..." />
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 sm:p-8 max-w-4xl mx-auto space-y-6">
-          <div className="text-center border-b border-slate-200 pb-4">
-            <h2 className="text-xl font-black text-slate-900">CV. MAHARANI UNTUNG ABADI</h2>
-            <p className="text-sm font-bold text-slate-600">NERACA KEUANGAN (BALANCE SHEET)</p>
-            <p className="text-xs text-slate-500">Per 30 November 2026</p>
-          </div>
+        <div className="report-print-container bg-white rounded-2xl border border-slate-100 shadow-sm p-6 sm:p-8 max-w-4xl mx-auto space-y-6">
+          {/* Official Letterhead */}
+          <ReportPrintHeader
+            title="NERACA KEUANGAN (BALANCE SHEET)"
+            periode={data?.periode || `Per ${asOfDate}`}
+          />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-xs">
+          <div className="grid grid-cols-1 md:grid-cols-2 print-grid-2 gap-8 text-xs">
             {/* SISI AKTIVA (ASET) */}
             <div className="space-y-4">
               <div className="bg-brand-50 p-3 rounded-xl border border-brand-200 font-black text-brand-950 text-sm">
@@ -155,6 +177,13 @@ export default function NeracaPage() {
               </div>
             </div>
           </div>
+
+          {/* Official Signatures */}
+          <ReportPrintFooter
+            preparer="Staff Accounting"
+            reviewer="Manager Keuangan"
+            approver="Direktur Utama"
+          />
         </div>
       )}
     </div>

@@ -118,7 +118,7 @@
 @media print {
   @page {
     size: A4 portrait;
-    margin: 8mm;
+    margin: 10mm;
   }
 
   html, body {
@@ -131,6 +131,25 @@
     overflow: visible !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  /* Universal print resets for layout flex containers to prevent Chrome print blank/cut-off bug */
+  #root,
+  .min-h-screen,
+  .flex-1,
+  main,
+  div[class*="flex-col"] {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    overflow: visible !important;
+    position: static !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
   }
 
   /* When printing from a modal (Surat Jalan, Invoice, SPK, Slip Gaji) */
@@ -185,8 +204,16 @@
   body:not(.print-modal-active) header,
   body:not(.print-modal-active) footer,
   body:not(.print-modal-active) nav,
-  body:not(.print-modal-active) .no-print {
+  body:not(.print-modal-active) .no-print,
+  button,
+  .no-print,
+  .no-print * {
     display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   body:not(.print-modal-active) main {
@@ -200,16 +227,30 @@
     padding-left: 0 !important;
   }
 
-  /* Universal hide for buttons and print actions */
-  button,
-  .no-print,
-  .no-print * {
-    display: none !important;
-    visibility: hidden !important;
-    height: 0 !important;
-    width: 0 !important;
-    margin: 0 !important;
+  /* Report Card Container Print Optimization */
+  .report-print-container {
     padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* Prevent page breaks inside cards & rows */
+  .break-inside-avoid,
+  tr,
+  .report-card-section {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Two-column layout in print for Neraca */
+  .print-grid-2 {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 1.5rem !important;
   }
 
   /* Table print optimization */
@@ -220,15 +261,5 @@
 
   thead {
     display: table-header-group !important;
-  }
-
-  tr {
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-  }
-
-  .print-area .grid {
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
   }
 }
