@@ -28,6 +28,7 @@ import { API_ENDPOINTS } from '@/utils/endpoints';
 import Modal from '@/components/common/Modal';
 import Badge from '@/components/common/Badge';
 import SearchableSelect from '@/components/common/SearchableSelect';
+import PrintPenawaranHarga from '@/components/print/PrintPenawaranHarga';
 
 // Spesifikasi standar industri & rumus toleransi karton gelombang CV. Maharani
 export const FLUTE_SPECS = {
@@ -121,7 +122,9 @@ export default function EstimasiHargaPage() {
   // Qty Simulasi Order
   const [simulasiQty, setSimulasiQty] = useState(1000);
 
-  // Modal Simpan ke Master Box
+  // Modal Cetak Penawaran & Master Box
+  const [printData, setPrintData] = useState(null);
+  const [customers, setCustomers] = useState([]);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveFormData, setSaveFormData] = useState({
@@ -129,19 +132,25 @@ export default function EstimasiHargaPage() {
     jenis_sambungan: 'Stitching'
   });
 
-  // Fetch Master Sheet untuk kemudahan pilih bahan baku
+  // Fetch Master Sheet & Customer untuk kemudahan penawaran
   useEffect(() => {
-    const fetchSheets = async () => {
+    const fetchData = async () => {
       try {
-        const res = await request.get(API_ENDPOINTS.PURCHASING.BAHAN_SHEET, { limit: 100 });
-        if (res.success && Array.isArray(res.data)) {
-          setMasterSheets(res.data);
+        const [sheetRes, custRes] = await Promise.all([
+          request.get(API_ENDPOINTS.PURCHASING.BAHAN_SHEET, { limit: 100 }),
+          request.get(API_ENDPOINTS.MARKETING.CUSTOMERS, { limit: 100 })
+        ]);
+        if (sheetRes.success && Array.isArray(sheetRes.data)) {
+          setMasterSheets(sheetRes.data);
+        }
+        if (custRes.success && Array.isArray(custRes.data)) {
+          setCustomers(custRes.data);
         }
       } catch (err) {
-        console.error('Fetch sheets error:', err);
+        console.error('Fetch data error:', err);
       }
     };
-    fetchSheets();
+    fetchData();
   }, []);
 
   // Sync saat ganti tipe flute
@@ -297,6 +306,29 @@ Terima kasih telah mempercayakan kebutuhan packaging Anda kepada CV. Maharani Un
     toast.success('Rincian penawaran disalin! Siap dipaste ke WhatsApp customer');
   };
 
+  // Buka Modal Pratinjau Cetak Surat Penawaran Resmi
+  const handleOpenPrintModal = () => {
+    setPrintData({
+      nama_barang: `Karton Box ${calculation.P_box}x${calculation.L_box}x${calculation.T_box} mm`,
+      panjang: calculation.P_box,
+      lebar: calculation.L_box,
+      tinggi: calculation.T_box,
+      tipe_flute: fluteType,
+      nama_flute: FLUTE_SPECS[fluteType]?.nama || '',
+      substansi: substansi,
+      P_sheet: calculation.P_sheet,
+      L_sheet: calculation.L_sheet,
+      luas_m2: calculation.luas_m2,
+      jenis_sambungan: saveFormData.jenis_sambungan || 'Stitching (Kawat Jahit)',
+      hargaJualPerPcs: calculation.hargaJualPerPcs,
+      qty: calculation.qty,
+      totalOmset: calculation.totalOmset,
+      customer_nama: 'Pimpinan / Purchasing Dept.',
+      customer_alamat: 'Di Tempat',
+      nama_sales: 'Marketing Lead'
+    });
+  };
+
   // Simpan Sebagai Produk Jadi di Master Box
   const handleOpenSaveModal = () => {
     setSaveFormData({
@@ -368,8 +400,9 @@ Terima kasih telah mempercayakan kebutuhan packaging Anda kepada CV. Maharani Un
           </button>
           <button
             type="button"
-            onClick={() => window.print()}
-            className="inline-flex items-center gap-2 px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs sm:text-sm font-semibold transition-colors shadow-2xs"
+            onClick={handleOpenPrintModal}
+            className="inline-flex items-center gap-2 px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs sm:text-sm font-semibold transition-colors shadow-2xs cursor-pointer"
+            title="Cetak Surat Penawaran Harga Resmi (PDF)"
           >
             <Printer className="w-4 h-4 text-slate-500" />
             Cetak Penawaran
@@ -916,6 +949,14 @@ Terima kasih telah mempercayakan kebutuhan packaging Anda kepada CV. Maharani Un
               </button>
               <button
                 type="button"
+                onClick={handleOpenPrintModal}
+                className="w-full py-2.5 px-4 bg-white hover:bg-slate-100 text-slate-800 font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-colors shadow-sm border border-white/20 cursor-pointer"
+              >
+                <Printer className="w-4 h-4 text-brand-600" />
+                Cetak Surat Penawaran Resmi (PDF)
+              </button>
+              <button
+                type="button"
                 onClick={() => navigate('/marketing/sales-orders')}
                 className="w-full py-2.5 px-4 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-2 transition-colors"
               >
@@ -1004,6 +1045,13 @@ Terima kasih telah mempercayakan kebutuhan packaging Anda kepada CV. Maharani Un
           </div>
         </form>
       </Modal>
+
+      {/* Modal Pratinjau Cetak Surat Penawaran Resmi */}
+      <PrintPenawaranHarga
+        data={printData}
+        onClose={() => setPrintData(null)}
+        customers={customers}
+      />
     </div>
   );
 }
