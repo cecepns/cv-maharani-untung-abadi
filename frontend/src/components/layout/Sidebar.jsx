@@ -153,8 +153,8 @@ export default function Sidebar({ isOpen, onClose }) {
         {/* Brand Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#0d332b] bg-[#031512]/50">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-white p-1.5 flex items-center justify-center shadow-md shadow-black/20 shrink-0">
-              <Box className="w-full h-full text-emerald-800" />
+            <div className="w-10 h-10 rounded-2xl bg-white p-1 flex items-center justify-center shadow-md shadow-black/20 shrink-0 overflow-hidden">
+              <img src="/logo.png" alt="CV. Maharani Logo" className="w-full h-full object-contain" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
@@ -162,7 +162,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   CV. MAHARANI
                 </h2>
               </div>
-              <p className="text-[11px] font-semibold text-emerald-400">Untung Abadi Packaging</p>
+              <p className="text-[11px] font-semibold text-emerald-400">Packaging & Offset Printing</p>
             </div>
           </div>
           <button

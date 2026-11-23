@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Box, Layers, Filter, CheckCircle2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Box, Layers, Filter, CheckCircle2, RotateCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { request } from '../../utils/request';
 import { API_ENDPOINTS } from '../../utils/endpoints';
@@ -40,6 +40,8 @@ export default function ProductsPage() {
     satuan: 'Pcs',
     harga_jual: 3500,
     min_stok: 200,
+    berat_roll_kg: 25,
+    harga_per_kg: 12000,
   });
   const [formLoading, setFormLoading] = useState(false);
 
@@ -89,6 +91,8 @@ export default function ProductsPage() {
       satuan: 'Pcs',
       harga_jual: 3500,
       min_stok: 200,
+      berat_roll_kg: 25,
+      harga_per_kg: 12000,
     });
     setIsModalOpen(true);
   };
@@ -107,11 +111,26 @@ export default function ProductsPage() {
       tinggi_mm: item.tinggi_mm || 0,
       jenis_sambungan: item.jenis_sambungan || 'Stitching',
       stok_qty: item.stok_qty || 0,
-      satuan: item.satuan || 'Pcs',
+      satuan: item.satuan || (item.jenis_barang === 'Single Face Roll' ? 'Roll' : 'Pcs'),
       harga_jual: item.harga_jual || 0,
       min_stok: item.min_stok || 100,
+      berat_roll_kg: item.berat_roll_kg || 0,
+      harga_per_kg: item.harga_per_kg || 0,
     });
     setIsModalOpen(true);
+  };
+
+  // Sync harga jual saat ubah berat roll atau harga per kg pada Single Face Roll
+  const handleBeratOrHargaKgChange = (newBerat, newHargaKg) => {
+    const berat = Number(newBerat) || 0;
+    const hargaKg = Number(newHargaKg) || 0;
+    const calcHargaJual = Math.round(berat * hargaKg);
+    setFormData((prev) => ({
+      ...prev,
+      berat_roll_kg: berat,
+      harga_per_kg: hargaKg,
+      harga_jual: calcHargaJual > 0 ? calcHargaJual : prev.harga_jual,
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -160,7 +179,7 @@ export default function ProductsPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Master Persediaan Box & Sheet</h1>
           <p className="text-sm text-slate-500">
-            Spesifikasi kemasan karton: dimensi (P x L x T mm), tipe flute, substansi kertas, dan sambungan.
+            Spesifikasi kemasan karton: Dus Box, Sheet Lembaran, dan Single Face Roll (gulungan).
           </p>
         </div>
         <button
@@ -168,7 +187,7 @@ export default function ProductsPage() {
           className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-semibold shadow-sm transition-all self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
-          Tambah Box / Sheet
+          Tambah Box / Roll
         </button>
       </div>
 
@@ -181,21 +200,22 @@ export default function ProductsPage() {
               setSearch(val);
               setPage(1);
             }}
-            placeholder="Cari kode, nama dus, substansi..."
-            className="w-full sm:w-72"
+            placeholder="Cari kode/nama dus..."
+            className="w-full sm:w-64"
           />
 
           <SearchableSelect
-            className="w-full sm:w-56 text-xs font-semibold"
+            className="w-full sm:w-52 text-xs font-semibold"
             value={filterJenis}
             onChange={(val) => {
               setFilterJenis(val || '');
               setPage(1);
             }}
             options={[
-              { value: '', label: 'Semua Jenis (Box & Sheet)' },
-              { value: 'Box', label: 'Box Jadi (Karton Box)' },
-              { value: 'Sheet', label: 'Sheet Lembaran (Karton Lembar)' },
+              { value: '', label: 'Semua Kemasan' },
+              { value: 'Box', label: 'Karton Box' },
+              { value: 'Sheet', label: 'Sheet Lembaran' },
+              { value: 'Single Face Roll', label: 'Single Face Roll' },
             ]}
             placeholder="Pilih Jenis..."
             isClearable
@@ -228,7 +248,7 @@ export default function ProductsPage() {
       {/* Table */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         {loading ? (
-          <LoadingSpinner text="Memuat data spesifikasi dus & sheet..." />
+          <LoadingSpinner text="Memuat data spesifikasi dus & roll..." />
         ) : products.length === 0 ? (
           <EmptyState
             title="Produk tidak ditemukan"
@@ -249,7 +269,7 @@ export default function ProductsPage() {
                 <tr>
                   <th className="px-6 py-4">Kode & Nama Dus</th>
                   <th className="px-6 py-4">Jenis & Flute</th>
-                  <th className="px-6 py-4">Dimensi (P x L x T mm)</th>
+                  <th className="px-6 py-4">Dimensi / Berat</th>
                   <th className="px-6 py-4">Substansi Kertas</th>
                   <th className="px-6 py-4">Sambungan</th>
                   <th className="px-6 py-4">Harga Jual</th>
@@ -260,6 +280,7 @@ export default function ProductsPage() {
               <tbody className="divide-y divide-slate-100">
                 {products.map((p) => {
                   const isLowStock = p.stok_qty <= p.min_stok;
+                  const isSingleFace = p.jenis_barang === 'Single Face Roll';
                   return (
                     <tr key={p.id} className="hover:bg-slate-50/60 transition-colors">
                       <td className="px-6 py-4">
@@ -267,13 +288,28 @@ export default function ProductsPage() {
                         <div className="text-xs font-mono text-amber-700 mt-0.5">{p.kode_barang}</div>
                       </td>
                       <td className="px-6 py-4">
-                        <Badge variant={p.jenis_barang === 'Box' ? 'primary' : 'warning'}>
+                        <Badge
+                          variant={
+                            p.jenis_barang === 'Box'
+                              ? 'primary'
+                              : isSingleFace
+                              ? 'purple'
+                              : 'warning'
+                          }
+                        >
                           {p.jenis_barang}
                         </Badge>
                         <div className="text-xs font-semibold text-slate-700 mt-1">{p.tipe_flute}</div>
                       </td>
-                      <td className="px-6 py-4 font-mono text-xs text-slate-700">
-                        {p.panjang_mm} x {p.lebar_mm} {p.tinggi_mm > 0 ? `x ${p.tinggi_mm}` : ''} mm
+                      <td className="px-6 py-4 text-xs font-mono text-slate-700">
+                        {isSingleFace ? (
+                          <div>
+                            <span className="font-bold text-purple-700">{p.berat_roll_kg ? `${p.berat_roll_kg} Kg / Roll` : '1 Roll'}</span>
+                            {p.lebar_mm > 0 && <div className="text-[11px] text-slate-400">Lebar: {p.lebar_mm} mm</div>}
+                          </div>
+                        ) : (
+                          `${p.panjang_mm} x ${p.lebar_mm} ${p.tinggi_mm > 0 ? `x ${p.tinggi_mm}` : ''} mm`
+                        )}
                       </td>
                       <td className="px-6 py-4 text-xs font-semibold text-slate-800">
                         {p.substansi}
@@ -281,8 +317,16 @@ export default function ProductsPage() {
                       <td className="px-6 py-4 text-xs text-slate-600">
                         {p.jenis_sambungan}
                       </td>
-                      <td className="px-6 py-4 font-bold text-slate-900">
-                        Rp {Number(p.harga_jual).toLocaleString('id-ID')}
+                      <td className="px-6 py-4">
+                        <div className="font-bold text-slate-900">
+                          Rp {Number(p.harga_jual).toLocaleString('id-ID')}
+                          <span className="text-xs font-normal text-slate-400 ml-1">/ {p.satuan || 'Pcs'}</span>
+                        </div>
+                        {isSingleFace && p.harga_per_kg > 0 && (
+                          <div className="text-[11px] font-semibold text-purple-600">
+                            (Rp {Number(p.harga_per_kg).toLocaleString('id-ID')} / kg)
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
@@ -339,7 +383,7 @@ export default function ProductsPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={isEditing ? 'Ubah Spesifikasi Dus / Sheet' : 'Tambah Kemasan / Dus Baru'}
+        title={isEditing ? 'Ubah Spesifikasi Dus / Sheet / Roll' : 'Tambah Kemasan / Dus Baru'}
         size="lg"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -350,35 +394,45 @@ export default function ProductsPage() {
                 type="text"
                 value={formData.kode_barang}
                 onChange={(e) => setFormData({ ...formData, kode_barang: e.target.value })}
-                placeholder="Contoh: BOX-006 (Otomatis jika kosong)"
+                placeholder="Contoh: BOX-006 / SFR-001 (Otomatis jika kosong)"
                 className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl"
               />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Nama Kemasan / Dus <span className="text-rose-500">*</span>
+                Nama Kemasan / Dus / Roll <span className="text-rose-500">*</span>
               </label>
               <input
                 type="text"
                 required
                 value={formData.nama_barang}
                 onChange={(e) => setFormData({ ...formData, nama_barang: e.target.value })}
-                placeholder="Master Box Biskuit 400x300x250"
+                placeholder="Single Face Roll 120cm / Box Biskuit 400x300x250"
                 className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
               />
             </div>
+
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Jenis Kemasan</label>
               <SearchableSelect
                 value={formData.jenis_barang}
-                onChange={(val) => setFormData({ ...formData, jenis_barang: val })}
+                onChange={(val) => {
+                  setFormData({
+                    ...formData,
+                    jenis_barang: val,
+                    satuan: val === 'Single Face Roll' ? 'Roll' : formData.satuan === 'Roll' ? 'Pcs' : formData.satuan,
+                    jenis_sambungan: val === 'Single Face Roll' ? 'Roll' : formData.jenis_sambungan,
+                  });
+                }}
                 options={[
-                  { value: 'Box', label: 'Karton Box Jadi (Dus)' },
+                  { value: 'Box', label: 'Karton Box Jadi (Dus RSC / A1)' },
                   { value: 'Sheet', label: 'Sheet Lembaran (Karton Lembar)' },
+                  { value: 'Single Face Roll', label: 'Single Face Roll (Gulungan)' },
                 ]}
                 placeholder="Pilih jenis kemasan..."
               />
             </div>
+
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Tipe Flute Corrugated</label>
               <SearchableSelect
@@ -393,16 +447,18 @@ export default function ProductsPage() {
                 placeholder="Pilih tipe flute..."
               />
             </div>
+
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Substansi Kertas</label>
               <input
                 type="text"
                 value={formData.substansi}
                 onChange={(e) => setFormData({ ...formData, substansi: e.target.value })}
-                placeholder="K125/M125/K125"
+                placeholder="K125/M125/K125 atau K125/M125"
                 className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
               />
             </div>
+
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Jenis Sambungan</label>
               <SearchableSelect
@@ -412,63 +468,146 @@ export default function ProductsPage() {
                   { value: 'Stitching', label: 'Stitching (Jahit Kawat Kencang)' },
                   { value: 'Glue', label: 'Glue (Lem Lipat / Folder Gluer)' },
                   { value: 'Die-cut', label: 'Die-cut (Klip / Kunci Tanpa Lem)' },
+                  { value: 'Roll', label: 'Roll (Gulungan Roll)' },
                   { value: 'Tanpa Sambungan', label: 'Tanpa Sambungan (Lembaran)' },
                 ]}
                 placeholder="Pilih jenis sambungan..."
               />
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Dimensi Panjang (mm)</label>
-              <input
-                type="number"
-                value={formData.panjang_mm}
-                onChange={(e) => setFormData({ ...formData, panjang_mm: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-              />
+          </div>
+
+          {/* Form Khusus Single Face Roll */}
+          {formData.jenis_barang === 'Single Face Roll' ? (
+            <div className="p-4 bg-purple-50/70 border border-purple-200 rounded-xl space-y-3">
+              <div className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
+                <RotateCw className="w-4 h-4 text-purple-600" />
+                Spesifikasi & Kalkulasi Harga Single Face Roll:
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    1 Roll Berapa Kg? (Berat) <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0.1"
+                      value={formData.berat_roll_kg}
+                      onChange={(e) => handleBeratOrHargaKgChange(e.target.value, formData.harga_per_kg)}
+                      placeholder="Contoh: 25"
+                      className="w-full pl-3 pr-8 py-2 text-sm bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-purple-500"
+                    />
+                    <span className="absolute right-3 top-2.5 text-xs text-slate-400 font-semibold">Kg</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Harga Jual per Kg (Rp) <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.harga_per_kg}
+                      onChange={(e) => handleBeratOrHargaKgChange(formData.berat_roll_kg, e.target.value)}
+                      placeholder="Contoh: 12000"
+                      className="w-full pl-3 pr-8 py-2 text-sm bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-purple-500"
+                    />
+                    <span className="absolute right-3 top-2.5 text-xs text-slate-400 font-semibold">/kg</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Lebar Roll (mm)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={formData.lebar_mm}
+                      onChange={(e) => setFormData({ ...formData, lebar_mm: Number(e.target.value) || 0 })}
+                      placeholder="Contoh: 1200"
+                      className="w-full pl-3 pr-9 py-2 text-sm bg-white border border-slate-300 rounded-xl font-bold text-slate-900"
+                    />
+                    <span className="absolute right-3 top-2.5 text-xs text-slate-400 font-semibold">mm</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-xs text-purple-900 bg-white/80 p-2.5 rounded-lg border border-purple-200 flex items-center justify-between">
+                <span>Total Otomatis Harga Jual 1 Roll ({formData.berat_roll_kg} kg x Rp {Number(formData.harga_per_kg).toLocaleString('id-ID')}):</span>
+                <span className="font-extrabold text-sm text-purple-800">
+                  Rp {Number(formData.harga_jual).toLocaleString('id-ID')} / Roll
+                </span>
+              </div>
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Dimensi Lebar (mm)</label>
-              <input
-                type="number"
-                value={formData.lebar_mm}
-                onChange={(e) => setFormData({ ...formData, lebar_mm: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-              />
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Dimensi Panjang (mm)</label>
+                <input
+                  type="number"
+                  value={formData.panjang_mm}
+                  onChange={(e) => setFormData({ ...formData, panjang_mm: e.target.value })}
+                  className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Dimensi Lebar (mm)</label>
+                <input
+                  type="number"
+                  value={formData.lebar_mm}
+                  onChange={(e) => setFormData({ ...formData, lebar_mm: e.target.value })}
+                  className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Dimensi Tinggi (mm)</label>
+                <input
+                  type="number"
+                  value={formData.tinggi_mm}
+                  onChange={(e) => setFormData({ ...formData, tinggi_mm: e.target.value })}
+                  className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
+                />
+              </div>
             </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Dimensi Tinggi (mm)</label>
-              <input
-                type="number"
-                value={formData.tinggi_mm}
-                onChange={(e) => setFormData({ ...formData, tinggi_mm: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Harga Jual Satuan (Rp)</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Harga Jual Satuan (Rp) <span className="text-rose-500">*</span>
+              </label>
               <input
                 type="number"
                 required
                 value={formData.harga_jual}
                 onChange={(e) => setFormData({ ...formData, harga_jual: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
+                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl font-bold text-slate-900"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Stok Awal</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Satuan Produk</label>
+              <SearchableSelect
+                value={formData.satuan}
+                onChange={(val) => setFormData({ ...formData, satuan: val })}
+                options={[
+                  { value: 'Pcs', label: 'Pcs' },
+                  { value: 'Roll', label: 'Roll' },
+                  { value: 'Kg', label: 'Kg' },
+                  { value: 'Ikat', label: 'Ikat' },
+                  { value: 'Lembar', label: 'Lembar' },
+                ]}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Stok Awal Tersedia</label>
               <input
                 type="number"
                 value={formData.stok_qty}
                 onChange={(e) => setFormData({ ...formData, stok_qty: e.target.value })}
-                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Batas Minimum Stok</label>
-              <input
-                type="number"
-                value={formData.min_stok}
-                onChange={(e) => setFormData({ ...formData, min_stok: e.target.value })}
                 className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
               />
             </div>
@@ -498,8 +637,8 @@ export default function ProductsPage() {
         onClose={() => setDeleteDialog({ isOpen: false, id: null, name: '' })}
         onConfirm={confirmDelete}
         isLoading={deleteLoading}
-        title="Hapus Produk Box"
-        message={`Apakah Anda yakin ingin menghapus produk "${deleteDialog.name}"?`}
+        title="Hapus Produk Kemasan"
+        message={`Apakah Anda yakin ingin menghapus item "${deleteDialog.name}"?`}
       />
     </div>
   );

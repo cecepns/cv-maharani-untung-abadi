@@ -69,17 +69,19 @@ CREATE TABLE products (
   id INT AUTO_INCREMENT PRIMARY KEY,
   kode_barang VARCHAR(30) NOT NULL UNIQUE,
   nama_barang VARCHAR(150) NOT NULL,
-  jenis_barang ENUM('Box', 'Sheet') DEFAULT 'Box',
+  jenis_barang VARCHAR(50) DEFAULT 'Box', -- Box, Sheet, Single Face Roll
   tipe_flute VARCHAR(30) DEFAULT 'B/F', -- B/F, C/F, E/F, B/C Double Wall
   substansi VARCHAR(60) DEFAULT 'K125/M125/K125', -- K: Kraft, M: Medium, WK: White Kraft
   panjang_mm INT DEFAULT 0,
   lebar_mm INT DEFAULT 0,
   tinggi_mm INT DEFAULT 0,
-  jenis_sambungan VARCHAR(50) DEFAULT 'Stitching', -- Stitching, Glue, Die-cut
+  jenis_sambungan VARCHAR(50) DEFAULT 'Stitching', -- Stitching, Glue, Die-cut, Roll, dll
   stok_qty INT DEFAULT 0,
   satuan VARCHAR(20) DEFAULT 'Pcs',
   harga_jual DECIMAL(15,2) NOT NULL DEFAULT 0,
   min_stok INT DEFAULT 100,
+  berat_roll_kg DECIMAL(10,2) DEFAULT 0, -- Khusus Single Face Roll
+  harga_per_kg DECIMAL(15,2) DEFAULT 0,  -- Khusus Single Face Roll
   gambar VARCHAR(255),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -249,11 +251,18 @@ CREATE TABLE bahan_baku_sheet (
   FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL
 );
 
+CREATE TABLE kategori_bahan_pembantu (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  nama_kategori VARCHAR(100) NOT NULL UNIQUE,
+  keterangan VARCHAR(255) DEFAULT '',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE bahan_pembantu (
   id INT AUTO_INCREMENT PRIMARY KEY,
   kode_bahan VARCHAR(30) NOT NULL UNIQUE,
   nama_bahan VARCHAR(150) NOT NULL,
-  kategori ENUM('Tinta Flexo', 'Lem Karton', 'Kawat Stitching', 'Tali Strapping', 'Lakban/Isolasi') DEFAULT 'Tinta Flexo',
+  kategori VARCHAR(100) DEFAULT 'Tinta Flexo',
   satuan VARCHAR(20) DEFAULT 'Kg',
   stok DECIMAL(12,2) DEFAULT 0,
   harga_satuan DECIMAL(15,2) DEFAULT 0,
@@ -656,6 +665,16 @@ INSERT INTO bahan_baku_sheet (kode_sheet, nama_sheet, supplier_id, flute, substa
 ('BBS-002', 'Karton Sheet C/F 1200x1400 K150/M125/K150', 1, 'C/F', 'K150/M125/K150', 1200, 1400, 3100, 4250, 800),
 ('BBS-003', 'Karton Sheet E/F 800x1000 WK150/M125/K125', 2, 'E/F', 'WK150/M125/K125', 800, 1000, 2500, 2600, 600),
 ('BBS-004', 'Karton Sheet B/C Double Wall 1100x1500', 1, 'B/C', 'K150/M125/M125/K150', 1100, 1500, 1800, 6800, 500);
+
+-- Kategori Bahan Pembantu
+INSERT INTO kategori_bahan_pembantu (nama_kategori, keterangan) VALUES
+('Tinta Flexo', 'Tinta cetak flexography waterbased'),
+('Lem Karton', 'Lem poly / dextrin / perekat sambungan flap dus'),
+('Kawat Stitching', 'Kawat jahit stapler karton box'),
+('Tali Strapping', 'Tali strapping band ikat per 25 pcs'),
+('Lakban/Isolasi', 'Opp tape lakban packaging & segel'),
+('Pisau Pond & Rotary', 'Pisau die-cut pond dan slitter mesin'),
+('Plat Polimer Cetak', 'Plat cetak karet / cyrel cetak flexo');
 
 -- Bahan Pembantu
 INSERT INTO bahan_pembantu (kode_bahan, nama_bahan, kategori, satuan, stok, harga_satuan, min_stok) VALUES

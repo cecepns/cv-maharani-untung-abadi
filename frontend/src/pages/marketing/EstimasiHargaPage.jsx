@@ -22,7 +22,9 @@ import {
   HelpCircle,
   PackageCheck,
   Table as TableIcon,
-  X
+  X,
+  Split,
+  FileCheck2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { request } from '@/utils/request';
@@ -70,25 +72,30 @@ export const FLUTE_SPECS = {
     kategori: 'Corrugated',
     deskripsi: 'Kotak pizza, kosmetik, hampers & dus die-cut halus'
   },
-  'Duplex': {
-    kode: 'Duplex',
-    nama: 'Karton Duplex Coated (White/Grey)',
-    kupingan: 25,
-    creasing: 5,
-    defaultGsm: 310,
-    kategori: 'Paperboard Solid',
-    deskripsi: 'Box makanan/martabak, farmasi (250-450 gsm)'
-  },
-  'Ivory': {
-    kode: 'Ivory',
-    nama: 'Karton Ivory Food Grade Solid',
-    kupingan: 25,
-    creasing: 5,
-    defaultGsm: 300,
-    kategori: 'Paperboard Solid',
-    deskripsi: 'Kemasan makanan steril premium & kosmetik'
-  }
 };
+
+// Data Index Duplex (Gambar 5 No. 2)
+export const DUPLEX_INDEX_TABLE = [
+  { gsm: 250, index: 2370, label: 'Duplex 250 gr (Index 2370)' },
+  { gsm: 310, index: 2173, label: 'Duplex 310 gr (Index 2173)' },
+  { gsm: 350, index: 2004, label: 'Duplex 350 gr (Index 2004)' },
+  { gsm: 400, index: 2050, label: 'Duplex 400 gr (Index 2050)' },
+  { gsm: 450, index: 2079, label: 'Duplex 450 gr (Index 2079)' },
+];
+
+// Data Pricelist Ivory Resmi (Gambar 6)
+export const IVORY_PRICE_TABLE = [
+  { brand: 'VA', gsmMin: 210, gsmMax: 350, gsmLabel: '210 - 350 GSM', hargaKg: 13800 },
+  { brand: 'IKKVC', gsmMin: 190, gsmMax: 190, gsmLabel: '190 GSM', hargaKg: 13500 },
+  { brand: 'IKKVC', gsmMin: 210, gsmMax: 210, gsmLabel: '210 GSM', hargaKg: 13000 },
+  { brand: 'IKKVC', gsmMin: 230, gsmMax: 350, gsmLabel: '230 - 350 GSM', hargaKg: 12700 },
+  { brand: 'IKKVB', gsmMin: 270, gsmMax: 300, gsmLabel: '270 & 300 GSM', hargaKg: 12200 },
+  { brand: 'BOHUI', gsmMin: 190, gsmMax: 190, gsmLabel: '190 GSM', hargaKg: 13700 },
+  { brand: 'BOHUI', gsmMin: 210, gsmMax: 210, gsmLabel: '210 GSM', hargaKg: 13200 },
+  { brand: 'BOHUI', gsmMin: 230, gsmMax: 400, gsmLabel: '230 - 400 GSM', hargaKg: 12900 },
+  { brand: 'IVORY PE', gsmMin: 230, gsmMax: 230, gsmLabel: '230 GSM (+PE Coating)', hargaKg: 16950 }, // Base + 4250
+  { brand: 'IVORY PE', gsmMin: 250, gsmMax: 350, gsmLabel: '250 - 350 GSM (+PE Coating)', hargaKg: 16700 }, // Base + 4000
+];
 
 // Tabel Resmi Pricelist Sheet PT. Qingda Maspion Paper Products (Harga / m² include PPN 11%)
 export const MASPION_PRICE_LIST = [
@@ -125,59 +132,88 @@ export const MASPION_PRICE_LIST = [
 export default function EstimasiHargaPage() {
   const navigate = useNavigate();
 
-  // State Ukuran Box (mm) - Default contoh client: Box Tepung 270x270x278
+  // Mode Kertas: 'corrugated' (Dus Box Gelombang), 'duplex' (Karton Duplex), 'ivory' (Karton Ivory)
+  const [paperMode, setPaperMode] = useState('corrugated');
+
+  // ==========================================
+  // STATE 1: CORRUGATED BOX (MASPION / GELOMBANG)
+  // ==========================================
   const [boxDimensions, setBoxDimensions] = useState({
     panjang: 270,
     lebar: 270,
-    tinggi: 278
+    tinggi: 278,
   });
 
-  // State Flute & Spesifikasi
+  // Sambungan: 'single' (1 Sambungan Kuping +83mm) vs 'double' (2 Sambungan Kuping +103mm & sheet / 2) (Gambar 7)
+  const [jointType, setJointType] = useState('single'); // 'single' | 'double'
+
   const [fluteType, setFluteType] = useState('B/C'); // B/C Double Wall
   const [useCustomAllowance, setUseCustomAllowance] = useState(false);
   const [customAllowance, setCustomAllowance] = useState({ kupingan: 63, creasing: 24 });
 
-  // State Sumber Index Kertas: 'maspion' (Pricelist Maspion), 'warehouse' (Master Gudang), 'manual' (Input Manual)
-  const [sourceType, setSourceType] = useState('maspion');
+  const [sourceType, setSourceType] = useState('maspion'); // 'maspion' | 'warehouse' | 'manual'
   const [selectedMaspionSubstance, setSelectedMaspionSubstance] = useState('125K/125M/125K');
   const [isMaspionModalOpen, setIsMaspionModalOpen] = useState(false);
 
-  // State Nilai Index & Gramatur
-  const [metodeIndex, setMetodeIndex] = useState('m2'); // 'm2' or 'kg'
+  const [metodeIndex, setMetodeIndex] = useState('m2');
   const [nilaiIndex, setNilaiIndex] = useState(7575);
   const [substansi, setSubstansi] = useState('125K/125M/125K');
   const [gsm, setGsm] = useState(680);
   const [masterSheets, setMasterSheets] = useState([]);
   const [selectedSheetId, setSelectedSheetId] = useState('');
 
-  // Perhitungan Lebar Roll Supplier (Aturan Maspion No. 5: "Harga dihitung berdasarkan lebar kertas")
   const [useRollWidth, setUseRollWidth] = useState(true);
-  const [rollOuts, setRollOuts] = useState(3); // 3 Out
-  const [rollWidthMm, setRollWidthMm] = useState(1750); // 1750 mm
+  const [rollOuts, setRollOuts] = useState(3);
+  const [rollWidthMm, setRollWidthMm] = useState(1750);
 
-  // Posisi Beli di Supplier (+/- %) -> "Skg beli di supplier posisi +"
-  // Contoh client: 5050 (+ 10%) = 5555
   const [posisiSupplierPersen, setPosisiSupplierPersen] = useState(10); // +10%
 
-  // Penyesuaian Harga Jual ke Customer (Margin / Diskon)
-  const [adjustType, setAdjustType] = useState('plus_percent'); // 'plus_percent', 'plus_nominal', 'minus_percent', 'minus_nominal'
+  // ==========================================
+  // STATE 2: DUPLEX (GAMBAR 5 NO. 2)
+  // Rumus: (L x P x gramatur) / 20.000 * Index (+ margin %)
+  // ==========================================
+  const [duplexDimensions, setDuplexDimensions] = useState({
+    lebarCm: 79,
+    panjangCm: 109,
+    unit: 'cm', // 'cm' or 'mm'
+  });
+  const [duplexGsm, setDuplexGsm] = useState(310);
+  const [duplexIndex, setDuplexIndex] = useState(2173);
+  const [duplexOutPerSheet, setDuplexOutPerSheet] = useState(1); // 1 plano jadi berapa box
+
+  // ==========================================
+  // STATE 3: IVORY (GAMBAR 5 NO. 3 & GAMBAR 6)
+  // Rumus: (L x P x gramatur) / 20.000 * Harga 1 kg (+ potong roll/sheet)
+  // ==========================================
+  const [ivoryDimensions, setIvoryDimensions] = useState({
+    lebarCm: 79,
+    panjangCm: 109,
+  });
+  const [ivoryBrand, setIvoryBrand] = useState('VA');
+  const [ivoryGsm, setIvoryGsm] = useState(250);
+  const [ivoryHargaKg, setIvoryHargaKg] = useState(13800);
+  const [ivoryPotongOption, setIvoryPotongOption] = useState('none'); // 'none' | 'potong_sheet' (+250) | 'in_roll' (-350)
+  const [ivoryOutPerSheet, setIvoryOutPerSheet] = useState(1);
+
+  // Penyesuaian Margin Jual ke Customer (Margin / Diskon)
+  const [adjustType, setAdjustType] = useState('plus_percent'); // 'plus_percent' | 'plus_nominal' | 'minus_percent' | 'minus_nominal'
   const [adjustValue, setAdjustValue] = useState(20); // 20% margin
 
-  // Biaya Proses Tambahan (Opsional)
-  const [biayaCetak, setBiayaCetak] = useState(0); // Rp/pcs flexo
-  const [biayaFinishing, setBiayaFinishing] = useState(0); // Rp/pcs stitching/lem
+  // Biaya Tambahan Cetak & Finishing
+  const [biayaCetak, setBiayaCetak] = useState(0);
+  const [biayaFinishing, setBiayaFinishing] = useState(0);
 
-  // Qty Simulasi Order
+  // Qty Simulasi Order (Free inputable / custom number) - REVISI 8
   const [simulasiQty, setSimulasiQty] = useState(1000);
 
-  // Modal Cetak Penawaran & Master Box
+  // Modal Print Penawaran & Save Product
   const [printData, setPrintData] = useState(null);
   const [customers, setCustomers] = useState([]);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveFormData, setSaveFormData] = useState({
     nama_barang: '',
-    jenis_sambungan: 'Stitching'
+    jenis_sambungan: 'Stitching',
   });
 
   // Fetch Master Sheet & Customer
@@ -186,7 +222,7 @@ export default function EstimasiHargaPage() {
       try {
         const [sheetRes, custRes] = await Promise.all([
           request.get(API_ENDPOINTS.PURCHASING.BAHAN_SHEET, { limit: 100 }),
-          request.get(API_ENDPOINTS.MARKETING.CUSTOMERS, { limit: 100 })
+          request.get(API_ENDPOINTS.MARKETING.CUSTOMERS, { limit: 100 }),
         ]);
         if (sheetRes.success && Array.isArray(sheetRes.data)) {
           setMasterSheets(sheetRes.data);
@@ -201,22 +237,24 @@ export default function EstimasiHargaPage() {
     fetchData();
   }, []);
 
-  // Sync saat ganti tipe flute
+  // Sync saat ganti tipe flute pada mode Corrugated
   useEffect(() => {
+    if (paperMode !== 'corrugated') return;
     const spec = FLUTE_SPECS[fluteType] || FLUTE_SPECS['B/C'];
     if (!useCustomAllowance) {
-      setCustomAllowance({ kupingan: spec.kupingan, creasing: spec.creasing });
+      // Jika Double Joint, kupingan standar +103mm (Gambar 7), jika Single Joint +83mm atau spec.kupingan
+      const kupingVal = jointType === 'double' ? 103 : jointType === 'single' ? 83 : spec.kupingan;
+      setCustomAllowance({ kupingan: kupingVal, creasing: spec.creasing });
     }
     setGsm(spec.defaultGsm);
 
-    // Jika sedang mode Maspion, sync index otomatis
     if (sourceType === 'maspion') {
       const found = MASPION_PRICE_LIST.find((m) => m.substance === selectedMaspionSubstance);
       if (found && found[fluteType]) {
         setNilaiIndex(found[fluteType]);
       }
     }
-  }, [fluteType, useCustomAllowance, sourceType, selectedMaspionSubstance]);
+  }, [fluteType, jointType, useCustomAllowance, sourceType, selectedMaspionSubstance, paperMode]);
 
   // Handle Pilih Substance Maspion
   const handleSelectMaspionSubstance = (sub) => {
@@ -254,114 +292,284 @@ export default function EstimasiHargaPage() {
     }
   };
 
+  // Handle Duplex Gramatur Switch
+  const handleSelectDuplexGsm = (gsmVal) => {
+    setDuplexGsm(gsmVal);
+    const found = DUPLEX_INDEX_TABLE.find((d) => d.gsm === Number(gsmVal));
+    if (found) {
+      setDuplexIndex(found.index);
+    }
+  };
+
+  // Handle Ivory Preset Switch
+  const handleSelectIvoryPreset = (brandName, gsmVal, harga) => {
+    setIvoryBrand(brandName);
+    setIvoryGsm(gsmVal);
+    setIvoryHargaKg(harga);
+  };
+
   // ========================================================
-  // RUMUS PERHITUNGAN PRESISI DARI CLIENT & MASPION
+  // RUMUS PERHITUNGAN PRESISI LENGKAP (CORRUGATED, DUPLEX, IVORY, DOUBLE JOINT)
   // ========================================================
   const calculation = useMemo(() => {
-    const P_box = Number(boxDimensions.panjang) || 0;
-    const L_box = Number(boxDimensions.lebar) || 0;
-    const T_box = Number(boxDimensions.tinggi) || 0;
-
-    const spec = FLUTE_SPECS[fluteType] || FLUTE_SPECS['B/C'];
-    const kupingan = useCustomAllowance ? Number(customAllowance.kupingan) || 0 : spec.kupingan;
-    const creasing = useCustomAllowance ? Number(customAllowance.creasing) || 0 : spec.creasing;
-
-    // 1. Ukuran Lembaran Sheet (mm)
-    // Sesuai coretan client:
-    // P_sheet = ((P + L) * 2) + kupingan -> ((270+270)*2) + 63 = 1143 mm
-    // L_sheet = L + T + creasing -> 270 + 278 + 24 = 572 mm
-    const P_sheet = ((P_box + L_box) * 2) + kupingan;
-    const L_sheet = L_box + T_box + creasing;
-
-    // 2. Luas 1 Lembar Bersih (Net m2)
-    const p_meter = P_sheet / 1000;
-    const l_meter = L_sheet / 1000;
-    const luasNetM2 = p_meter * l_meter;
-
-    // 3. Luas Tagihan Roll Kertas Supplier (Sesuai Aturan Maspion No. 5)
-    // Coretan client: 572 x 3 = 1716 mm -> lebar roll supplier 1750 mm!
-    const outs = Number(rollOuts) || 1;
-    const rollWidth = Number(rollWidthMm) || (L_sheet * outs);
-    const totalLebarOuts = L_sheet * outs;
-    const luasTagihanM2 = useRollWidth
-      ? ((rollWidth / 1000) * p_meter) / outs
-      : luasNetM2;
-
-    // 4. Harga Dasar Sheet dari Pricelist Supplier (Sebelum Posisi Supplier)
-    let hargaDasarPricelist = 0;
-    const idx = Number(nilaiIndex) || 0;
-    if (metodeIndex === 'm2') {
-      hargaDasarPricelist = Math.round(luasTagihanM2 * idx);
-    } else {
-      const berat_kg = luasTagihanM2 * ((Number(gsm) || 680) / 1000);
-      hargaDasarPricelist = Math.round(berat_kg * idx);
-    }
-
-    // 5. Posisi Harga Beli Supplier (+ / - %)
-    // "Skg beli di supplier posisi +" -> Coretan client: 5050 (+ 10%) = 5555
-    const posSupplier = Number(posisiSupplierPersen) || 0;
-    const selisihPosisiSupplier = Math.round(hargaDasarPricelist * (posSupplier / 100));
-    const modalBeliSheet = hargaDasarPricelist + selisihPosisiSupplier;
-
-    // 6. Total HPP Dasar Dus (Sheet + Cetak + Finishing)
+    const qty = Math.max(1, Number(simulasiQty) || 1000);
     const biayaCetakVal = Number(biayaCetak) || 0;
     const biayaFinishingVal = Number(biayaFinishing) || 0;
-    const hppDasarTotal = modalBeliSheet + biayaCetakVal + biayaFinishingVal;
-
-    // 7. Penyesuaian Margin / Diskon untuk Customer
-    let selisihAdjust = 0;
+    const posSupplier = Number(posisiSupplierPersen) || 0;
     const adjVal = Number(adjustValue) || 0;
-    if (adjustType === 'plus_percent') {
-      selisihAdjust = Math.round(hppDasarTotal * (adjVal / 100));
-    } else if (adjustType === 'plus_nominal') {
-      selisihAdjust = adjVal;
-    } else if (adjustType === 'minus_percent') {
-      selisihAdjust = -Math.round(hppDasarTotal * (adjVal / 100));
-    } else if (adjustType === 'minus_nominal') {
-      selisihAdjust = -adjVal;
+
+    // ----------------------------------------------------
+    // MODE 1: CORRUGATED BOX (MASPION / GELOMBANG)
+    // ----------------------------------------------------
+    if (paperMode === 'corrugated') {
+      const P_box = Number(boxDimensions.panjang) || 0;
+      const L_box = Number(boxDimensions.lebar) || 0;
+      const T_box = Number(boxDimensions.tinggi) || 0;
+
+      const spec = FLUTE_SPECS[fluteType] || FLUTE_SPECS['B/C'];
+      const kupingan = useCustomAllowance
+        ? Number(customAllowance.kupingan) || 0
+        : jointType === 'double'
+        ? 103
+        : 83;
+      const creasing = useCustomAllowance ? Number(customAllowance.creasing) || 0 : spec.creasing;
+
+      // Single Joint vs Double Joint (Gambar 7):
+      // Single Joint: P_sheet = ((P + L) * 2) + kupingan (misal +83mm). 1 box = 1 lembar sheet.
+      // Double Joint: P_sheet = (((P + L) * 2) + kupingan) / 2 (misal +103mm). 1 box = 2 lembar sheet!
+      const isDouble = jointType === 'double';
+      const rawPanjangBentangan = (P_box + L_box) * 2 + kupingan;
+      const P_sheet = isDouble ? Math.round(rawPanjangBentangan / 2) : rawPanjangBentangan;
+      const L_sheet = L_box + T_box + creasing;
+      const sheetsPerBox = isDouble ? 2 : 1;
+
+      // Luas 1 lembar sheet (m2)
+      const p_meter = P_sheet / 1000;
+      const l_meter = L_sheet / 1000;
+      const luasSheetNetM2 = p_meter * l_meter;
+
+      // Luas tagihan roll Maspion
+      const outs = Number(rollOuts) || 1;
+      const rollWidth = Number(rollWidthMm) || L_sheet * outs;
+      const totalLebarOuts = L_sheet * outs;
+      const luasTagihanPerSheetM2 = useRollWidth
+        ? ((rollWidth / 1000) * p_meter) / outs
+        : luasSheetNetM2;
+
+      // Luas tagihan total per 1 box (dikali 2 jika double joint)
+      const luasTagihanM2 = luasTagihanPerSheetM2 * sheetsPerBox;
+
+      // Harga Dasar Sheet dari Pricelist Supplier
+      let hargaDasarPricelist = 0;
+      const idx = Number(nilaiIndex) || 0;
+      if (metodeIndex === 'm2') {
+        hargaDasarPricelist = Math.round(luasTagihanM2 * idx);
+      } else {
+        const berat_kg = luasTagihanM2 * ((Number(gsm) || 680) / 1000);
+        hargaDasarPricelist = Math.round(berat_kg * idx);
+      }
+
+      // Posisi Harga Beli Supplier (+ / - %)
+      const selisihPosisiSupplier = Math.round(hargaDasarPricelist * (posSupplier / 100));
+      const modalBeliSheet = hargaDasarPricelist + selisihPosisiSupplier;
+
+      // Total HPP Dasar Dus (Sheet + Cetak + Finishing)
+      const hppDasarTotal = modalBeliSheet + biayaCetakVal + biayaFinishingVal;
+
+      // Penyesuaian Margin / Diskon untuk Customer
+      let selisihAdjust = 0;
+      if (adjustType === 'plus_percent') {
+        selisihAdjust = Math.round(hppDasarTotal * (adjVal / 100));
+      } else if (adjustType === 'plus_nominal') {
+        selisihAdjust = adjVal;
+      } else if (adjustType === 'minus_percent') {
+        selisihAdjust = -Math.round(hppDasarTotal * (adjVal / 100));
+      } else if (adjustType === 'minus_nominal') {
+        selisihAdjust = -adjVal;
+      }
+
+      const hargaJualPerPcs = Math.max(0, hppDasarTotal + selisihAdjust);
+      const profitPerPcs = hargaJualPerPcs - hppDasarTotal;
+      const marginPersen = hppDasarTotal > 0 ? Math.round((profitPerPcs / hppDasarTotal) * 1000) / 10 : 0;
+
+      const totalOmset = hargaJualPerPcs * qty;
+      const totalModal = hppDasarTotal * qty;
+      const totalProfit = profitPerPcs * qty;
+
+      return {
+        mode: 'corrugated',
+        P_box,
+        L_box,
+        T_box,
+        jointType,
+        isDouble,
+        sheetsPerBox,
+        kupingan,
+        creasing,
+        P_sheet,
+        L_sheet,
+        outs,
+        rollWidth,
+        totalLebarOuts,
+        luasNetM2: Math.round(luasSheetNetM2 * sheetsPerBox * 10000) / 10000,
+        luasTagihanM2: Math.round(luasTagihanM2 * 10000) / 10000,
+        hargaDasarPricelist,
+        posSupplier,
+        selisihPosisiSupplier,
+        modalBeliSheet,
+        biayaCetakVal,
+        biayaFinishingVal,
+        hppDasarTotal,
+        selisihAdjust,
+        hargaJualPerPcs,
+        profitPerPcs,
+        marginPersen,
+        qty,
+        totalOmset,
+        totalModal,
+        totalProfit,
+      };
     }
 
-    const hargaJualPerPcs = Math.max(0, hppDasarTotal + selisihAdjust);
-    const profitPerPcs = hargaJualPerPcs - hppDasarTotal;
-    const marginPersen = hppDasarTotal > 0 ? Math.round((profitPerPcs / hppDasarTotal) * 1000) / 10 : 0;
+    // ----------------------------------------------------
+    // MODE 2: DUPLEX (GAMBAR 5 NO. 2)
+    // Rumus: (L x P x gramatur) / 20.000 * Index
+    // ----------------------------------------------------
+    if (paperMode === 'duplex') {
+      const L_cm = Number(duplexDimensions.lebarCm) || 0;
+      const P_cm = Number(duplexDimensions.panjangCm) || 0;
+      const gsmVal = Number(duplexGsm) || 310;
+      const idx = Number(duplexIndex) || 2173;
+      const outs = Math.max(1, Number(duplexOutPerSheet) || 1);
 
-    // 8. Simulasi Total Order
-    const qty = Number(simulasiQty) || 1000;
-    const totalOmset = hargaJualPerPcs * qty;
-    const totalModal = hppDasarTotal * qty;
-    const totalProfit = profitPerPcs * qty;
+      // (L x P x gramatur) / 20.000
+      const koefisien = (L_cm * P_cm * gsmVal) / 20000;
+      // Harga dasar 1 plano (atau per 500 lbr rim jika dikonversi)
+      // Rumus coretan client: (L x P x gramatur) / 20.000 x Index = ... + %
+      const modalPlano = Math.round(koefisien * idx);
+      const modalPerPcs = Math.round(modalPlano / outs);
 
-    return {
-      P_box,
-      L_box,
-      T_box,
-      kupingan,
-      creasing,
-      P_sheet,
-      L_sheet,
-      outs,
-      rollWidth,
-      totalLebarOuts,
-      luasNetM2: Math.round(luasNetM2 * 10000) / 10000,
-      luasTagihanM2: Math.round(luasTagihanM2 * 10000) / 10000,
-      hargaDasarPricelist,
-      posSupplier,
-      selisihPosisiSupplier,
-      modalBeliSheet,
-      biayaCetakVal,
-      biayaFinishingVal,
-      hppDasarTotal,
-      selisihAdjust,
-      hargaJualPerPcs,
-      profitPerPcs,
-      marginPersen,
-      qty,
-      totalOmset,
-      totalModal,
-      totalProfit
-    };
+      const hppDasarTotal = modalPerPcs + biayaCetakVal + biayaFinishingVal;
+
+      let selisihAdjust = 0;
+      if (adjustType === 'plus_percent') {
+        selisihAdjust = Math.round(hppDasarTotal * (adjVal / 100));
+      } else if (adjustType === 'plus_nominal') {
+        selisihAdjust = adjVal;
+      } else if (adjustType === 'minus_percent') {
+        selisihAdjust = -Math.round(hppDasarTotal * (adjVal / 100));
+      } else if (adjustType === 'minus_nominal') {
+        selisihAdjust = -adjVal;
+      }
+
+      const hargaJualPerPcs = Math.max(0, hppDasarTotal + selisihAdjust);
+      const profitPerPcs = hargaJualPerPcs - hppDasarTotal;
+      const marginPersen = hppDasarTotal > 0 ? Math.round((profitPerPcs / hppDasarTotal) * 1000) / 10 : 0;
+
+      const totalOmset = hargaJualPerPcs * qty;
+      const totalModal = hppDasarTotal * qty;
+      const totalProfit = profitPerPcs * qty;
+
+      return {
+        mode: 'duplex',
+        L_cm,
+        P_cm,
+        gsmVal,
+        idx,
+        outs,
+        koefisien: Math.round(koefisien * 100) / 100,
+        modalPlano,
+        modalPerPcs,
+        modalBeliSheet: modalPerPcs,
+        biayaCetakVal,
+        biayaFinishingVal,
+        hppDasarTotal,
+        selisihAdjust,
+        hargaJualPerPcs,
+        profitPerPcs,
+        marginPersen,
+        qty,
+        totalOmset,
+        totalModal,
+        totalProfit,
+      };
+    }
+
+    // ----------------------------------------------------
+    // MODE 3: IVORY (GAMBAR 5 NO. 3 & GAMBAR 6)
+    // Rumus: (L x P x gramatur) / 20.000 * Harga 1 kg (+ opsi potong)
+    // ----------------------------------------------------
+    if (paperMode === 'ivory') {
+      const L_cm = Number(ivoryDimensions.lebarCm) || 0;
+      const P_cm = Number(ivoryDimensions.panjangCm) || 0;
+      const gsmVal = Number(ivoryGsm) || 250;
+      let effectiveHargaKg = Number(ivoryHargaKg) || 13800;
+
+      // Add-on potong roll to sheet (+250) atau in roll (-350)
+      if (ivoryPotongOption === 'potong_sheet') {
+        effectiveHargaKg += 250;
+      } else if (ivoryPotongOption === 'in_roll') {
+        effectiveHargaKg -= 350;
+      }
+
+      const outs = Math.max(1, Number(ivoryOutPerSheet) || 1);
+
+      // (L x P x gramatur) / 20.000
+      const koefisien = (L_cm * P_cm * gsmVal) / 20000;
+      const modalPlano = Math.round(koefisien * effectiveHargaKg);
+      const modalPerPcs = Math.round(modalPlano / outs);
+
+      const hppDasarTotal = modalPerPcs + biayaCetakVal + biayaFinishingVal;
+
+      let selisihAdjust = 0;
+      if (adjustType === 'plus_percent') {
+        selisihAdjust = Math.round(hppDasarTotal * (adjVal / 100));
+      } else if (adjustType === 'plus_nominal') {
+        selisihAdjust = adjVal;
+      } else if (adjustType === 'minus_percent') {
+        selisihAdjust = -Math.round(hppDasarTotal * (adjVal / 100));
+      } else if (adjustType === 'minus_nominal') {
+        selisihAdjust = -adjVal;
+      }
+
+      const hargaJualPerPcs = Math.max(0, hppDasarTotal + selisihAdjust);
+      const profitPerPcs = hargaJualPerPcs - hppDasarTotal;
+      const marginPersen = hppDasarTotal > 0 ? Math.round((profitPerPcs / hppDasarTotal) * 1000) / 10 : 0;
+
+      const totalOmset = hargaJualPerPcs * qty;
+      const totalModal = hppDasarTotal * qty;
+      const totalProfit = profitPerPcs * qty;
+
+      return {
+        mode: 'ivory',
+        L_cm,
+        P_cm,
+        gsmVal,
+        effectiveHargaKg,
+        outs,
+        koefisien: Math.round(koefisien * 100) / 100,
+        modalPlano,
+        modalPerPcs,
+        modalBeliSheet: modalPerPcs,
+        biayaCetakVal,
+        biayaFinishingVal,
+        hppDasarTotal,
+        selisihAdjust,
+        hargaJualPerPcs,
+        profitPerPcs,
+        marginPersen,
+        qty,
+        totalOmset,
+        totalModal,
+        totalProfit,
+      };
+    }
+
+    return {};
   }, [
+    paperMode,
     boxDimensions,
+    jointType,
     fluteType,
     useCustomAllowance,
     customAllowance,
@@ -372,26 +580,37 @@ export default function EstimasiHargaPage() {
     metodeIndex,
     gsm,
     posisiSupplierPersen,
+    duplexDimensions,
+    duplexGsm,
+    duplexIndex,
+    duplexOutPerSheet,
+    ivoryDimensions,
+    ivoryBrand,
+    ivoryGsm,
+    ivoryHargaKg,
+    ivoryPotongOption,
+    ivoryOutPerSheet,
     biayaCetak,
     biayaFinishing,
     adjustType,
     adjustValue,
-    simulasiQty
+    simulasiQty,
   ]);
 
-  // Saat ukuran sheet berubah dan menggunakan roll width, sesuaikan lebar roll otomatis
+  // Saat ukuran sheet berubah dan menggunakan roll width pada mode Corrugated
   useEffect(() => {
-    if (useRollWidth) {
+    if (paperMode === 'corrugated' && useRollWidth && calculation.L_sheet) {
       const totalOutsWidth = calculation.L_sheet * rollOuts;
-      // Dibulatkan ke atas kelipatan 50mm (contoh 1716 -> 1750)
       const autoRoll = Math.max(1000, Math.ceil(totalOutsWidth / 50) * 50);
       setRollWidthMm(autoRoll);
     }
-  }, [calculation.L_sheet, rollOuts, useRollWidth]);
+  }, [calculation.L_sheet, rollOuts, useRollWidth, paperMode]);
 
   // Handler Preset Contoh Client: Box Tepung 270x270x278 (B/C Maspion)
   const applyClientExample = () => {
+    setPaperMode('corrugated');
     setBoxDimensions({ panjang: 270, lebar: 270, tinggi: 278 });
+    setJointType('single');
     setFluteType('B/C');
     setSourceType('maspion');
     handleSelectMaspionSubstance('125K/125M/125K');
@@ -404,21 +623,50 @@ export default function EstimasiHargaPage() {
     toast.success('Contoh "Box Tepung 270x270x278 B/C (Maspion)" berhasil dimuat!');
   };
 
+  // Handler Preset Double Joint Contoh Client (Gambar 7): 740x740x490
+  const applyDoubleJointExample = () => {
+    setPaperMode('corrugated');
+    setBoxDimensions({ panjang: 740, lebar: 740, tinggi: 490 });
+    setJointType('double');
+    setFluteType('B/C');
+    setSourceType('maspion');
+    handleSelectMaspionSubstance('150K/125M/150K');
+    setUseRollWidth(false);
+    toast.success('Contoh Dus Besar Double Joint (740x740x490) dimuat!');
+  };
+
   // Salin Rincian ke WhatsApp
   const handleCopyWhatsApp = () => {
-    const text = `*PENAWARAN ESTIMASI HARGA DUS KARTON BOX*
-*CV. MAHARANI UNTUNG ABADI*
------------------------------------------
-📦 *Spesifikasi Kemasan:*
-- Model: Karton Box Standar (A1 / RSC)
+    let specText = '';
+    if (paperMode === 'corrugated') {
+      specText = `📦 *Spesifikasi Karton Box:*
+- Model: Karton Box Standar (${calculation.isDouble ? 'Double Joint (2 Sambungan)' : 'Single Joint (1 Sambungan)'})
 - Ukuran Box: ${calculation.P_box} x ${calculation.L_box} x ${calculation.T_box} mm
 - Tipe Flute: ${fluteType} (${FLUTE_SPECS[fluteType]?.nama || ''})
 - Substansi: ${substansi}
-- Dimensi Sheet: ${calculation.P_sheet} x ${calculation.L_sheet} mm (${calculation.luasTagihanM2} m²/pcs)
-${useRollWidth ? `- Lebar Roll Supplier: ${calculation.rollWidth} mm (${calculation.outs} Out)` : ''}
+- Dimensi Sheet: ${calculation.P_sheet} x ${calculation.L_sheet} mm (${calculation.sheetsPerBox} lembar/dus)
+${useRollWidth ? `- Lebar Roll Supplier: ${calculation.rollWidth} mm (${calculation.outs} Out)` : ''}`;
+    } else if (paperMode === 'duplex') {
+      specText = `📦 *Spesifikasi Kemasan Duplex:*
+- Material: Karton Duplex Coated
+- Dimensi Plano: ${calculation.L_cm} x ${calculation.P_cm} cm
+- Gramatur: ${calculation.gsmVal} GSM (Index: ${calculation.idx})
+- Out per Plano: ${calculation.outs} box/plano`;
+    } else {
+      specText = `📦 *Spesifikasi Kemasan Ivory Food Grade:*
+- Material: Karton Ivory Solid Food Grade (${ivoryBrand})
+- Dimensi Plano: ${calculation.L_cm} x ${calculation.P_cm} cm
+- Gramatur: ${calculation.gsmVal} GSM (Harga Dasar: Rp ${calculation.effectiveHargaKg.toLocaleString('id-ID')}/kg)
+- Out per Plano: ${calculation.outs} box/plano`;
+    }
+
+    const text = `*PENAWARAN ESTIMASI HARGA KEMASAN*
+*CV. MAHARANI UNTUNG ABADI*
+-----------------------------------------
+${specText}
 
 💰 *Estimasi Harga:*
-- Harga Modal Supplier: Rp ${calculation.modalBeliSheet.toLocaleString('id-ID')} / pcs
+- Modal Bahan: Rp ${calculation.modalBeliSheet.toLocaleString('id-ID')} / pcs
 - *Harga Jual Penawaran: Rp ${calculation.hargaJualPerPcs.toLocaleString('id-ID')} / pcs*
 - Simulasi Qty: ${calculation.qty.toLocaleString('id-ID')} pcs
 - Total Estimasi: Rp ${calculation.totalOmset.toLocaleString('id-ID')}
@@ -426,9 +674,9 @@ ${useRollWidth ? `- Lebar Roll Supplier: ${calculation.rollWidth} mm (${calculat
 Catatan:
 - Harga belum termasuk PPN 11% (jika ada faktur)
 - Estimasi berlaku 14 hari kerja
-- Hubungi kami untuk penyesuaian cetak logo & sample box.
+- Hubungi kami untuk penyesuaian cetak logo & sample kemasan.
 -----------------------------------------
-CV. Maharani Untung Abadi • Spesialis Packaging Industri`;
+CV. Maharani Untung Abadi • Packaging & Offset Printing`;
 
     navigator.clipboard.writeText(text);
     toast.success('Rincian penawaran disalin! Siap dipaste ke WhatsApp');
@@ -436,32 +684,77 @@ CV. Maharani Untung Abadi • Spesialis Packaging Industri`;
 
   // Buka Modal Cetak Penawaran
   const handleOpenPrintModal = () => {
+    let namaBarang = '';
+    let p_sheet = 0;
+    let l_sheet = 0;
+    let luas_m2 = 0;
+    let sub = '';
+
+    if (paperMode === 'corrugated') {
+      namaBarang = `Karton Box ${calculation.P_box}x${calculation.L_box}x${calculation.T_box} mm (${calculation.isDouble ? 'Double Joint' : 'Single Joint'})`;
+      p_sheet = calculation.P_sheet;
+      l_sheet = calculation.L_sheet;
+      luas_m2 = calculation.luasTagihanM2;
+      sub = substansi;
+    } else if (paperMode === 'duplex') {
+      namaBarang = `Dus Duplex ${calculation.gsmVal} GSM (${calculation.L_cm}x${calculation.P_cm} cm)`;
+      p_sheet = calculation.P_cm * 10;
+      l_sheet = calculation.L_cm * 10;
+      luas_m2 = (calculation.L_cm * calculation.P_cm) / 10000;
+      sub = `Duplex ${calculation.gsmVal} GSM`;
+    } else {
+      namaBarang = `Kemasan Ivory ${ivoryBrand} ${calculation.gsmVal} GSM (${calculation.L_cm}x${calculation.P_cm} cm)`;
+      p_sheet = calculation.P_cm * 10;
+      l_sheet = calculation.L_cm * 10;
+      luas_m2 = (calculation.L_cm * calculation.P_cm) / 10000;
+      sub = `Ivory ${ivoryBrand} ${calculation.gsmVal} GSM`;
+    }
+
     setPrintData({
-      nama_barang: `Karton Box ${calculation.P_box}x${calculation.L_box}x${calculation.T_box} mm`,
-      panjang: calculation.P_box,
-      lebar: calculation.L_box,
-      tinggi: calculation.T_box,
-      tipe_flute: fluteType,
-      nama_flute: FLUTE_SPECS[fluteType]?.nama || '',
-      substansi: substansi,
-      P_sheet: calculation.P_sheet,
-      L_sheet: calculation.L_sheet,
-      luas_m2: calculation.luasTagihanM2,
-      jenis_sambungan: saveFormData.jenis_sambungan || 'Stitching (Kawat Jahit)',
+      nama_barang: namaBarang,
+      panjang: calculation.P_box || calculation.P_cm * 10,
+      lebar: calculation.L_box || calculation.L_cm * 10,
+      tinggi: calculation.T_box || 0,
+      tipe_flute: paperMode === 'corrugated' ? fluteType : paperMode === 'duplex' ? 'Duplex' : 'Ivory',
+      nama_flute: paperMode === 'corrugated' ? FLUTE_SPECS[fluteType]?.nama : paperMode,
+      substansi: sub,
+      P_sheet: p_sheet,
+      L_sheet: l_sheet,
+      luas_m2: luas_m2,
+      jenis_sambungan:
+        paperMode === 'corrugated'
+          ? calculation.isDouble
+            ? 'Double Joint (2 Jahit)'
+            : 'Single Joint (1 Jahit)'
+          : 'Glue / Kunci Lipat',
       hargaJualPerPcs: calculation.hargaJualPerPcs,
       qty: calculation.qty,
       totalOmset: calculation.totalOmset,
       customer_nama: 'Pimpinan / Purchasing Dept.',
       customer_alamat: 'Di Tempat',
-      nama_sales: 'Marketing Lead'
+      nama_sales: 'Marketing Lead',
     });
   };
 
   // Simpan Sebagai Produk Jadi di Master Box
   const handleOpenSaveModal = () => {
+    let defaultNama = '';
+    if (paperMode === 'corrugated') {
+      defaultNama = `Karton Box ${calculation.P_box}x${calculation.L_box}x${calculation.T_box} ${fluteType}`;
+    } else if (paperMode === 'duplex') {
+      defaultNama = `Dus Duplex ${calculation.gsmVal} GSM (${calculation.L_cm}x${calculation.P_cm} cm)`;
+    } else {
+      defaultNama = `Dus Ivory ${ivoryBrand} ${calculation.gsmVal} GSM (${calculation.L_cm}x${calculation.P_cm} cm)`;
+    }
+
     setSaveFormData({
-      nama_barang: `Karton Box ${calculation.P_box}x${calculation.L_box}x${calculation.T_box} ${fluteType}`,
-      jenis_sambungan: 'Stitching'
+      nama_barang: defaultNama,
+      jenis_sambungan:
+        paperMode === 'corrugated'
+          ? calculation.isDouble
+            ? 'Stitching (Double Joint)'
+            : 'Stitching'
+          : 'Glue',
     });
     setIsSaveModalOpen(true);
   };
@@ -470,21 +763,21 @@ CV. Maharani Untung Abadi • Spesialis Packaging Industri`;
     e.preventDefault();
     try {
       setSaveLoading(true);
-      const kode = `BOX-${calculation.P_box}x${calculation.L_box}-${Date.now().toString().slice(-4)}`;
+      const kode = `BOX-${Date.now().toString().slice(-6)}`;
       const payload = {
         kode_barang: kode,
         nama_barang: saveFormData.nama_barang,
         jenis_barang: 'Box',
-        tipe_flute: fluteType,
-        substansi: substansi,
-        panjang_mm: calculation.P_box,
-        lebar_mm: calculation.L_box,
-        tinggi_mm: calculation.T_box,
+        tipe_flute: paperMode === 'corrugated' ? fluteType : paperMode === 'duplex' ? 'Duplex' : 'Ivory',
+        substansi: paperMode === 'corrugated' ? substansi : `${paperMode} ${calculation.gsmVal} GSM`,
+        panjang_mm: calculation.P_box || calculation.P_cm * 10,
+        lebar_mm: calculation.L_box || calculation.L_cm * 10,
+        tinggi_mm: calculation.T_box || 0,
         jenis_sambungan: saveFormData.jenis_sambungan,
         stok_qty: 0,
         satuan: 'Pcs',
         harga_jual: calculation.hargaJualPerPcs,
-        min_stok: 200
+        min_stok: 200,
       };
 
       await request.post(API_ENDPOINTS.MARKETING.PRODUCTS, payload);
@@ -508,32 +801,45 @@ CV. Maharani Untung Abadi • Spesialis Packaging Industri`;
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-slate-800">
-                Kalkulator Estimasi Harga Dus & Index Sheet
+                Kalkulator Estimasi Harga Packaging & Offset
               </h1>
               <p className="text-xs sm:text-sm text-slate-500">
-                Hitung dimensi lembaran sheet dari P x L x T box, modal sheet dari index supplier (Pricelist Maspion), posisi beli supplier, dan markup harga jual.
+                Hitung otomatis harga jual dus karton gelombang (Single/Double Joint Maspion), Karton Duplex, dan Ivory Food Grade.
               </p>
             </div>
           </div>
         </div>
 
         <div className="no-print flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={applyClientExample}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition-colors shadow-2xs"
-            title="Klik untuk memuat contoh box tepung standar Maspion"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-            Contoh Box Tepung (B/C Maspion)
-          </button>
+          {paperMode === 'corrugated' && (
+            <>
+              <button
+                type="button"
+                onClick={applyClientExample}
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition-colors shadow-2xs"
+                title="Klik untuk memuat contoh box tepung standar Maspion"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                Contoh Box Tepung
+              </button>
+              <button
+                type="button"
+                onClick={applyDoubleJointExample}
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-300 rounded-xl text-xs font-bold transition-colors shadow-2xs"
+                title="Klik untuk memuat contoh dus besar Double Joint (Gambar 7)"
+              >
+                <Split className="w-3.5 h-3.5 text-indigo-600" />
+                Contoh Double Joint
+              </button>
+            </>
+          )}
           <button
             type="button"
             onClick={handleCopyWhatsApp}
             className="inline-flex items-center gap-2 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-semibold transition-colors shadow-2xs"
           >
             <Share2 className="w-4 h-4" />
-            Salin WhatsApp
+            Salin WA
           </button>
           <button
             type="button"
@@ -549,8 +855,55 @@ CV. Maharani Untung Abadi • Spesialis Packaging Industri`;
             className="inline-flex items-center gap-2 px-3.5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs sm:text-sm font-semibold transition-colors shadow-2xs"
           >
             <Save className="w-4 h-4" />
-            Simpan Master Box
+            Simpan Master
           </button>
+        </div>
+      </div>
+
+      {/* TAB PILIHAN MATERIAL KERTAS: Corrugated, Duplex, Ivory */}
+      <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-2">
+        <div className="flex gap-2 w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={() => setPaperMode('corrugated')}
+            className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+              paperMode === 'corrugated'
+                ? 'bg-brand-600 text-white shadow-sm'
+                : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Box className="w-4 h-4" />
+            Corrugated Box (Maspion)
+          </button>
+          <button
+            type="button"
+            onClick={() => setPaperMode('duplex')}
+            className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+              paperMode === 'duplex'
+                ? 'bg-amber-600 text-white shadow-sm'
+                : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Layers className="w-4 h-4" />
+            Karton Duplex (Offset)
+          </button>
+          <button
+            type="button"
+            onClick={() => setPaperMode('ivory')}
+            className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+              paperMode === 'ivory'
+                ? 'bg-purple-600 text-white shadow-sm'
+                : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Sparkles className="w-4 h-4" />
+            Karton Ivory Food Grade
+          </button>
+        </div>
+        <div className="text-xs text-slate-500 font-semibold px-2">
+          {paperMode === 'corrugated' && 'Kardus gelombang single / double wall'}
+          {paperMode === 'duplex' && 'Rumus: (L x P x Gramatur)/20.000 x Index'}
+          {paperMode === 'ivory' && 'Rumus: (L x P x Gramatur)/20.000 x Harga/kg'}
         </div>
       </div>
 
@@ -558,345 +911,653 @@ CV. Maharani Untung Abadi • Spesialis Packaging Industri`;
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Kolom Kiri: Input Parameter Box & Index (7 Kolom) */}
         <div className="lg:col-span-7 space-y-6">
-          {/* Card 1: Dimensi Box & Flute */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <Box className="w-4 h-4 text-brand-600" />
-                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
-                  1. Ukuran Dus Box Karton (P x L x T mm)
-                </h2>
-              </div>
-              <span className="text-xs text-slate-400">Satuan Milimeter (mm)</span>
-            </div>
-
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Panjang (P) <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min="10"
-                    value={boxDimensions.panjang}
-                    onChange={(e) => setBoxDimensions({ ...boxDimensions, panjang: Number(e.target.value) || 0 })}
-                    className="w-full pl-3 pr-9 py-2 text-sm font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-brand-500"
-                  />
-                  <span className="absolute right-3 top-2.5 text-xs text-slate-400 font-semibold">mm</span>
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Lebar (L) <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min="10"
-                    value={boxDimensions.lebar}
-                    onChange={(e) => setBoxDimensions({ ...boxDimensions, lebar: Number(e.target.value) || 0 })}
-                    className="w-full pl-3 pr-9 py-2 text-sm font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-brand-500"
-                  />
-                  <span className="absolute right-3 top-2.5 text-xs text-slate-400 font-semibold">mm</span>
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Tinggi (T) <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min="10"
-                    value={boxDimensions.tinggi}
-                    onChange={(e) => setBoxDimensions({ ...boxDimensions, tinggi: Number(e.target.value) || 0 })}
-                    className="w-full pl-3 pr-9 py-2 text-sm font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-brand-500"
-                  />
-                  <span className="absolute right-3 top-2.5 text-xs text-slate-400 font-semibold">mm</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Presets Dimensi Box */}
-            <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
-              <span className="text-slate-400 font-medium">Contoh Ukuran:</span>
-              <button
-                type="button"
-                onClick={() => setBoxDimensions({ panjang: 270, lebar: 270, tinggi: 278 })}
-                className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-lg text-[11px] font-bold transition-colors"
-              >
-                270 x 270 x 278 (Box Tepung)
-              </button>
-              <button
-                type="button"
-                onClick={() => setBoxDimensions({ panjang: 400, lebar: 200, tinggi: 130 })}
-                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-semibold transition-colors"
-              >
-                400 x 200 x 130
-              </button>
-              <button
-                type="button"
-                onClick={() => setBoxDimensions({ panjang: 300, lebar: 200, tinggi: 200 })}
-                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-semibold transition-colors"
-              >
-                300 x 200 x 200
-              </button>
-            </div>
-
-            {/* Tipe Flute & Allowance */}
-            <div className="pt-2 border-t border-slate-100 space-y-3">
-              <label className="block text-xs font-bold text-slate-700">
-                Pilih Tipe Flute / Ketebalan Karton Gelombang
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                {Object.values(FLUTE_SPECS).map((f) => (
-                  <div
-                    key={f.kode}
-                    onClick={() => setFluteType(f.kode)}
-                    className={`cursor-pointer p-3 rounded-xl border text-left transition-all ${
-                      fluteType === f.kode
-                        ? 'border-brand-500 bg-brand-50/50 ring-2 ring-brand-500/20'
-                        : 'border-slate-200 hover:border-slate-300 bg-white'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-sm text-slate-800">{f.kode}</span>
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                        f.kode === 'B/C' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        +{f.kupingan} / +{f.creasing}mm
-                      </span>
-                    </div>
-                    <div className="text-[11px] text-slate-500 mt-1 line-clamp-1">{f.nama}</div>
+          {/* ========================================================= */}
+          {/* A. TAMPILAN JIKA MODE CORRUGATED BOX                      */}
+          {/* ========================================================= */}
+          {paperMode === 'corrugated' && (
+            <>
+              {/* Card 1: Dimensi Box & Flute */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Box className="w-4 h-4 text-brand-600" />
+                    <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
+                      1. Ukuran Dus Box Karton (P x L x T mm)
+                    </h2>
                   </div>
-                ))}
-              </div>
-
-              {/* Rumus visual dari kertas client */}
-              <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl text-xs space-y-1.5 text-amber-950">
-                <div className="flex items-center gap-1.5 font-bold text-amber-900">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-700" />
-                  Rumus Ukuran Lembaran Sheet ({fluteType}):
+                  <span className="text-xs text-slate-400">Satuan Milimeter (mm)</span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono">
-                  <div className="p-1.5 bg-white/80 rounded border border-amber-200">
-                    <strong>Lebar Sheet (L):</strong> L + T + {calculation.creasing} ={' '}
-                    <span className="font-bold text-brand-700">{calculation.L_sheet} mm</span>
-                  </div>
-                  <div className="p-1.5 bg-white/80 rounded border border-amber-200">
-                    <strong>Panjang Sheet (P):</strong> ((P + L) × 2) + {calculation.kupingan} ={' '}
-                    <span className="font-bold text-brand-700">{calculation.P_sheet} mm</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
 
-          {/* Card 2: Sumber Index Kertas (Pricelist Maspion Resmi) & Lebar Roll */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-emerald-600" />
-                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
-                  2. Sumber Index Kertas & Lebar Roll Supplier
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsMaspionModalOpen(true)}
-                className="text-xs font-bold text-brand-600 hover:text-brand-800 flex items-center gap-1"
-              >
-                <TableIcon className="w-3.5 h-3.5" />
-                Lihat Tabel Maspion
-              </button>
-            </div>
-
-            {/* Tab Pilihan Sumber Index (Menggantikan istilah "Input Bebas" agar tidak bingung) */}
-            <div className="flex gap-1.5 p-1 bg-slate-100 rounded-xl">
-              <button
-                type="button"
-                onClick={() => {
-                  setSourceType('maspion');
-                  handleSelectMaspionSubstance(selectedMaspionSubstance);
-                }}
-                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all ${
-                  sourceType === 'maspion'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                📋 Pricelist Maspion (Resmi)
-              </button>
-              <button
-                type="button"
-                onClick={() => setSourceType('warehouse')}
-                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all ${
-                  sourceType === 'warehouse'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                🏭 Master Sheet Gudang
-              </button>
-              <button
-                type="button"
-                onClick={() => setSourceType('manual')}
-                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all ${
-                  sourceType === 'manual'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                ✏️ Input Manual Index
-              </button>
-            </div>
-
-            {/* Mode 1: Pricelist Maspion Resmi */}
-            {sourceType === 'maspion' && (
-              <div className="space-y-3 p-3.5 bg-emerald-50/50 border border-emerald-200/80 rounded-xl text-xs">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Pilih Substance Kertas Maspion:
-                  </label>
-                  <SearchableSelect
-                    options={MASPION_PRICE_LIST.map((m) => ({
-                      value: m.substance,
-                      label: `${m.no}. ${m.substance} (${fluteType}: Rp ${m[fluteType] ? m[fluteType].toLocaleString('id-ID') : '-'})`,
-                    }))}
-                    value={selectedMaspionSubstance}
-                    onChange={(val) => handleSelectMaspionSubstance(val)}
-                    placeholder="Pilih substansi kertas Maspion..."
-                  />
-                </div>
-                <div className="flex items-center justify-between text-xs pt-1 border-t border-emerald-200/60">
-                  <span className="text-slate-600">
-                    Nilai Index Otomatis ({fluteType}):
-                  </span>
-                  <span className="font-black text-emerald-800 text-sm">
-                    Rp {nilaiIndex.toLocaleString('id-ID')} / m² (Include PPN 11%)
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Mode 2: Dari Master Sheet Gudang */}
-            {sourceType === 'warehouse' && (
-              <div className="space-y-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs">
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Pilih Bahan Sheet dari Database Gudang:
-                </label>
-                <SearchableSelect
-                  options={masterSheets.map((s) => ({
-                    value: s.id,
-                    label: `${s.kode_sheet} - ${s.nama_sheet} (${s.flute} ${s.substansi}) - Rp ${Number(s.harga_per_lembar || 0).toLocaleString('id-ID')}/lbr`,
-                  }))}
-                  value={selectedSheetId}
-                  onChange={(val) => handleSelectMasterSheet(val)}
-                  placeholder="-- Cari Bahan Baku Sheet Gudang --"
-                />
-              </div>
-            )}
-
-            {/* Mode 3: Input Manual */}
-            {sourceType === 'manual' && (
-              <div className="grid grid-cols-2 gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Nilai Index (Rp / m²) *
-                  </label>
-                  <input
-                    type="number"
-                    value={nilaiIndex}
-                    onChange={(e) => setNilaiIndex(Number(e.target.value) || 0)}
-                    className="w-full px-3 py-1.5 text-sm font-bold text-emerald-800 bg-white border border-slate-300 rounded-lg"
-                    placeholder="Contoh: 7575"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Substansi Kertas
-                  </label>
-                  <input
-                    type="text"
-                    value={substansi}
-                    onChange={(e) => setSubstansi(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg"
-                    placeholder="Contoh: 125K/125M/125K"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Bagian Perhitungan Lebar Roll Kertas Supplier (Aturan Maspion No. 5) */}
-            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3 text-xs">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="font-bold text-slate-800 block">
-                    Hitung Berdasarkan Lebar Kertas Roll Mesin Supplier
-                  </span>
-                  <span className="text-[11px] text-slate-500">
-                    Sesuai Aturan Maspion No. 5: Lebar sheet dihitung kelipatan out & lebar roll terdekat
-                  </span>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={useRollWidth}
-                  onChange={(e) => setUseRollWidth(e.target.checked)}
-                  className="w-4 h-4 text-brand-600 rounded"
-                />
-              </div>
-
-              {useRollWidth && (
-                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200">
+                <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-slate-600 font-semibold mb-1">
-                      Potongan / Kelipatan (Outs):
-                    </label>
-                    <div className="flex items-center gap-1.5">
-                      {[1, 2, 3, 4].map((o) => (
-                        <button
-                          key={o}
-                          type="button"
-                          onClick={() => setRollOuts(o)}
-                          className={`flex-1 py-1 rounded-lg text-xs font-bold border transition-colors ${
-                            rollOuts === o
-                              ? 'bg-brand-600 text-white border-brand-600'
-                              : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
-                          }`}
-                        >
-                          {o} Out
-                        </button>
-                      ))}
-                    </div>
-                    <span className="text-[10px] text-slate-400 mt-1 block">
-                      {calculation.L_sheet} mm × {rollOuts} = {calculation.L_sheet * rollOuts} mm
-                    </span>
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-600 font-semibold mb-1">
-                      Lebar Roll Kertas Supplier (mm):
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Panjang (P) <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
                       <input
                         type="number"
-                        value={rollWidthMm}
-                        onChange={(e) => setRollWidthMm(Number(e.target.value) || 0)}
-                        className="w-full pl-3 pr-9 py-1 text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-lg"
+                        min="10"
+                        value={boxDimensions.panjang}
+                        onChange={(e) =>
+                          setBoxDimensions({ ...boxDimensions, panjang: Number(e.target.value) || 0 })
+                        }
+                        className="w-full pl-3 pr-9 py-2 text-sm font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-brand-500"
                       />
-                      <span className="absolute right-3 top-1 text-xs text-slate-400 font-semibold">mm</span>
+                      <span className="absolute right-3 top-2.5 text-xs text-slate-400 font-semibold">mm</span>
                     </div>
-                    <span className="text-[10px] text-brand-600 font-semibold mt-1 block">
-                      {calculation.rollWidth} mm ÷ {calculation.outs} out = {Math.round(calculation.rollWidth / calculation.outs)} mm/lembar
-                    </span>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Lebar (L) <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="10"
+                        value={boxDimensions.lebar}
+                        onChange={(e) =>
+                          setBoxDimensions({ ...boxDimensions, lebar: Number(e.target.value) || 0 })
+                        }
+                        className="w-full pl-3 pr-9 py-2 text-sm font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-brand-500"
+                      />
+                      <span className="absolute right-3 top-2.5 text-xs text-slate-400 font-semibold">mm</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Tinggi (T) <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="10"
+                        value={boxDimensions.tinggi}
+                        onChange={(e) =>
+                          setBoxDimensions({ ...boxDimensions, tinggi: Number(e.target.value) || 0 })
+                        }
+                        className="w-full pl-3 pr-9 py-2 text-sm font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-brand-500"
+                      />
+                      <span className="absolute right-3 top-2.5 text-xs text-slate-400 font-semibold">mm</span>
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
-          </div>
 
-          {/* Card 3: POSISI BELI DI SUPPLIER (+/- %) & MARGIN JUAL KE CUSTOMER */}
+                {/* TIPE SAMBUNGAN: SINGLE JOINT VS DOUBLE JOINT (GAMBAR 7) */}
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800">
+                      Tipe Sambungan Dus (Gambar 7):
+                    </span>
+                    <span className="text-[11px] text-slate-500">
+                      Dus standar vs dus jumbo 2 sambungan
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setJointType('single')}
+                      className={`p-2.5 rounded-xl border text-left transition-all ${
+                        jointType === 'single'
+                          ? 'border-brand-600 bg-brand-50/70 text-brand-900 ring-2 ring-brand-500/20'
+                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="font-bold text-xs flex items-center justify-between">
+                        <span>Single Joint (1 Sambungan)</span>
+                        {jointType === 'single' && <Check className="w-3.5 h-3.5 text-brand-600" />}
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">
+                        Kupingan +83mm • 1 Lembar Sheet
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setJointType('double')}
+                      className={`p-2.5 rounded-xl border text-left transition-all ${
+                        jointType === 'double'
+                          ? 'border-indigo-600 bg-indigo-50/70 text-indigo-900 ring-2 ring-indigo-500/20'
+                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="font-bold text-xs flex items-center justify-between">
+                        <span>Double Joint (2 Sambungan)</span>
+                        {jointType === 'double' && <Check className="w-3.5 h-3.5 text-indigo-600" />}
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">
+                        Kupingan +103mm • Sheet Dibagi 2 (2 Lembar)
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Tipe Flute */}
+                <div className="pt-2 border-t border-slate-100 space-y-3">
+                  <label className="block text-xs font-bold text-slate-700">
+                    Pilih Tipe Flute / Ketebalan Gelombang
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {Object.values(FLUTE_SPECS).map((f) => (
+                      <div
+                        key={f.kode}
+                        onClick={() => setFluteType(f.kode)}
+                        className={`cursor-pointer p-2.5 rounded-xl border text-left transition-all ${
+                          fluteType === f.kode
+                            ? 'border-brand-500 bg-brand-50/50 ring-2 ring-brand-500/20'
+                            : 'border-slate-200 hover:border-slate-300 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-sm text-slate-800">{f.kode}</span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">{f.nama}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Rumus visual dari kertas client */}
+                  <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl text-xs space-y-1.5 text-amber-950">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-700" />
+                      Rumus Bentangan Sheet ({fluteType} - {jointType === 'double' ? 'Double Joint' : 'Single Joint'}):
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono">
+                      <div className="p-1.5 bg-white/80 rounded border border-amber-200">
+                        <strong>Lebar Sheet (L):</strong> L + T + {calculation.creasing} ={' '}
+                        <span className="font-bold text-brand-700">{calculation.L_sheet} mm</span>
+                      </div>
+                      <div className="p-1.5 bg-white/80 rounded border border-amber-200">
+                        <strong>Panjang Sheet (P):</strong>{' '}
+                        {calculation.isDouble
+                          ? `(((P+L)×2)+${calculation.kupingan})/2 = `
+                          : `((P+L)×2)+${calculation.kupingan} = `}
+                        <span className="font-bold text-brand-700">{calculation.P_sheet} mm</span>
+                        {calculation.isDouble && (
+                          <span className="text-[10px] text-indigo-700 block font-sans font-bold">
+                            (2 Lembar / Dus)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 2: Sumber Index Kertas (Pricelist Maspion Resmi) & Lebar Roll */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-emerald-600" />
+                    <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
+                      2. Sumber Index Kertas & Lebar Roll Supplier
+                    </h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsMaspionModalOpen(true)}
+                    className="text-xs font-bold text-brand-600 hover:text-brand-800 flex items-center gap-1"
+                  >
+                    <TableIcon className="w-3.5 h-3.5" />
+                    Lihat Tabel Maspion
+                  </button>
+                </div>
+
+                <div className="flex gap-1.5 p-1 bg-slate-100 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSourceType('maspion');
+                      handleSelectMaspionSubstance(selectedMaspionSubstance);
+                    }}
+                    className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all ${
+                      sourceType === 'maspion'
+                        ? 'bg-white text-slate-900 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    📋 Pricelist Maspion (Resmi)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSourceType('warehouse')}
+                    className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all ${
+                      sourceType === 'warehouse'
+                        ? 'bg-white text-slate-900 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    🏭 Master Sheet Gudang
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSourceType('manual')}
+                    className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all ${
+                      sourceType === 'manual'
+                        ? 'bg-white text-slate-900 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    ✏️ Input Manual Index
+                  </button>
+                </div>
+
+                {sourceType === 'maspion' && (
+                  <div className="space-y-3 p-3.5 bg-emerald-50/50 border border-emerald-200/80 rounded-xl text-xs">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Pilih Substance Kertas Maspion:
+                      </label>
+                      <SearchableSelect
+                        options={MASPION_PRICE_LIST.map((m) => ({
+                          value: m.substance,
+                          label: `${m.no}. ${m.substance} (${fluteType}: Rp ${
+                            m[fluteType] ? m[fluteType].toLocaleString('id-ID') : '-'
+                          })`,
+                        }))}
+                        value={selectedMaspionSubstance}
+                        onChange={(val) => handleSelectMaspionSubstance(val)}
+                        placeholder="Pilih substansi kertas Maspion..."
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-xs pt-1 border-t border-emerald-200/60">
+                      <span className="text-slate-600">Nilai Index Otomatis ({fluteType}):</span>
+                      <span className="font-black text-emerald-800 text-sm">
+                        Rp {nilaiIndex.toLocaleString('id-ID')} / m² (Include PPN 11%)
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {sourceType === 'warehouse' && (
+                  <div className="space-y-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Pilih Bahan Sheet dari Database Gudang:
+                    </label>
+                    <SearchableSelect
+                      options={masterSheets.map((s) => ({
+                        value: s.id,
+                        label: `${s.kode_sheet} - ${s.nama_sheet} (${s.flute} ${s.substansi}) - Rp ${Number(
+                          s.harga_per_lembar || 0
+                        ).toLocaleString('id-ID')}/lbr`,
+                      }))}
+                      value={selectedSheetId}
+                      onChange={(val) => handleSelectMasterSheet(val)}
+                      placeholder="-- Cari Bahan Baku Sheet Gudang --"
+                    />
+                  </div>
+                )}
+
+                {sourceType === 'manual' && (
+                  <div className="grid grid-cols-2 gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Nilai Index (Rp / m²) *
+                      </label>
+                      <input
+                        type="number"
+                        value={nilaiIndex}
+                        onChange={(e) => setNilaiIndex(Number(e.target.value) || 0)}
+                        className="w-full px-3 py-1.5 text-sm font-bold text-emerald-800 bg-white border border-slate-300 rounded-lg"
+                        placeholder="Contoh: 7575"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Substansi Kertas
+                      </label>
+                      <input
+                        type="text"
+                        value={substansi}
+                        onChange={(e) => setSubstansi(e.target.value)}
+                        className="w-full px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg"
+                        placeholder="Contoh: 125K/125M/125K"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Perhitungan Lebar Roll Maspion */}
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3 text-xs">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-slate-800 block">
+                        Hitung Berdasarkan Lebar Kertas Roll Supplier
+                      </span>
+                      <span className="text-[11px] text-slate-500">
+                        Sesuai Aturan Maspion No. 5: Lebar sheet dihitung kelipatan out & roll terdekat
+                      </span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={useRollWidth}
+                      onChange={(e) => setUseRollWidth(e.target.checked)}
+                      className="w-4 h-4 text-brand-600 rounded"
+                    />
+                  </div>
+
+                  {useRollWidth && (
+                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200">
+                      <div>
+                        <label className="block text-slate-600 font-semibold mb-1">
+                          Potongan / Kelipatan (Outs):
+                        </label>
+                        <div className="flex items-center gap-1.5">
+                          {[1, 2, 3, 4].map((o) => (
+                            <button
+                              key={o}
+                              type="button"
+                              onClick={() => setRollOuts(o)}
+                              className={`flex-1 py-1 rounded-lg text-xs font-bold border transition-colors ${
+                                rollOuts === o
+                                  ? 'bg-brand-600 text-white border-brand-600'
+                                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                              }`}
+                            >
+                              {o} Out
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-600 font-semibold mb-1">
+                          Lebar Roll Kertas Supplier (mm):
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            value={rollWidthMm}
+                            onChange={(e) => setRollWidthMm(Number(e.target.value) || 0)}
+                            className="w-full pl-3 pr-9 py-1 text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-lg"
+                          />
+                          <span className="absolute right-3 top-1 text-xs text-slate-400 font-semibold">mm</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ========================================================= */}
+          {/* B. TAMPILAN JIKA MODE KARTON DUPLEX (GAMBAR 5 NO. 2)       */}
+          {/* ========================================================= */}
+          {paperMode === 'duplex' && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-amber-600" />
+                  <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
+                    Parameter Karton Duplex (Gambar 5 No. 2)
+                  </h2>
+                </div>
+                <Badge variant="warning">Offset Printing</Badge>
+              </div>
+
+              {/* Rumus Coretan Client */}
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs space-y-1 text-amber-950 font-mono">
+                <div className="font-bold font-sans text-amber-900 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-700" />
+                  Rumus Duplex Client: (L × P × Gramatur) ÷ 20.000 × Index
+                </div>
+                <div className="text-[11px] text-amber-800 font-sans">
+                  *Dimensi Plano dihitung dalam Centimeter (cm). Contoh: 79 x 109 cm.
+                </div>
+              </div>
+
+              {/* Ukuran Plano */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Lebar Plano (cm) <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={duplexDimensions.lebarCm}
+                      onChange={(e) =>
+                        setDuplexDimensions({ ...duplexDimensions, lebarCm: Number(e.target.value) || 0 })
+                      }
+                      className="w-full pl-3 pr-8 py-2 text-sm font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl"
+                    />
+                    <span className="absolute right-3 top-2.5 text-xs text-slate-400 font-semibold">cm</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Panjang Plano (cm) <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={duplexDimensions.panjangCm}
+                      onChange={(e) =>
+                        setDuplexDimensions({ ...duplexDimensions, panjangCm: Number(e.target.value) || 0 })
+                      }
+                      className="w-full pl-3 pr-8 py-2 text-sm font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl"
+                    />
+                    <span className="absolute right-3 top-2.5 text-xs text-slate-400 font-semibold">cm</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Out per Plano (Dus/Lbr)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={duplexOutPerSheet}
+                    onChange={(e) => setDuplexOutPerSheet(Math.max(1, Number(e.target.value) || 1))}
+                    className="w-full px-3 py-2 text-sm font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl"
+                    placeholder="Contoh: 1, 2, 4 box"
+                  />
+                </div>
+              </div>
+
+              {/* Pilihan Gramatur & Index Duplex */}
+              <div className="space-y-2 pt-2">
+                <label className="block text-xs font-bold text-slate-700">
+                  Pilih Gramatur & Index Duplex Resmi:
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  {DUPLEX_INDEX_TABLE.map((item) => (
+                    <button
+                      key={item.gsm}
+                      type="button"
+                      onClick={() => handleSelectDuplexGsm(item.gsm)}
+                      className={`p-2 rounded-xl border text-center transition-all ${
+                        duplexGsm === item.gsm
+                          ? 'border-amber-600 bg-amber-50 text-amber-950 ring-2 ring-amber-500/20 font-bold'
+                          : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      <div className="text-sm font-extrabold">{item.gsm} gr</div>
+                      <div className="text-[10px] text-amber-800 mt-0.5">Index: {item.index}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Live Preview Hitungan Duplex */}
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs grid grid-cols-2 sm:grid-cols-3 gap-2 text-center font-mono">
+                <div>
+                  <span className="text-[10px] text-slate-500 block font-sans">Koefisien Plano:</span>
+                  <span className="font-bold text-slate-800">{calculation.koefisien}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-500 block font-sans">Modal per Plano:</span>
+                  <span className="font-bold text-amber-700">Rp {calculation.modalPlano?.toLocaleString('id-ID')}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-500 block font-sans">Modal Dasar / Pcs ({calculation.outs} Out):</span>
+                  <span className="font-extrabold text-brand-700 text-sm">Rp {calculation.modalPerPcs?.toLocaleString('id-ID')}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* C. TAMPILAN JIKA MODE KARTON IVORY (GAMBAR 5 NO. 3 & 6)    */}
+          {/* ========================================================= */}
+          {paperMode === 'ivory' && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-purple-600" />
+                  <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
+                    Parameter Karton Ivory Food Grade (Gambar 6)
+                  </h2>
+                </div>
+                <Badge variant="purple">Steril & Food Grade</Badge>
+              </div>
+
+              {/* Rumus Coretan Client */}
+              <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl text-xs space-y-1 text-purple-950 font-mono">
+                <div className="font-bold font-sans text-purple-900 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-purple-700" />
+                  Rumus Ivory Client: (L × P × Gramatur) ÷ 20.000 × Harga 1 kg
+                </div>
+                <div className="text-[11px] text-purple-800 font-sans">
+                  *Dimensi Plano dalam Centimeter (cm). Harga 1 kg sesuai tabel resmi VA, IKKVC, IKKVB, BOHUI, & PE.
+                </div>
+              </div>
+
+              {/* Ukuran Plano */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Lebar Plano (cm) <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={ivoryDimensions.lebarCm}
+                      onChange={(e) =>
+                        setIvoryDimensions({ ...ivoryDimensions, lebarCm: Number(e.target.value) || 0 })
+                      }
+                      className="w-full pl-3 pr-8 py-2 text-sm font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl"
+                    />
+                    <span className="absolute right-3 top-2.5 text-xs text-slate-400 font-semibold">cm</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Panjang Plano (cm) <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={ivoryDimensions.panjangCm}
+                      onChange={(e) =>
+                        setIvoryDimensions({ ...ivoryDimensions, panjangCm: Number(e.target.value) || 0 })
+                      }
+                      className="w-full pl-3 pr-8 py-2 text-sm font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl"
+                    />
+                    <span className="absolute right-3 top-2.5 text-xs text-slate-400 font-semibold">cm</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Out per Plano (Dus/Lbr)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={ivoryOutPerSheet}
+                    onChange={(e) => setIvoryOutPerSheet(Math.max(1, Number(e.target.value) || 1))}
+                    className="w-full px-3 py-2 text-sm font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl"
+                    placeholder="Contoh: 1, 2, 4 box"
+                  />
+                </div>
+              </div>
+
+              {/* Tabel Pilihan Merek & GSM Ivory Resmi */}
+              <div className="space-y-2 pt-2">
+                <label className="block text-xs font-bold text-slate-700">
+                  Pilih Merek & Spesifikasi Ivory (Pricelist Resmi Gambar 6):
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto border border-slate-200 rounded-xl p-1.5">
+                  {IVORY_PRICE_TABLE.map((item, idx) => {
+                    const isSelected =
+                      ivoryBrand === item.brand &&
+                      ivoryGsm >= item.gsmMin &&
+                      ivoryGsm <= item.gsmMax &&
+                      ivoryHargaKg === item.hargaKg;
+                    return (
+                      <div
+                        key={idx}
+                        onClick={() => handleSelectIvoryPreset(item.brand, item.gsmMin, item.hargaKg)}
+                        className={`cursor-pointer p-2 rounded-lg border text-xs transition-all ${
+                          isSelected
+                            ? 'border-purple-600 bg-purple-50 text-purple-950 font-bold'
+                            : 'border-slate-100 hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-extrabold">{item.brand}</span>
+                          <span className="text-purple-700 font-mono">
+                            Rp {item.hargaKg.toLocaleString('id-ID')}/kg
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">{item.gsmLabel}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Opsi Tambahan Potong Roll / Sheet */}
+              <div className="p-3 bg-purple-50/50 border border-purple-200 rounded-xl space-y-2 text-xs">
+                <span className="font-bold text-purple-900 block">
+                  Ketentuan Roll / Potong (Gambar 6):
+                </span>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIvoryPotongOption('none')}
+                    className={`p-2 rounded-lg text-xs font-semibold border transition-all ${
+                      ivoryPotongOption === 'none'
+                        ? 'bg-purple-600 text-white border-purple-600'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    Standar Sheet (Normal)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIvoryPotongOption('potong_sheet')}
+                    className={`p-2 rounded-lg text-xs font-semibold border transition-all ${
+                      ivoryPotongOption === 'potong_sheet'
+                        ? 'bg-purple-600 text-white border-purple-600'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    Potong Roll to Sheet (+250/kg)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIvoryPotongOption('in_roll')}
+                    className={`p-2 rounded-lg text-xs font-semibold border transition-all ${
+                      ivoryPotongOption === 'in_roll'
+                        ? 'bg-purple-600 text-white border-purple-600'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    In Roll (-350/kg include)
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* Card 3: POSISI BELI & MARGIN JUAL KE CUSTOMER            */}
+          {/* ========================================================= */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
@@ -907,82 +1568,53 @@ CV. Maharani Untung Abadi • Spesialis Packaging Industri`;
               </div>
             </div>
 
-            {/* Bagian A: Posisi Harga Beli Supplier (+ / - %) */}
-            <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-xl space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div>
-                  <span className="text-xs font-black text-amber-950 block">
-                    Posisi Harga Beli di Supplier (+ / - %)
-                  </span>
-                  <span className="text-[11px] text-amber-800">
-                    Penyesuaian posisi harga pasar dari pricelist supplier (contoh: +10% dari pricelist Maspion)
-                  </span>
+            {/* Bagian A: Posisi Harga Beli Supplier (Hanya untuk Corrugated / Sheet Supplier) */}
+            {paperMode === 'corrugated' && (
+              <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-xl space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div>
+                    <span className="text-xs font-black text-amber-950 block">
+                      Posisi Harga Beli di Supplier (+ / - %)
+                    </span>
+                    <span className="text-[11px] text-amber-800">
+                      Penyesuaian posisi pasar dari pricelist supplier (contoh: +10% dari pricelist Maspion)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-amber-900 font-bold">
+                      {posisiSupplierPersen >= 0 ? '+' : ''}
+                    </span>
+                    <input
+                      type="number"
+                      value={posisiSupplierPersen}
+                      onChange={(e) => setPosisiSupplierPersen(Number(e.target.value) || 0)}
+                      className="w-24 px-3 py-1.5 text-sm font-black text-slate-900 bg-white border border-amber-300 rounded-xl text-right"
+                    />
+                    <span className="text-xs font-bold text-amber-900">%</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-amber-900 font-bold">
-                    {posisiSupplierPersen >= 0 ? '+' : ''}
-                  </span>
-                  <input
-                    type="number"
-                    value={posisiSupplierPersen}
-                    onChange={(e) => setPosisiSupplierPersen(Number(e.target.value) || 0)}
-                    className="w-24 px-3 py-1.5 text-sm font-black text-slate-900 bg-white border border-amber-300 rounded-xl text-right"
-                  />
-                  <span className="text-xs font-bold text-amber-900">%</span>
+
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[11px] text-amber-800 font-medium">Pilihan Posisi:</span>
+                  {[0, 5, 7.5, 10, 12.5, 15].map((val) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setPosisiSupplierPersen(val)}
+                      className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-colors ${
+                        posisiSupplierPersen === val
+                          ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
+                          : 'bg-white border-amber-300 text-amber-900 hover:bg-amber-100'
+                      }`}
+                    >
+                      +{val}% {val === 10 ? '(Sesuai Kertas)' : ''}
+                    </button>
+                  ))}
                 </div>
               </div>
+            )}
 
-              {/* Preset Tombol Cepat Posisi Supplier */}
-              <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                <span className="text-[11px] text-amber-800 font-medium">Pilihan Posisi:</span>
-                {[0, 5, 7.5, 10, 12.5, 15].map((val) => (
-                  <button
-                    key={val}
-                    type="button"
-                    onClick={() => setPosisiSupplierPersen(val)}
-                    className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-colors ${
-                      posisiSupplierPersen === val
-                        ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
-                        : 'bg-white border-amber-300 text-amber-900 hover:bg-amber-100'
-                    }`}
-                  >
-                    +{val}% {val === 10 ? '(Sesuai Kertas)' : ''}
-                  </button>
-                ))}
-                {[-3, -5].map((val) => (
-                  <button
-                    key={val}
-                    type="button"
-                    onClick={() => setPosisiSupplierPersen(val)}
-                    className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-colors ${
-                      posisiSupplierPersen === val
-                        ? 'bg-rose-600 text-white border-rose-600 shadow-2xs'
-                        : 'bg-white border-rose-300 text-rose-800 hover:bg-rose-50'
-                    }`}
-                  >
-                    {val}% (Diskon)
-                  </button>
-                ))}
-              </div>
-
-              {/* Rincian Modal Sheet Berdasarkan Coretan Client */}
-              <div className="p-2.5 bg-white/90 border border-amber-300 rounded-lg text-xs grid grid-cols-3 gap-2 text-center font-mono">
-                <div>
-                  <span className="text-[10px] text-slate-500 block font-sans">Harga Dasar Pricelist:</span>
-                  <span className="font-bold text-slate-800">Rp {calculation.hargaDasarPricelist.toLocaleString('id-ID')}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-500 block font-sans">Posisi (+{calculation.posSupplier}%):</span>
-                  <span className="font-bold text-amber-700">+{calculation.selisihPosisiSupplier.toLocaleString('id-ID')}</span>
-                </div>
-                <div className="bg-amber-100/70 p-1 rounded border border-amber-300">
-                  <span className="text-[10px] text-amber-900 block font-sans font-bold">Modal Beli Supplier:</span>
-                  <span className="font-black text-amber-950 text-sm">Rp {calculation.modalBeliSheet.toLocaleString('id-ID')}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Bagian B: Penyesuaian Harga Jual ke Customer (Markup / Diskon) */}
+            {/* Bagian B: Penyesuaian Margin Jual ke Customer */}
             <div className="space-y-3 pt-2">
               <label className="block text-xs font-bold text-slate-700">
                 Atur Keuntungan Jual ke Customer (Margin / Diskon):
@@ -991,7 +1623,10 @@ CV. Maharani Untung Abadi • Spesialis Packaging Industri`;
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <button
                   type="button"
-                  onClick={() => { setAdjustType('plus_percent'); setAdjustValue(20); }}
+                  onClick={() => {
+                    setAdjustType('plus_percent');
+                    setAdjustValue(20);
+                  }}
                   className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                     adjustType === 'plus_percent'
                       ? 'bg-brand-600 text-white shadow-xs'
@@ -1002,7 +1637,10 @@ CV. Maharani Untung Abadi • Spesialis Packaging Industri`;
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setAdjustType('plus_nominal'); setAdjustValue(500); }}
+                  onClick={() => {
+                    setAdjustType('plus_nominal');
+                    setAdjustValue(500);
+                  }}
                   className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                     adjustType === 'plus_nominal'
                       ? 'bg-brand-600 text-white shadow-xs'
@@ -1013,7 +1651,10 @@ CV. Maharani Untung Abadi • Spesialis Packaging Industri`;
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setAdjustType('minus_percent'); setAdjustValue(5); }}
+                  onClick={() => {
+                    setAdjustType('minus_percent');
+                    setAdjustValue(5);
+                  }}
                   className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                     adjustType === 'minus_percent'
                       ? 'bg-rose-600 text-white shadow-xs'
@@ -1024,7 +1665,10 @@ CV. Maharani Untung Abadi • Spesialis Packaging Industri`;
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setAdjustType('minus_nominal'); setAdjustValue(200); }}
+                  onClick={() => {
+                    setAdjustType('minus_nominal');
+                    setAdjustValue(200);
+                  }}
                   className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                     adjustType === 'minus_nominal'
                       ? 'bg-rose-600 text-white shadow-xs'
@@ -1053,14 +1697,14 @@ CV. Maharani Untung Abadi • Spesialis Packaging Industri`;
               </div>
             </div>
 
-            {/* Biaya Produksi Tambahan (Opsional) */}
+            {/* Biaya Produksi Tambahan */}
             <div className="pt-2 border-t border-slate-100">
               <label className="block text-xs font-bold text-slate-700 mb-2">
                 Biaya Tambahan Cetak / Finishing (Opsional / Per Pcs):
               </label>
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div>
-                  <label className="block text-[11px] text-slate-500 mb-1">Biaya Cetak Flexo (Rp/pcs)</label>
+                  <label className="block text-[11px] text-slate-500 mb-1">Biaya Cetak Flexo / Offset (Rp/pcs)</label>
                   <input
                     type="number"
                     value={biayaCetak}
@@ -1096,7 +1740,15 @@ CV. Maharani Untung Abadi • Spesialis Packaging Industri`;
                 <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                 Kalkulasi Live Real-time
               </span>
-              <span className="text-xs text-slate-400">Model: Box Standar A1</span>
+              <span className="text-xs text-slate-400">
+                {paperMode === 'corrugated'
+                  ? calculation.isDouble
+                    ? 'Double Joint'
+                    : 'Single Joint'
+                  : paperMode === 'duplex'
+                  ? 'Duplex Coated'
+                  : 'Ivory Solid'}
+              </span>
             </div>
 
             {/* Highlight Harga Jual Final */}
@@ -1105,14 +1757,19 @@ CV. Maharani Untung Abadi • Spesialis Packaging Industri`;
                 ESTIMASI HARGA JUAL KE CUSTOMER
               </div>
               <div className="text-3xl sm:text-4xl font-black text-amber-400 tracking-tight">
-                Rp {calculation.hargaJualPerPcs.toLocaleString('id-ID')}
+                Rp {calculation.hargaJualPerPcs?.toLocaleString('id-ID')}
                 <span className="text-sm font-semibold text-slate-300 ml-1">/ pcs</span>
               </div>
               <div className="flex items-center justify-center gap-2 mt-2 text-xs">
-                <span className="text-slate-400">Modal: Rp {calculation.hppDasarTotal.toLocaleString('id-ID')}</span>
+                <span className="text-slate-400">Modal: Rp {calculation.hppDasarTotal?.toLocaleString('id-ID')}</span>
                 <span className="text-slate-500">•</span>
-                <span className={`font-bold ${calculation.profitPerPcs >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {calculation.profitPerPcs >= 0 ? '+' : ''}Rp {calculation.profitPerPcs.toLocaleString('id-ID')} ({calculation.marginPersen}%)
+                <span
+                  className={`font-bold ${
+                    calculation.profitPerPcs >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                  }`}
+                >
+                  {calculation.profitPerPcs >= 0 ? '+' : ''}Rp{' '}
+                  {calculation.profitPerPcs?.toLocaleString('id-ID')} ({calculation.marginPersen}%)
                 </span>
               </div>
             </div>
@@ -1120,84 +1777,164 @@ CV. Maharani Untung Abadi • Spesialis Packaging Industri`;
             {/* Breakdown Rincian Hitungan Sesuai Kertas Client */}
             <div className="space-y-3 text-xs">
               <div className="text-xs font-bold text-slate-300 uppercase tracking-wide">
-                Rincian Lembaran Sheet & Modal Beli:
+                Rincian Lembaran Sheet & Modal:
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-center">
-                <div className="p-2.5 bg-white/5 border border-white/10 rounded-xl">
-                  <div className="text-[11px] text-slate-400">Lebar Sheet (L)</div>
-                  <div className="text-sm font-black text-white mt-0.5">{calculation.L_sheet} mm</div>
-                  <div className="text-[10px] text-slate-400 font-mono">L + T + {calculation.creasing}</div>
-                </div>
-                <div className="p-2.5 bg-white/5 border border-white/10 rounded-xl">
-                  <div className="text-[11px] text-slate-400">Panjang Sheet (P)</div>
-                  <div className="text-sm font-black text-white mt-0.5">{calculation.P_sheet} mm</div>
-                  <div className="text-[10px] text-slate-400 font-mono">((P+L)×2) + {calculation.kupingan}</div>
-                </div>
-              </div>
+              {paperMode === 'corrugated' ? (
+                <>
+                  <div className="grid grid-cols-2 gap-2 text-center">
+                    <div className="p-2.5 bg-white/5 border border-white/10 rounded-xl">
+                      <div className="text-[11px] text-slate-400">Lebar Sheet (L)</div>
+                      <div className="text-sm font-black text-white mt-0.5">{calculation.L_sheet} mm</div>
+                      <div className="text-[10px] text-slate-400 font-mono">
+                        L + T + {calculation.creasing}
+                      </div>
+                    </div>
+                    <div className="p-2.5 bg-white/5 border border-white/10 rounded-xl">
+                      <div className="text-[11px] text-slate-400">
+                        Panjang Sheet {calculation.isDouble ? '(½ Sheet)' : '(P)'}
+                      </div>
+                      <div className="text-sm font-black text-white mt-0.5">{calculation.P_sheet} mm</div>
+                      <div className="text-[10px] text-slate-400 font-mono">
+                        {calculation.isDouble ? '(((P+L)×2)+103)/2' : '((P+L)×2)+83'}
+                      </div>
+                    </div>
+                  </div>
 
-              <div className="p-3 bg-white/5 border border-white/10 rounded-xl space-y-1.5">
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Ukuran Bentangan Sheet:</span>
-                  <span className="font-bold text-white">{calculation.L_sheet} × {calculation.P_sheet} mm</span>
-                </div>
-                {useRollWidth && (
-                  <div className="flex justify-between text-amber-300">
-                    <span>Roll Kertas Maspion:</span>
-                    <span className="font-semibold">{calculation.rollWidth} mm ({calculation.outs} Out)</span>
+                  <div className="p-3 bg-white/5 border border-white/10 rounded-xl space-y-1.5">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Ukuran Bentangan Sheet:</span>
+                      <span className="font-bold text-white">
+                        {calculation.L_sheet} × {calculation.P_sheet} mm ({calculation.sheetsPerBox} Lembar/Dus)
+                      </span>
+                    </div>
+                    {useRollWidth && (
+                      <div className="flex justify-between text-amber-300">
+                        <span>Roll Kertas Maspion:</span>
+                        <span className="font-semibold">
+                          {calculation.rollWidth} mm ({calculation.outs} Out)
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Luas Tagihan Supplier:</span>
+                      <span className="font-semibold text-slate-200">
+                        {calculation.luasTagihanM2} m²/pcs
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Index Dasar Pricelist:</span>
+                      <span className="text-slate-200">Rp {nilaiIndex.toLocaleString('id-ID')} / m²</span>
+                    </div>
+                    <div className="flex justify-between text-slate-300">
+                      <span>Harga Dasar Sheet:</span>
+                      <span>Rp {calculation.hargaDasarPricelist?.toLocaleString('id-ID')}</span>
+                    </div>
+                    <div className="flex justify-between text-amber-300 font-semibold">
+                      <span>Posisi Beli Supplier (+{calculation.posSupplier}%):</span>
+                      <span>+{calculation.selisihPosisiSupplier?.toLocaleString('id-ID')}</span>
+                    </div>
+                    <div className="pt-1.5 border-t border-white/10 flex justify-between font-bold text-emerald-400">
+                      <span>Modal Beli Sheet ke Supplier:</span>
+                      <span>Rp {calculation.modalBeliSheet?.toLocaleString('id-ID')}</span>
+                    </div>
                   </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Luas Tagihan Supplier:</span>
-                  <span className="font-semibold text-slate-200">{calculation.luasTagihanM2} m²/pcs</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Index Dasar Pricelist:</span>
-                  <span className="text-slate-200">Rp {nilaiIndex.toLocaleString('id-ID')} / m²</span>
-                </div>
-                <div className="flex justify-between text-slate-300">
-                  <span>Harga Dasar Sheet:</span>
-                  <span>Rp {calculation.hargaDasarPricelist.toLocaleString('id-ID')}</span>
-                </div>
-                <div className="flex justify-between text-amber-300 font-semibold">
-                  <span>Posisi Beli Supplier (+{calculation.posSupplier}%):</span>
-                  <span>+{calculation.selisihPosisiSupplier.toLocaleString('id-ID')}</span>
-                </div>
-                <div className="pt-1.5 border-t border-white/10 flex justify-between font-bold text-emerald-400">
-                  <span>Modal Beli Sheet ke Supplier:</span>
-                  <span>Rp {calculation.modalBeliSheet.toLocaleString('id-ID')}</span>
-                </div>
-                {calculation.biayaCetakVal > 0 && (
-                  <div className="flex justify-between text-slate-400">
-                    <span>Biaya Cetak Flexo:</span>
-                    <span>+Rp {calculation.biayaCetakVal.toLocaleString('id-ID')}</span>
+                </>
+              ) : paperMode === 'duplex' ? (
+                <div className="p-3 bg-white/5 border border-white/10 rounded-xl space-y-1.5">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Dimensi Plano:</span>
+                    <span className="font-bold text-white">
+                      {calculation.L_cm} × {calculation.P_cm} cm ({calculation.gsmVal} GSM)
+                    </span>
                   </div>
-                )}
-                {calculation.biayaFinishingVal > 0 && (
-                  <div className="flex justify-between text-slate-400">
-                    <span>Biaya Finishing:</span>
-                    <span>+Rp {calculation.biayaFinishingVal.toLocaleString('id-ID')}</span>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Index Duplex:</span>
+                    <span className="font-semibold text-amber-300">{calculation.idx}</span>
                   </div>
-                )}
-                <div className="pt-1.5 border-t border-white/10 flex justify-between font-bold text-white">
-                  <span>Total HPP Modal Dasar:</span>
-                  <span>Rp {calculation.hppDasarTotal.toLocaleString('id-ID')}</span>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Koefisien ((L×P×GSM)/20.000):</span>
+                    <span className="text-slate-200">{calculation.koefisien}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-300">
+                    <span>Harga Modal per Plano:</span>
+                    <span className="font-bold text-white">
+                      Rp {calculation.modalPlano?.toLocaleString('id-ID')}
+                    </span>
+                  </div>
+                  <div className="pt-1.5 border-t border-white/10 flex justify-between font-bold text-emerald-400">
+                    <span>Modal per Box ({calculation.outs} Out):</span>
+                    <span>Rp {calculation.modalPerPcs?.toLocaleString('id-ID')}</span>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="p-3 bg-white/5 border border-white/10 rounded-xl space-y-1.5">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Dimensi & Merek:</span>
+                    <span className="font-bold text-white">
+                      {calculation.L_cm} × {calculation.P_cm} cm • {ivoryBrand} ({calculation.gsmVal} GSM)
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Harga per Kg:</span>
+                    <span className="font-semibold text-purple-300">
+                      Rp {calculation.effectiveHargaKg?.toLocaleString('id-ID')} / kg
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Koefisien ((L×P×GSM)/20.000):</span>
+                    <span className="text-slate-200">{calculation.koefisien}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-300">
+                    <span>Harga Modal per Plano:</span>
+                    <span className="font-bold text-white">
+                      Rp {calculation.modalPlano?.toLocaleString('id-ID')}
+                    </span>
+                  </div>
+                  <div className="pt-1.5 border-t border-white/10 flex justify-between font-bold text-emerald-400">
+                    <span>Modal per Box ({calculation.outs} Out):</span>
+                    <span>Rp {calculation.modalPerPcs?.toLocaleString('id-ID')}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Simulasi Quantity Order */}
+            {/* ========================================================= */}
+            {/* SIMULASI ORDER: BEBAS INPUT QTY (REVISI 8)                */}
+            {/* ========================================================= */}
             <div className="pt-2 border-t border-white/10 space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-slate-300">Simulasi Order (Qty Pcs):</label>
-                <div className="flex items-center gap-1.5">
-                  {[500, 1000, 2000, 5000].map((q) => (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-300">
+                    Simulasi Qty Order (Bebas Input):
+                  </label>
+                  <span className="text-[10px] text-amber-300">Ketik jumlah pesanan</span>
+                </div>
+
+                {/* Input Bebas Qty Simulasi Order */}
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="1"
+                    value={simulasiQty}
+                    onChange={(e) => setSimulasiQty(Math.max(1, Number(e.target.value) || 1))}
+                    className="w-full px-3 py-2 text-sm font-extrabold text-slate-900 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-400"
+                    placeholder="Ketik Qty..."
+                  />
+                  <span className="absolute right-3 top-2.5 text-xs text-slate-400 font-bold">Pcs</span>
+                </div>
+
+                {/* Tombol Cepat Preset Qty */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  {[500, 1000, 2000, 5000, 10000].map((q) => (
                     <button
                       key={q}
                       type="button"
                       onClick={() => setSimulasiQty(q)}
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        simulasiQty === q ? 'bg-amber-400 text-slate-900' : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold transition-colors ${
+                        simulasiQty === q
+                          ? 'bg-amber-400 text-slate-900 shadow-xs'
+                          : 'bg-white/10 text-slate-300 hover:bg-white/20'
                       }`}
                     >
                       {q.toLocaleString('id-ID')}
@@ -1214,7 +1951,7 @@ CV. Maharani Untung Abadi • Spesialis Packaging Industri`;
                   </div>
                 </div>
                 <div className="p-2 bg-white/5 border border-white/10 rounded-xl">
-                  <div className="text-[10px] text-slate-400">Total Modal Sheet</div>
+                  <div className="text-[10px] text-slate-400">Total Modal Bahan</div>
                   <div className="font-bold text-slate-300 text-xs mt-1">
                     Rp {(calculation.totalModal / 1000000).toFixed(2)} jt
                   </div>
@@ -1302,10 +2039,18 @@ CV. Maharani Untung Abadi • Spesialis Packaging Industri`;
                     >
                       <td className="p-2 text-center border-r border-slate-200">{m.no}</td>
                       <td className="p-2 font-mono border-r border-slate-200">{m.substance}</td>
-                      <td className="p-2 text-right border-r border-slate-200 font-mono">Rp {m['E/F'].toLocaleString('id-ID')}</td>
-                      <td className="p-2 text-right border-r border-slate-200 font-mono">Rp {m['B/F'].toLocaleString('id-ID')}</td>
-                      <td className="p-2 text-right border-r border-slate-200 font-mono">Rp {m['C/F'].toLocaleString('id-ID')}</td>
-                      <td className="p-2 text-right font-mono font-bold text-emerald-700">Rp {m['B/C'].toLocaleString('id-ID')}</td>
+                      <td className="p-2 text-right border-r border-slate-200 font-mono">
+                        Rp {m['E/F'].toLocaleString('id-ID')}
+                      </td>
+                      <td className="p-2 text-right border-r border-slate-200 font-mono">
+                        Rp {m['B/F'].toLocaleString('id-ID')}
+                      </td>
+                      <td className="p-2 text-right border-r border-slate-200 font-mono">
+                        Rp {m['C/F'].toLocaleString('id-ID')}
+                      </td>
+                      <td className="p-2 text-right font-mono font-bold text-emerald-700">
+                        Rp {m['B/C'].toLocaleString('id-ID')}
+                      </td>
                     </tr>
                   );
                 })}
@@ -1349,23 +2094,14 @@ CV. Maharani Untung Abadi • Spesialis Packaging Industri`;
             <div>
               <span className="text-slate-400">Dimensi Box:</span>
               <div className="font-bold text-slate-800">
-                {calculation.P_box} x {calculation.L_box} x {calculation.T_box} mm
+                {calculation.P_box || calculation.P_cm * 10} x {calculation.L_box || calculation.L_cm * 10}{' '}
+                {calculation.T_box > 0 ? `x ${calculation.T_box}` : ''} mm
               </div>
-            </div>
-            <div>
-              <span className="text-slate-400">Ukuran Lembaran Sheet:</span>
-              <div className="font-bold text-slate-800">
-                {calculation.L_sheet} x {calculation.P_sheet} mm ({fluteType})
-              </div>
-            </div>
-            <div>
-              <span className="text-slate-400">Substansi Kertas:</span>
-              <div className="font-bold text-slate-800">{substansi}</div>
             </div>
             <div>
               <span className="text-slate-400">Harga Jual Estimasi:</span>
               <div className="font-bold text-emerald-700">
-                Rp {calculation.hargaJualPerPcs.toLocaleString('id-ID')} / pcs
+                Rp {calculation.hargaJualPerPcs?.toLocaleString('id-ID')} / pcs
               </div>
             </div>
           </div>
@@ -1377,8 +2113,10 @@ CV. Maharani Untung Abadi • Spesialis Packaging Industri`;
             <SearchableSelect
               options={[
                 { value: 'Stitching', label: 'Stitching (Kawat Jahit)' },
-                { value: 'Lem Glue', label: 'Lem Glue (Dextrin)' },
+                { value: 'Stitching (Double Joint)', label: 'Stitching (Double Joint / 2 Jahit)' },
+                { value: 'Lem Glue', label: 'Lem Glue (Dextrin / Hotmelt)' },
                 { value: 'Die Cut Lock', label: 'Die Cut Lock (Tanpa Sambungan)' },
+                { value: 'Roll', label: 'Roll (Gulungan)' },
               ]}
               value={saveFormData.jenis_sambungan}
               onChange={(val) => setSaveFormData({ ...saveFormData, jenis_sambungan: val })}

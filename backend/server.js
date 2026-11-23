@@ -114,6 +114,38 @@ async function initTipeBahanSheetTable() {
       await db.query(`UPDATE pembayaran_hutang SET jumlah_bayar = nominal_bayar WHERE (jumlah_bayar IS NULL OR jumlah_bayar = 0) AND nominal_bayar IS NOT NULL`);
     } catch (_) { }
 
+    // Products table support for Single Face Roll, harga per kg, berat roll
+    try { await db.query(`ALTER TABLE products MODIFY COLUMN jenis_barang VARCHAR(50) DEFAULT 'Box'`); } catch (_) { }
+    try { await db.query(`ALTER TABLE products MODIFY COLUMN jenis_sambungan VARCHAR(50) DEFAULT 'Stitching'`); } catch (_) { }
+    try { await db.query(`ALTER TABLE products ADD COLUMN berat_roll_kg DECIMAL(10,2) DEFAULT 0`); } catch (_) { }
+    try { await db.query(`ALTER TABLE products ADD COLUMN harga_per_kg DECIMAL(15,2) DEFAULT 0`); } catch (_) { }
+
+    // Bahan pembantu categories table & flexible kategori column
+    try { await db.query(`ALTER TABLE bahan_pembantu MODIFY COLUMN kategori VARCHAR(100) DEFAULT 'Tinta Flexo'`); } catch (_) { }
+    try {
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS kategori_bahan_pembantu (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          nama_kategori VARCHAR(100) NOT NULL UNIQUE,
+          keterangan VARCHAR(255) DEFAULT '',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      const [katCount] = await db.query('SELECT COUNT(*) as cnt FROM kategori_bahan_pembantu');
+      if (katCount[0].cnt === 0) {
+        await db.query(`
+          INSERT IGNORE INTO kategori_bahan_pembantu (nama_kategori, keterangan) VALUES
+          ('Tinta Flexo', 'Tinta cetak flexography waterbased'),
+          ('Lem Karton', 'Lem poly / dextrin / perekat sambungan flap dus'),
+          ('Kawat Stitching', 'Kawat jahit stapler karton box'),
+          ('Tali Strapping', 'Tali strapping band ikat per 25 pcs'),
+          ('Lakban/Isolasi', 'Opp tape lakban packaging & segel'),
+          ('Pisau Pond & Rotary', 'Pisau die-cut pond dan slitter mesin'),
+          ('Plat Polimer Cetak', 'Plat cetak karet / cyrel cetak flexo')
+        `);
+      }
+    } catch (_) { }
+
     const [rows] = await db.query('SELECT COUNT(*) as cnt FROM tipe_bahan_sheet');
     if (rows[0].cnt === 0) {
       const defaultTypes = [
@@ -662,16 +694,33 @@ app.get('/api/marketing/products/:id', async (req, res) => {
 
 app.post('/api/marketing/products', upload.single('gambar'), async (req, res) => {
   try {
-    const { kode_barang, nama_barang, jenis_barang, tipe_flute, substansi, panjang_mm, lebar_mm, tinggi_mm, jenis_sambungan, stok_qty, satuan, harga_jual, min_stok } = req.body;
+    const { kode_barang, nama_barang, jenis_barang, tipe_flute, substansi, panjang_mm, lebar_mm, tinggi_mm, jenis_sambungan, stok_qty, satuan, harga_jual, min_stok, berat_roll_kg, harga_per_kg } = req.body;
     if (!nama_barang) return res.status(400).json({ success: false, message: 'Nama barang wajib diisi' });
 
     const kode = kode_barang || `BOX-${Date.now().toString().slice(-4)}`;
     const gambar = req.file ? `/uploads/${req.file.filename}` : null;
 
     const [result] = await db.query(
-      `INSERT INTO products (kode_barang, nama_barang, jenis_barang, tipe_flute, substansi, panjang_mm, lebar_mm, tinggi_mm, jenis_sambungan, stok_qty, satuan, harga_jual, min_stok, gambar)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [kode, nama_barang, jenis_barang || 'Box', tipe_flute || 'B/F', substansi || 'K125/M125/K125', panjang_mm || 0, lebar_mm || 0, tinggi_mm || 0, jenis_sambungan || 'Stitching', stok_qty || 0, satuan || 'Pcs', harga_jual || 0, min_stok || 100, gambar]
+      `INSERT INTO products (kode_barang, nama_barang, jenis_barang, tipe_flute, substansi, panjang_mm, lebar_mm, tinggi_mm, jenis_sambungan, stok_qty, satuan, harga_jual, min_stok, berat_roll_kg, harga_per_kg, gambar)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        kode,
+        nama_barang,
+        jenis_barang || 'Box',
+        tipe_flute || 'B/F',
+        substansi || 'K125/M125/K125',
+        Number(panjang_mm) || 0,
+        Number(lebar_mm) || 0,
+        Number(tinggi_mm) || 0,
+        jenis_sambungan || 'Stitching',
+        Number(stok_qty) || 0,
+        satuan || 'Pcs',
+        Number(harga_jual) || 0,
+        Number(min_stok) || 100,
+        Number(berat_roll_kg) || 0,
+        Number(harga_per_kg) || 0,
+        gambar
+      ]
     );
 
     const [newProd] = await db.query('SELECT * FROM products WHERE id = ?', [result.insertId]);
@@ -683,9 +732,25 @@ app.post('/api/marketing/products', upload.single('gambar'), async (req, res) =>
 
 app.put('/api/marketing/products/:id', upload.single('gambar'), async (req, res) => {
   try {
-    const { kode_barang, nama_barang, jenis_barang, tipe_flute, substansi, panjang_mm, lebar_mm, tinggi_mm, jenis_sambungan, stok_qty, satuan, harga_jual, min_stok } = req.body;
+    const { kode_barang, nama_barang, jenis_barang, tipe_flute, substansi, panjang_mm, lebar_mm, tinggi_mm, jenis_sambungan, stok_qty, satuan, harga_jual, min_stok, berat_roll_kg, harga_per_kg } = req.body;
     let gambarUpdate = '';
-    let params = [kode_barang, nama_barang, jenis_barang, tipe_flute, substansi, panjang_mm, lebar_mm, tinggi_mm, jenis_sambungan, stok_qty, satuan, harga_jual, min_stok];
+    let params = [
+      kode_barang,
+      nama_barang,
+      jenis_barang,
+      tipe_flute,
+      substansi,
+      panjang_mm,
+      lebar_mm,
+      tinggi_mm,
+      jenis_sambungan,
+      stok_qty,
+      satuan,
+      harga_jual,
+      min_stok,
+      berat_roll_kg !== undefined ? berat_roll_kg : null,
+      harga_per_kg !== undefined ? harga_per_kg : null
+    ];
 
     if (req.file) {
       gambarUpdate = ', gambar = ?';
@@ -707,7 +772,9 @@ app.put('/api/marketing/products/:id', upload.single('gambar'), async (req, res)
         stok_qty = COALESCE(?, stok_qty),
         satuan = COALESCE(?, satuan),
         harga_jual = COALESCE(?, harga_jual),
-        min_stok = COALESCE(?, min_stok)
+        min_stok = COALESCE(?, min_stok),
+        berat_roll_kg = COALESCE(?, berat_roll_kg),
+        harga_per_kg = COALESCE(?, harga_per_kg)
         ${gambarUpdate}
       WHERE id = ?`,
       params
@@ -893,13 +960,16 @@ app.post('/api/marketing/sales-orders/:id/generate-spk', async (req, res) => {
   try {
     const soId = req.params.id;
     const [orders] = await db.query(
-      `SELECT so.*, c.nama_customer FROM sales_orders so LEFT JOIN customers c ON so.customer_id = c.id WHERE so.id = ?`,
+      `SELECT so.*, c.nama_customer, c.kode_customer, c.alamat as customer_alamat, c.telepon as customer_telepon, c.termin_bayar 
+       FROM sales_orders so 
+       LEFT JOIN customers c ON so.customer_id = c.id 
+       WHERE so.id = ?`,
       [soId]
     );
     if (orders.length === 0) return res.status(404).json({ success: false, message: 'SO tidak ditemukan' });
 
     const [items] = await db.query(
-      `SELECT soi.*, p.nama_barang, p.panjang_mm, p.lebar_mm, p.tinggi_mm, p.tipe_flute, p.substansi 
+      `SELECT soi.*, p.nama_barang, p.panjang_mm, p.lebar_mm, p.tinggi_mm, p.tipe_flute, p.substansi, p.jenis_sambungan 
        FROM sales_order_items soi LEFT JOIN products p ON soi.product_id = p.id WHERE soi.so_id = ? LIMIT 1`,
       [soId]
     );
@@ -907,16 +977,66 @@ app.post('/api/marketing/sales-orders/:id/generate-spk', async (req, res) => {
     const so = orders[0];
     const item = items[0] || {};
     const nomor_spk = `SPK-${Date.now().toString().slice(-6)}`;
-    const ukuranBox = `${item.panjang_mm || 300}x${item.lebar_mm || 200}x${item.tinggi_mm || 150} mm`;
+    
+    const pBox = Number(item.panjang_mm || 0) || 390;
+    const lBox = Number(item.lebar_mm || 0) || 290;
+    const tBox = Number(item.tinggi_mm || 0) || 270;
+    const ukuranBox = `${pBox} x ${lBox} x ${tBox} mm`;
+    const qtyTarget = Number(item.qty || 0) || 10000;
+    const tipeFlute = item.tipe_flute || 'B/F';
+    const substansi = item.substansi || '150K/125/150K BF';
+    const isDoubleWall = tipeFlute.includes('B/C') || tipeFlute.includes('BC');
+    const kuping = isDoubleWall ? 63 : 43;
+    const crease = isDoubleWall ? 24 : 12;
+    const lSheet = lBox + tBox + crease;
+    const pSheet = ((pBox + lBox) * 2) + kuping;
+    const ukuranSheet = `${lSheet} x ${pSheet} mm`;
+    const custName = so.nama_customer || 'Customer';
 
     const [spkResult] = await db.query(
       `INSERT INTO spk_produksi (nomor_spk, so_id, customer_nama, nama_box, ukuran_box, qty_target, tanggal_mulai, target_selesai, desain_cetak, status)
-       VALUES (?, ?, ?, ?, ?, ?, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 3 DAY), ?, 'Berjalan')`,
-      [nomor_spk, soId, so.nama_customer, item.nama_barang || 'Box Packaging Corrugated', ukuranBox, item.qty || 1000, item.spek_khusus || '1 Warna Flexo']
+       VALUES (?, ?, ?, ?, ?, ?, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 21 DAY), ?, 'Berjalan')`,
+      [nomor_spk, soId, custName, item.nama_barang || 'Box Packaging Corrugated', ukuranBox, qtyTarget, item.spek_khusus || 'Merah, Hitam']
     );
 
     await db.query("UPDATE sales_orders SET status = 'Diproses' WHERE id = ?", [soId]);
-    res.json({ success: true, message: `SPK ${nomor_spk} berhasil digenerate dari Sales Order`, data: { id: spkResult.insertId, nomor_spk } });
+
+    const fullSpkData = {
+      id: spkResult.insertId,
+      nomor_spk,
+      so_id: soId,
+      nomor_so: so.nomor_so,
+      tanggal_so: so.tanggal_so,
+      customer_nama: custName,
+      nama_customer: custName,
+      alamat_customer: so.customer_alamat || 'Jl. Klampis Anom 33 Surabaya',
+      telepon_customer: so.customer_telepon || '-',
+      syarat_pembayaran: so.termin_bayar || '1 bulan setelah barang terima',
+      nama_box: item.nama_barang || 'Box Packaging Corrugated',
+      nama_barang: item.nama_barang || 'Box Packaging Corrugated',
+      ukuran_box: ukuranBox,
+      panjang: pBox,
+      lebar: lBox,
+      tinggi: tBox,
+      substance: substansi,
+      tipe_flute: tipeFlute,
+      ukuran_sheet: ukuranSheet,
+      qty_target: qtyTarget,
+      harga_satuan: item.harga_satuan || 3850,
+      total_nilai: so.total_nilai,
+      warna_cetak: item.spek_khusus || 'Merah, Hitam',
+      sambungan: item.jenis_sambungan || 'Stitching',
+      tanggal_mulai: new Date().toISOString().split('T')[0],
+      target_selesai: new Date(Date.now() + 21 * 86400000).toISOString().split('T')[0],
+      waktu_pengiriman: '3 minggu',
+      status: 'Berjalan'
+    };
+
+    res.json({ 
+      success: true, 
+      message: `SPK ${nomor_spk} berhasil digenerate dari Sales Order`, 
+      data: fullSpkData 
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
   }
@@ -1667,6 +1787,42 @@ app.delete('/api/purchasing/bahan-pembantu/:id', async (req, res) => {
   }
 });
 
+// Kategori Bahan Pembantu CRUD
+app.get('/api/gudang/kategori-pembantu', async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT * FROM kategori_bahan_pembantu ORDER BY nama_kategori ASC');
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
+app.post('/api/gudang/kategori-pembantu', async (req, res) => {
+  try {
+    const { nama_kategori, keterangan } = req.body;
+    if (!nama_kategori || !nama_kategori.trim()) {
+      return res.status(400).json({ success: false, message: 'Nama kategori wajib diisi' });
+    }
+    const [result] = await db.query(
+      'INSERT INTO kategori_bahan_pembantu (nama_kategori, keterangan) VALUES (?, ?)',
+      [nama_kategori.trim(), keterangan || '']
+    );
+    res.json({ success: true, message: 'Kategori bahan pembantu berhasil ditambahkan', data: { id: result.insertId, nama_kategori: nama_kategori.trim() } });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
+app.delete('/api/gudang/kategori-pembantu/:id', async (req, res) => {
+  try {
+    const [result] = await db.query('DELETE FROM kategori_bahan_pembantu WHERE id = ?', [req.params.id]);
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Kategori tidak ditemukan' });
+    res.json({ success: true, message: 'Kategori bahan pembantu berhasil dihapus' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
+  }
+});
+
 // Purchase Orders (PO)
 app.get('/api/purchasing/orders', async (req, res) => {
   try {
@@ -2261,9 +2417,39 @@ app.get('/api/produksi/spk', async (req, res) => {
 
 app.get('/api/produksi/spk/:id', async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT * FROM spk_produksi WHERE id = ?', [req.params.id]);
+    const [rows] = await db.query(
+      `SELECT spk.*, 
+              c.nama_customer, c.alamat as alamat_customer, c.telepon as telepon_customer, c.termin_bayar as syarat_pembayaran,
+              so.nomor_so, so.tanggal_so, so.total_nilai,
+              soi.harga_satuan, soi.spek_khusus,
+              p.tipe_flute, p.substansi, p.jenis_sambungan, p.panjang_mm, p.lebar_mm, p.tinggi_mm
+       FROM spk_produksi spk
+       LEFT JOIN sales_orders so ON spk.so_id = so.id
+       LEFT JOIN customers c ON so.customer_id = c.id
+       LEFT JOIN sales_order_items soi ON so.id = soi.so_id
+       LEFT JOIN products p ON soi.product_id = p.id
+       WHERE spk.id = ?
+       LIMIT 1`,
+      [req.params.id]
+    );
     if (rows.length === 0) return res.status(404).json({ success: false, message: 'SPK tidak ditemukan' });
-    res.json({ success: true, data: rows[0] });
+    
+    const spk = rows[0];
+    const pBox = Number(spk.panjang_mm || 0) || 390;
+    const lBox = Number(spk.lebar_mm || 0) || 290;
+    const tBox = Number(spk.tinggi_mm || 0) || 270;
+    const isDoubleWall = (spk.tipe_flute || '').includes('B/C') || (spk.tipe_flute || '').includes('BC');
+    const kuping = isDoubleWall ? 63 : 43;
+    const crease = isDoubleWall ? 24 : 12;
+    const lSheet = lBox + tBox + crease;
+    const pSheet = ((pBox + lBox) * 2) + kuping;
+    spk.ukuran_sheet = `${lSheet} x ${pSheet} mm`;
+    spk.warna_cetak = spk.spek_khusus || spk.desain_cetak || 'Merah, Hitam';
+    spk.sambungan = spk.jenis_sambungan || 'Stitching';
+    spk.harga_satuan = spk.harga_satuan || 3850;
+    spk.nama_customer = spk.customer_nama || spk.nama_customer;
+
+    res.json({ success: true, data: spk });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
   }

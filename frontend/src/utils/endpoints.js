@@ -59,6 +59,8 @@ export const API_ENDPOINTS = {
   GUDANG: {
     STOCK_SHEET: '/api/gudang/stock-sheet',
     STOCK_PEMBANTU: '/api/gudang/stock-pembantu',
+    KATEGORI_PEMBANTU: '/api/gudang/kategori-pembantu',
+    KATEGORI_PEMBANTU_DETAIL: (id) => `/api/gudang/kategori-pembantu/${id}`,
     STOCK_BARANG_JADI: '/api/gudang/stock-barang-jadi',
     WIP: '/api/gudang/wip',
     MUTASI: '/api/gudang/mutasi',

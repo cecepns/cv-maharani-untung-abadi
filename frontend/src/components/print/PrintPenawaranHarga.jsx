@@ -94,23 +94,23 @@ export default function PrintPenawaranHarga({ data, onClose, customers = [] }) {
       {/* Printable Area */}
       <div className="print-area font-sans text-slate-900 leading-relaxed text-sm">
         {/* Kop Surat Resmi */}
-        <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4 mb-4">
-          <div className="flex items-start gap-3.5">
-            <div className="w-12 h-12 bg-slate-900 text-white rounded-xl flex items-center justify-center font-black text-xl tracking-tighter shrink-0 print:border print:border-slate-900 print:text-slate-900 print:bg-white">
-              MUA
-            </div>
+        <div className="flex justify-between items-start border-b-2 border-slate-900 pb-3 mb-4">
+          <div className="flex items-center gap-3.5">
+            <img
+              src="/logo.png"
+              alt="Logo Maharani"
+              className="w-14 h-14 object-contain shrink-0"
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
             <div>
-              <h1 className="text-xl font-black tracking-tight text-slate-900 uppercase leading-none">
-                CV. MAHARANI UNTUNG ABADI
+              <h1 className="text-xl font-black tracking-wider text-rose-700 leading-none">
+                MAHARANI
               </h1>
-              <p className="text-xs font-semibold text-slate-700 mt-1">
-                Pabrik & Spesialis Packaging & Corrugated Box / Karton Gelombang
+              <p className="text-[11px] font-black tracking-widest text-slate-900 uppercase mt-0.5">
+                PACKAGING CARTON BOX & OFFSET PRINTING
               </p>
-              <p className="text-[11px] text-slate-500">
-                Jl. Industri Raya No. 88, Kawasan Pergudangan • Telp: (021) 8900-1234
-              </p>
-              <p className="text-[11px] text-slate-500">
-                NPWP: 01.998.776.5-012.000 • Email: cv.maharaniuntungabadi@gmail.com
+              <p className="text-[10px] text-slate-700 font-medium">
+                Factory : Medokan Asri Tengah II Q / 23-24 Telp./Fax. (031) 8795150, 8713507 Surabaya
               </p>
             </div>
           </div>

@@ -57,8 +57,8 @@ export default function Navbar({ onToggleSidebar }) {
           </button>
 
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200/80 flex items-center justify-center shrink-0">
-              <Box className="w-5 h-5 text-emerald-700" />
+            <div className="w-9 h-9 rounded-xl bg-white border border-slate-200/80 p-0.5 flex items-center justify-center shrink-0 overflow-hidden shadow-xs">
+              <img src="/logo.png" alt="CV. Maharani Logo" className="w-full h-full object-contain" />
             </div>
             <div className="hidden sm:block text-left">
               <h2 className="text-xs font-extrabold text-slate-800 tracking-wider uppercase">

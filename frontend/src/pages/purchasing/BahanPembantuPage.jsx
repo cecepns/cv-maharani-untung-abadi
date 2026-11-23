@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Scissors, Box, Layers } from 'lucide-react';
+import { Plus, Edit2, Trash2, Scissors, Box, Layers, Tag } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { request } from '../../utils/request';
 import { API_ENDPOINTS } from '../../utils/endpoints';
@@ -20,6 +20,13 @@ export default function BahanPembantuPage() {
   const [limit, setLimit] = useState(10);
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
 
+  // Kategori Dinamis State
+  const [kategoriList, setKategoriList] = useState([]);
+  const [isKategoriModalOpen, setIsKategoriModalOpen] = useState(false);
+  const [newKategoriName, setNewKategoriName] = useState('');
+  const [kategoriLoading, setKategoriLoading] = useState(false);
+  const [deleteKategoriDialog, setDeleteKategoriDialog] = useState({ isOpen: false, id: null, name: '' });
+
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -38,6 +45,17 @@ export default function BahanPembantuPage() {
   // Confirm Delete
   const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, id: null, name: '' });
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const fetchKategori = async () => {
+    try {
+      const res = await request.get(API_ENDPOINTS.GUDANG.KATEGORI_PEMBANTU);
+      if (res.success && Array.isArray(res.data)) {
+        setKategoriList(res.data);
+      }
+    } catch (err) {
+      console.error('Gagal memuat kategori:', err);
+    }
+  };
 
   const fetchBahan = async () => {
     try {
@@ -59,6 +77,10 @@ export default function BahanPembantuPage() {
   };
 
   useEffect(() => {
+    fetchKategori();
+  }, []);
+
+  useEffect(() => {
     fetchBahan();
   }, [page, limit, search]);
 
@@ -68,7 +90,7 @@ export default function BahanPembantuPage() {
       id: null,
       kode_bahan: '',
       nama_bahan: '',
-      kategori: 'Tinta Flexo',
+      kategori: kategoriList.length > 0 ? kategoriList[0].nama_kategori : 'Tinta Flexo',
       satuan: 'Kg',
       stok: 50,
       harga_satuan: 40000,
@@ -131,6 +153,53 @@ export default function BahanPembantuPage() {
     }
   };
 
+  const handleAddKategori = async (e) => {
+    e.preventDefault();
+    if (!newKategoriName.trim()) {
+      toast.error('Nama kategori tidak boleh kosong');
+      return;
+    }
+    try {
+      setKategoriLoading(true);
+      const res = await request.post(API_ENDPOINTS.GUDANG.KATEGORI_PEMBANTU, {
+        nama_kategori: newKategoriName.trim(),
+      });
+      if (res.success) {
+        toast.success(`Kategori "${newKategoriName}" berhasil ditambahkan`);
+        setNewKategoriName('');
+        fetchKategori();
+      }
+    } catch (err) {
+      toast.error(err.message || 'Gagal menambahkan kategori');
+    } finally {
+      setKategoriLoading(false);
+    }
+  };
+
+  const handleDeleteKategori = async () => {
+    try {
+      setKategoriLoading(true);
+      const res = await request.delete(
+        API_ENDPOINTS.GUDANG.KATEGORI_PEMBANTU_DETAIL(deleteKategoriDialog.id)
+      );
+      if (res.success) {
+        toast.success(`Kategori "${deleteKategoriDialog.name}" berhasil dihapus`);
+        setDeleteKategoriDialog({ isOpen: false, id: null, name: '' });
+        fetchKategori();
+      }
+    } catch (err) {
+      toast.error(err.message || 'Gagal menghapus kategori');
+    } finally {
+      setKategoriLoading(false);
+    }
+  };
+
+  // Kategori Options untuk Dropdown
+  const categoryOptions = kategoriList.map((k) => ({
+    value: k.nama_kategori,
+    label: k.nama_kategori,
+  }));
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -138,16 +207,26 @@ export default function BahanPembantuPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Master Bahan Pembantu</h1>
           <p className="text-sm text-slate-500">
-            Material produksi kardus: Tinta Flexo waterbased, Lem Poly perekat, Kawat Stitching, dan Tali Strapping Band.
+            Material produksi kardus: Tinta Flexo waterbased, Lem Poly perekat, Kawat Stitching, Plat Polimer, Pisau Pond, dan Strapping Band.
           </p>
         </div>
-        <button
-          onClick={handleOpenCreate}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-semibold shadow-sm transition-all self-start sm:self-auto"
-        >
-          <Plus className="w-4 h-4" />
-          Tambah Bahan Pembantu
-        </button>
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={() => setIsKategoriModalOpen(true)}
+            className="inline-flex items-center gap-2 px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-semibold shadow-xs transition-all"
+          >
+            <Tag className="w-4 h-4 text-brand-600" />
+            Kelola Kategori
+          </button>
+          <button
+            onClick={handleOpenCreate}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-semibold shadow-sm transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            Tambah Bahan Pembantu
+          </button>
+        </div>
       </div>
 
       {/* Filter & Search Bar */}
@@ -212,7 +291,9 @@ export default function BahanPembantuPage() {
                               ? 'primary'
                               : b.kategori === 'Lem Karton'
                               ? 'warning'
-                              : 'purple'
+                              : b.kategori === 'Kawat Stitching'
+                              ? 'purple'
+                              : 'slate'
                           }
                         >
                           {b.kategori}
@@ -271,7 +352,7 @@ export default function BahanPembantuPage() {
         />
       </div>
 
-      {/* Modal Form */}
+      {/* Modal Form Create/Edit */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -293,13 +374,7 @@ export default function BahanPembantuPage() {
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Kategori Bahan</label>
               <SearchableSelect
-                options={[
-                  { value: 'Tinta Flexo', label: 'Tinta Flexo Waterbased' },
-                  { value: 'Lem Karton', label: 'Lem Karton / Dextrin / Poly' },
-                  { value: 'Kawat Stitching', label: 'Kawat Stitching Galvanized' },
-                  { value: 'Tali Strapping', label: 'Tali Strapping Ikat Dus' },
-                  { value: 'Lakban/Isolasi', label: 'Lakban / Isolasi Opp Tape' },
-                ]}
+                options={categoryOptions}
                 value={formData.kategori}
                 onChange={(val) => setFormData({ ...formData, kategori: val })}
               />
@@ -315,7 +390,7 @@ export default function BahanPembantuPage() {
               required
               value={formData.nama_bahan}
               onChange={(e) => setFormData({ ...formData, nama_bahan: e.target.value })}
-              placeholder="Tinta Flexo Hijau Tua / Kawat Stitch No. 17"
+              placeholder="Tinta Flexo Hijau Tua / Kawat Stitch No. 17 / Pisau Pond"
               className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl"
             />
           </div>
@@ -329,6 +404,8 @@ export default function BahanPembantuPage() {
                   { value: 'Roll', label: 'Roll (Gulungan)' },
                   { value: 'Galon', label: 'Galon / Pail' },
                   { value: 'Pcs', label: 'Pcs / Batang' },
+                  { value: 'Set', label: 'Set / Pasang' },
+                  { value: 'Meter', label: 'Meter' },
                 ]}
                 value={formData.satuan}
                 onChange={(val) => setFormData({ ...formData, satuan: val })}
@@ -385,6 +462,70 @@ export default function BahanPembantuPage() {
         </form>
       </Modal>
 
+      {/* Modal Kelola Kategori Bahan */}
+      <Modal
+        isOpen={isKategoriModalOpen}
+        onClose={() => setIsKategoriModalOpen(false)}
+        title="Kelola Kategori Bahan Pembantu"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-slate-500">
+            Tambahkan atau kelola kategori master bahan penolong pabrik karton box & percetakan offset.
+          </p>
+
+          <form onSubmit={handleAddKategori} className="flex gap-2">
+            <input
+              type="text"
+              value={newKategoriName}
+              onChange={(e) => setNewKategoriName(e.target.value)}
+              placeholder="Nama Kategori Baru..."
+              className="flex-1 px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none"
+            />
+            <button
+              type="submit"
+              disabled={kategoriLoading || !newKategoriName.trim()}
+              className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-semibold transition-all flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <Plus className="w-4 h-4" />
+              Tambah
+            </button>
+          </form>
+
+          <div className="border border-slate-100 rounded-xl overflow-hidden divide-y divide-slate-100 max-h-60 overflow-y-auto">
+            {kategoriList.map((k) => (
+              <div key={k.id || k.nama_kategori} className="p-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                <div className="flex items-center gap-2">
+                  <Tag className="w-4 h-4 text-slate-400" />
+                  <span className="text-sm font-semibold text-slate-800">{k.nama_kategori}</span>
+                </div>
+                {k.id && (
+                  <button
+                    type="button"
+                    onClick={() => setDeleteKategoriDialog({ isOpen: true, id: k.id, name: k.nama_kategori })}
+                    className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors"
+                    title="Hapus Kategori"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="pt-3 border-t border-slate-100 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setIsKategoriModalOpen(false)}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-semibold transition-colors"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Confirm Delete Material Dialog */}
       <ConfirmDialog
         isOpen={deleteDialog.isOpen}
         onClose={() => setDeleteDialog({ isOpen: false, id: null, name: '' })}
@@ -392,6 +533,16 @@ export default function BahanPembantuPage() {
         isLoading={deleteLoading}
         title="Hapus Bahan Pembantu"
         message={`Apakah Anda yakin ingin menghapus data material "${deleteDialog.name}"?`}
+      />
+
+      {/* Confirm Delete Kategori Dialog */}
+      <ConfirmDialog
+        isOpen={deleteKategoriDialog.isOpen}
+        onClose={() => setDeleteKategoriDialog({ isOpen: false, id: null, name: '' })}
+        onConfirm={handleDeleteKategori}
+        isLoading={kategoriLoading}
+        title="Hapus Kategori Bahan"
+        message={`Apakah Anda yakin ingin menghapus kategori "${deleteKategoriDialog.name}"?`}
       />
     </div>
   );

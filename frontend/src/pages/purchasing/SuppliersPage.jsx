@@ -360,6 +360,8 @@ export default function SuppliersPage() {
                   { value: '30 Hari', label: '30 Hari' },
                   { value: '45 Hari', label: '45 Hari' },
                   { value: '60 Hari', label: '60 Hari' },
+                  { value: '90 Hari', label: '90 Hari' },
+                  { value: '120 Hari', label: '120 Hari' },
                 ]}
                 value={formData.termin_bayar}
                 onChange={(val) => setFormData({ ...formData, termin_bayar: val })}
