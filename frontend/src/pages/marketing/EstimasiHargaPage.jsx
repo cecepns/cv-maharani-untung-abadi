@@ -25,6 +25,7 @@ import {
   X,
   Split,
   FileCheck2,
+  Info,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { request } from '@/utils/request';
@@ -241,9 +242,14 @@ export default function EstimasiHargaPage() {
   useEffect(() => {
     if (paperMode !== 'corrugated') return;
     const spec = FLUTE_SPECS[fluteType] || FLUTE_SPECS['B/C'];
+    const isDoubleWall = fluteType === 'B/C';
     if (!useCustomAllowance) {
-      // Jika Double Joint, kupingan standar +103mm (Gambar 7), jika Single Joint +83mm atau spec.kupingan
-      const kupingVal = jointType === 'double' ? 103 : jointType === 'single' ? 83 : spec.kupingan;
+      // Sesuai Catatan Kertas Client (Gambar 7):
+      // Double Joint (2 Sambungan): Single Wall = +83mm, Double Wall = +103mm
+      // Single Joint (1 Sambungan): Single Wall = +40mm, Double Wall = +50mm
+      const kupingVal = jointType === 'double'
+        ? (isDoubleWall ? 103 : 83)
+        : (isDoubleWall ? 50 : 40);
       setCustomAllowance({ kupingan: kupingVal, creasing: spec.creasing });
     }
     setGsm(spec.defaultGsm);
@@ -327,16 +333,17 @@ export default function EstimasiHargaPage() {
       const T_box = Number(boxDimensions.tinggi) || 0;
 
       const spec = FLUTE_SPECS[fluteType] || FLUTE_SPECS['B/C'];
+      const isDoubleWall = fluteType === 'B/C';
       const kupingan = useCustomAllowance
         ? Number(customAllowance.kupingan) || 0
         : jointType === 'double'
-        ? 103
-        : 83;
+        ? (isDoubleWall ? 103 : 83)
+        : (isDoubleWall ? 50 : 40);
       const creasing = useCustomAllowance ? Number(customAllowance.creasing) || 0 : spec.creasing;
 
       // Single Joint vs Double Joint (Gambar 7):
-      // Single Joint: P_sheet = ((P + L) * 2) + kupingan (misal +83mm). 1 box = 1 lembar sheet.
-      // Double Joint: P_sheet = (((P + L) * 2) + kupingan) / 2 (misal +103mm). 1 box = 2 lembar sheet!
+      // Single Joint: P_sheet = ((P + L) * 2) + kupingan (Single Wall +40mm, Double Wall +50mm). 1 box = 1 lembar sheet.
+      // Double Joint: P_sheet = (((P + L) * 2) + kupingan) / 2 (Single Wall +83mm, Double Wall +103mm). 1 box = 2 lembar sheet!
       const isDouble = jointType === 'double';
       const rawPanjangBentangan = (P_box + L_box) * 2 + kupingan;
       const P_sheet = isDouble ? Math.round(rawPanjangBentangan / 2) : rawPanjangBentangan;
@@ -442,12 +449,14 @@ export default function EstimasiHargaPage() {
       const idx = Number(duplexIndex) || 2173;
       const outs = Math.max(1, Number(duplexOutPerSheet) || 1);
 
-      // (L x P x gramatur) / 20.000
-      const koefisien = (L_cm * P_cm * gsmVal) / 20000;
-      // Harga dasar 1 plano (atau per 500 lbr rim jika dikonversi)
-      // Rumus coretan client: (L x P x gramatur) / 20.000 x Index = ... + %
-      const modalPlano = Math.round(koefisien * idx);
-      const modalPerPcs = Math.round(modalPlano / outs);
+      // (L x P x gramatur) / 20.000 = Berat 1 Rim (500 Lembar Plano) dalam Kg
+      const beratRimKg = (L_cm * P_cm * gsmVal) / 20000;
+      // Harga 1 Rim (500 Lembar Plano) = Berat 1 Rim * Index
+      const modalPerRim = Math.round(beratRimKg * idx);
+      // Harga 1 Lembar Plano (1 Rim = 500 Lembar)
+      const modalPerLembar = Math.round(modalPerRim / 500);
+      // Modal Bahan per Box (1 Lembar menghasilkan N Box / Outs)
+      const modalPerPcs = Math.max(1, Math.round(modalPerLembar / outs));
 
       const hppDasarTotal = modalPerPcs + biayaCetakVal + biayaFinishingVal;
 
@@ -477,8 +486,11 @@ export default function EstimasiHargaPage() {
         gsmVal,
         idx,
         outs,
-        koefisien: Math.round(koefisien * 100) / 100,
-        modalPlano,
+        beratRimKg: Math.round(beratRimKg * 100) / 100,
+        koefisien: Math.round(beratRimKg * 100) / 100,
+        modalPerRim,
+        modalPerLembar,
+        modalPlano: modalPerLembar,
         modalPerPcs,
         modalBeliSheet: modalPerPcs,
         biayaCetakVal,
@@ -514,10 +526,14 @@ export default function EstimasiHargaPage() {
 
       const outs = Math.max(1, Number(ivoryOutPerSheet) || 1);
 
-      // (L x P x gramatur) / 20.000
-      const koefisien = (L_cm * P_cm * gsmVal) / 20000;
-      const modalPlano = Math.round(koefisien * effectiveHargaKg);
-      const modalPerPcs = Math.round(modalPlano / outs);
+      // (L x P x gramatur) / 20.000 = Berat 1 Rim (500 Lembar Plano) dalam Kg
+      const beratRimKg = (L_cm * P_cm * gsmVal) / 20000;
+      // Harga 1 Rim (500 Lembar Plano) = Berat 1 Rim * Harga 1 kg
+      const modalPerRim = Math.round(beratRimKg * effectiveHargaKg);
+      // Harga 1 Lembar Plano (1 Rim = 500 Lembar)
+      const modalPerLembar = Math.round(modalPerRim / 500);
+      // Modal Bahan per Box (1 Lembar menghasilkan N Box / Outs)
+      const modalPerPcs = Math.max(1, Math.round(modalPerLembar / outs));
 
       const hppDasarTotal = modalPerPcs + biayaCetakVal + biayaFinishingVal;
 
@@ -547,8 +563,11 @@ export default function EstimasiHargaPage() {
         gsmVal,
         effectiveHargaKg,
         outs,
-        koefisien: Math.round(koefisien * 100) / 100,
-        modalPlano,
+        beratRimKg: Math.round(beratRimKg * 100) / 100,
+        koefisien: Math.round(beratRimKg * 100) / 100,
+        modalPerRim,
+        modalPerLembar,
+        modalPlano: modalPerLembar,
         modalPerPcs,
         modalBeliSheet: modalPerPcs,
         biayaCetakVal,
@@ -902,8 +921,18 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
         </div>
         <div className="text-xs text-slate-500 font-semibold px-2">
           {paperMode === 'corrugated' && 'Kardus gelombang single / double wall'}
-          {paperMode === 'duplex' && 'Rumus: (L x P x Gramatur)/20.000 x Index'}
-          {paperMode === 'ivory' && 'Rumus: (L x P x Gramatur)/20.000 x Harga/kg'}
+          {paperMode === 'duplex' && 'Rumus: (L x P x Gramatur)/20.000 x Index = Harga per Rim (500 lbr)'}
+          {paperMode === 'ivory' && 'Rumus: (L x P x Gramatur)/20.000 x Harga/kg = Harga per Rim (500 lbr)'}
+        </div>
+      </div>
+
+      {/* INFO MASTER DATA ASAL (REVISI CLIENT) */}
+      <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-xl flex items-center justify-between text-xs text-blue-950">
+        <div className="flex items-center gap-2">
+          <Info className="w-4 h-4 text-blue-600 shrink-0" />
+          <span>
+            <strong>Info Master Persediaan:</strong> Master Dus & Box Jadi dikelola di menu <a href="/marketing/products" className="underline font-bold text-blue-700 hover:text-blue-900">Marketing ➜ Master Produk</a>, sedangkan Master Bahan Sheet dikelola di menu <a href="/gudang/sheet" className="underline font-bold text-blue-700 hover:text-blue-900">Gudang ➜ Bahan Baku Sheet</a>.
+          </span>
         </div>
       </div>
 
@@ -1007,7 +1036,7 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
                         {jointType === 'single' && <Check className="w-3.5 h-3.5 text-brand-600" />}
                       </div>
                       <div className="text-[11px] text-slate-500 mt-0.5">
-                        Kupingan +83mm • 1 Lembar Sheet
+                        {fluteType === 'B/C' ? 'Double Wall: Kuping +50mm' : 'Single Wall: Kuping +40mm'} • 1 Sheet/Box
                       </div>
                     </button>
 
@@ -1025,7 +1054,7 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
                         {jointType === 'double' && <Check className="w-3.5 h-3.5 text-indigo-600" />}
                       </div>
                       <div className="text-[11px] text-slate-500 mt-0.5">
-                        Kupingan +103mm • Sheet Dibagi 2 (2 Lembar)
+                        {fluteType === 'B/C' ? 'Double Wall: Kuping +103mm' : 'Single Wall: Kuping +83mm'} • 2 Sheet/Box
                       </div>
                     </button>
                   </div>
@@ -1381,19 +1410,23 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
                 </div>
               </div>
 
-              {/* Live Preview Hitungan Duplex */}
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs grid grid-cols-2 sm:grid-cols-3 gap-2 text-center font-mono">
+              {/* Live Preview Hitungan Duplex (Sesuai Catatan Kertas Client & WA) */}
+              <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl text-xs grid grid-cols-2 sm:grid-cols-4 gap-2 text-center font-mono">
                 <div>
-                  <span className="text-[10px] text-slate-500 block font-sans">Koefisien Plano:</span>
-                  <span className="font-bold text-slate-800">{calculation.koefisien}</span>
+                  <span className="text-[10px] text-slate-500 block font-sans">Berat 1 Rim (500 Lbr):</span>
+                  <span className="font-bold text-slate-800">{calculation.beratRimKg} kg</span>
+                </div>
+                <div className="bg-amber-100/70 p-1 rounded">
+                  <span className="text-[10px] text-amber-900 block font-sans font-bold">Harga / Rim (500 Lbr):</span>
+                  <span className="font-black text-amber-900 text-xs">Rp {calculation.modalPerRim?.toLocaleString('id-ID')}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-500 block font-sans">Modal per Plano:</span>
-                  <span className="font-bold text-amber-700">Rp {calculation.modalPlano?.toLocaleString('id-ID')}</span>
+                  <span className="text-[10px] text-slate-500 block font-sans">Harga / Lembar Plano:</span>
+                  <span className="font-bold text-slate-800">Rp {calculation.modalPerLembar?.toLocaleString('id-ID')}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-500 block font-sans">Modal Dasar / Pcs ({calculation.outs} Out):</span>
-                  <span className="font-extrabold text-brand-700 text-sm">Rp {calculation.modalPerPcs?.toLocaleString('id-ID')}</span>
+                  <span className="text-[10px] text-slate-500 block font-sans">Modal / Box ({calculation.outs} Out):</span>
+                  <span className="font-extrabold text-brand-700 text-xs">Rp {calculation.modalPerPcs?.toLocaleString('id-ID')}</span>
                 </div>
               </div>
             </div>
@@ -1550,6 +1583,26 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
                   >
                     In Roll (-350/kg include)
                   </button>
+                </div>
+              </div>
+
+              {/* Live Preview Hitungan Ivory (Sesuai Catatan Kertas Client & WA: 1 Rim = 500 Lbr) */}
+              <div className="p-3 bg-purple-50/70 border border-purple-200/80 rounded-xl text-xs grid grid-cols-2 sm:grid-cols-4 gap-2 text-center font-mono">
+                <div>
+                  <span className="text-[10px] text-slate-500 block font-sans">Berat 1 Rim (500 Lbr):</span>
+                  <span className="font-bold text-slate-800">{calculation.beratRimKg} kg</span>
+                </div>
+                <div className="bg-purple-100/70 p-1 rounded">
+                  <span className="text-[10px] text-purple-900 block font-sans font-bold">Harga / Rim (500 Lbr):</span>
+                  <span className="font-black text-purple-900 text-xs">Rp {calculation.modalPerRim?.toLocaleString('id-ID')}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-500 block font-sans">Harga / Lembar Plano:</span>
+                  <span className="font-bold text-slate-800">Rp {calculation.modalPerLembar?.toLocaleString('id-ID')}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-500 block font-sans">Modal / Box ({calculation.outs} Out):</span>
+                  <span className="font-extrabold text-brand-700 text-xs">Rp {calculation.modalPerPcs?.toLocaleString('id-ID')}</span>
                 </div>
               </div>
             </div>
@@ -1853,17 +1906,21 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
                     <span className="font-semibold text-amber-300">{calculation.idx}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Koefisien ((L×P×GSM)/20.000):</span>
-                    <span className="text-slate-200">{calculation.koefisien}</span>
+                    <span className="text-slate-400">Berat 1 Rim (500 Lbr):</span>
+                    <span className="text-slate-200">{calculation.beratRimKg} kg</span>
+                  </div>
+                  <div className="flex justify-between text-amber-300 font-bold bg-white/5 px-2 py-1 rounded">
+                    <span>Harga per Rim (500 Lbr):</span>
+                    <span>Rp {calculation.modalPerRim?.toLocaleString('id-ID')}</span>
                   </div>
                   <div className="flex justify-between text-slate-300">
-                    <span>Harga Modal per Plano:</span>
+                    <span>Harga per Lembar Plano:</span>
                     <span className="font-bold text-white">
-                      Rp {calculation.modalPlano?.toLocaleString('id-ID')}
+                      Rp {calculation.modalPerLembar?.toLocaleString('id-ID')}
                     </span>
                   </div>
                   <div className="pt-1.5 border-t border-white/10 flex justify-between font-bold text-emerald-400">
-                    <span>Modal per Box ({calculation.outs} Out):</span>
+                    <span>Modal Bahan per Box ({calculation.outs} Out):</span>
                     <span>Rp {calculation.modalPerPcs?.toLocaleString('id-ID')}</span>
                   </div>
                 </div>
@@ -1882,17 +1939,21 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Koefisien ((L×P×GSM)/20.000):</span>
-                    <span className="text-slate-200">{calculation.koefisien}</span>
+                    <span className="text-slate-400">Berat 1 Rim (500 Lbr):</span>
+                    <span className="text-slate-200">{calculation.beratRimKg} kg</span>
+                  </div>
+                  <div className="flex justify-between text-purple-300 font-bold bg-white/5 px-2 py-1 rounded">
+                    <span>Harga per Rim (500 Lbr):</span>
+                    <span>Rp {calculation.modalPerRim?.toLocaleString('id-ID')}</span>
                   </div>
                   <div className="flex justify-between text-slate-300">
-                    <span>Harga Modal per Plano:</span>
+                    <span>Harga per Lembar Plano:</span>
                     <span className="font-bold text-white">
-                      Rp {calculation.modalPlano?.toLocaleString('id-ID')}
+                      Rp {calculation.modalPerLembar?.toLocaleString('id-ID')}
                     </span>
                   </div>
                   <div className="pt-1.5 border-t border-white/10 flex justify-between font-bold text-emerald-400">
-                    <span>Modal per Box ({calculation.outs} Out):</span>
+                    <span>Modal Bahan per Box ({calculation.outs} Out):</span>
                     <span>Rp {calculation.modalPerPcs?.toLocaleString('id-ID')}</span>
                   </div>
                 </div>

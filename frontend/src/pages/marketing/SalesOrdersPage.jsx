@@ -103,9 +103,17 @@ export default function SalesOrdersPage() {
     fetchSalesOrders();
   }, [page, limit, search, statusFilter]);
 
+  const checkIsPkp = (cust) => {
+    if (!cust) return false;
+    if (!cust.npwp) return false;
+    const val = cust.npwp.trim();
+    if (!val || val === '-' || val.toLowerCase().includes('non')) return false;
+    return true;
+  };
+
   const handleOpenCreate = () => {
     const cust = customers.length ? customers[0] : null;
-    const isPkp = cust && cust.npwp && cust.npwp.trim() !== '';
+    const isPkp = checkIsPkp(cust);
     setFormData({
       customer_id: cust ? cust.id : '',
       sales_id: salesPersons.length ? salesPersons[0].id : '',
@@ -126,11 +134,11 @@ export default function SalesOrdersPage() {
 
   const handleCustomerChange = (custId) => {
     const cust = customers.find(c => c.id === parseInt(custId, 10));
-    const isPkp = cust && cust.npwp && cust.npwp.trim() !== '';
+    const isPkp = checkIsPkp(cust);
     setFormData(prev => ({
       ...prev,
       customer_id: custId,
-      tipe_pajak: isPkp ? 'PPN 11%' : prev.tipe_pajak
+      tipe_pajak: isPkp ? 'PPN 11%' : 'Non-PPN'
     }));
   };
 
@@ -174,7 +182,17 @@ export default function SalesOrdersPage() {
 
     try {
       setFormLoading(true);
-      await request.post(API_ENDPOINTS.MARKETING.SALES_ORDERS, formData);
+      const subtotal = formData.items.reduce((sum, it) => sum + (Number(it.qty || 0) * Number(it.harga_satuan || 0)), 0);
+      const isPpn = formData.tipe_pajak === 'PPN 11%';
+      const ppn = isPpn ? Math.round(subtotal * 0.11) : 0;
+      const payload = {
+        ...formData,
+        subtotal,
+        ppn,
+        total_nilai: subtotal + ppn,
+        is_ppn: isPpn,
+      };
+      await request.post(API_ENDPOINTS.MARKETING.SALES_ORDERS, payload);
       toast.success('Sales Order berhasil dibuat & siap diproses SPK');
       setIsModalOpen(false);
       fetchSalesOrders();

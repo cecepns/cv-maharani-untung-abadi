@@ -212,7 +212,7 @@ export default function NotaBeliPage() {
                       {n.nomor_faktur_beli}
                     </td>
                     <td className="px-6 py-4 font-bold text-slate-800">
-                      {n.supplier_nama}
+                      {n.supplier_nama || n.nama_supplier || 'Supplier'}
                     </td>
                     <td className="px-6 py-4 font-mono text-xs text-brand-600">
                       {n.nomor_po}
@@ -286,7 +286,7 @@ export default function NotaBeliPage() {
               onChange={(val) => handlePOSelect(val)}
               options={orders.map((po) => ({
                 value: po.id,
-                label: `${po.nomor_po} - ${po.supplier_nama} (Rp ${Number(po.total_nilai).toLocaleString('id-ID')})`,
+                label: `${po.nomor_po} - ${po.supplier_nama || po.nama_supplier || 'Supplier'} (Rp ${Number(po.total_nilai).toLocaleString('id-ID')})`,
               }))}
               placeholder="Cari & pilih Purchase Order..."
             />

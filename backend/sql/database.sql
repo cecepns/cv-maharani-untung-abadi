@@ -430,13 +430,17 @@ CREATE TABLE produksi_finishing (
 CREATE TABLE produksi_ikat (
   id INT AUTO_INCREMENT PRIMARY KEY,
   spk_id INT NOT NULL,
+  nomor_ikat VARCHAR(50) DEFAULT NULL,
   tanggal_proses DATE NOT NULL,
   operator_nama VARCHAR(100) NOT NULL,
   isi_per_ikat INT DEFAULT 25,
   jumlah_ikat INT DEFAULT 0,
   total_barang_jadi INT NOT NULL,
+  total_ikat INT DEFAULT 0,
+  total_pcs INT DEFAULT 0,
   status ENUM('Proses', 'Selesai') DEFAULT 'Selesai',
   serah_terima_gudang BOOLEAN DEFAULT TRUE,
+  catatan TEXT DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (spk_id) REFERENCES spk_produksi(id) ON DELETE CASCADE
 );
@@ -563,6 +567,8 @@ CREATE TABLE karyawan (
   no_hp VARCHAR(20),
   no_rekening VARCHAR(50),
   bank VARCHAR(30) DEFAULT 'BCA',
+  tipe_gaji ENUM('Bulanan', 'Harian') DEFAULT 'Bulanan',
+  upah_harian DECIMAL(15,2) DEFAULT 0,
   gaji_pokok DECIMAL(15,2) DEFAULT 4500000,
   tunjangan_jabatan DECIMAL(15,2) DEFAULT 500000,
   uang_makan_perhari DECIMAL(15,2) DEFAULT 25000,
@@ -610,6 +616,8 @@ CREATE TABLE slip_gaji (
   upah_lembur DECIMAL(15,2) DEFAULT 0,
   potongan_bpjs DECIMAL(15,2) DEFAULT 0,
   potongan_absen DECIMAL(15,2) DEFAULT 0,
+  tipe_gaji ENUM('Bulanan', 'Harian') DEFAULT 'Bulanan',
+  upah_harian DECIMAL(15,2) DEFAULT 0,
   total_gaji_bersih DECIMAL(15,2) NOT NULL,
   FOREIGN KEY (payroll_id) REFERENCES payroll_periode(id) ON DELETE CASCADE,
   FOREIGN KEY (karyawan_id) REFERENCES karyawan(id) ON DELETE RESTRICT

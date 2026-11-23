@@ -120,6 +120,21 @@ async function initTipeBahanSheetTable() {
     try { await db.query(`ALTER TABLE products ADD COLUMN berat_roll_kg DECIMAL(10,2) DEFAULT 0`); } catch (_) { }
     try { await db.query(`ALTER TABLE products ADD COLUMN harga_per_kg DECIMAL(15,2) DEFAULT 0`); } catch (_) { }
 
+    // Produksi ikat table sync
+    try { await db.query(`ALTER TABLE produksi_ikat ADD COLUMN nomor_ikat VARCHAR(50) DEFAULT NULL`); } catch (_) { }
+    try { await db.query(`ALTER TABLE produksi_ikat ADD COLUMN catatan TEXT DEFAULT NULL`); } catch (_) { }
+    try { await db.query(`ALTER TABLE produksi_ikat ADD COLUMN total_ikat INT DEFAULT 0`); } catch (_) { }
+    try { await db.query(`ALTER TABLE produksi_ikat ADD COLUMN total_pcs INT DEFAULT 0`); } catch (_) { }
+    try { await db.query(`ALTER TABLE produksi_ikat ADD COLUMN jumlah_ikat INT DEFAULT 0`); } catch (_) { }
+    try { await db.query(`ALTER TABLE produksi_ikat ADD COLUMN total_barang_jadi INT DEFAULT 0`); } catch (_) { }
+    try { await db.query(`ALTER TABLE produksi_ikat ADD COLUMN isi_per_ikat INT DEFAULT 25`); } catch (_) { }
+
+    // Karyawan & Slip Gaji daily wage support
+    try { await db.query(`ALTER TABLE karyawan ADD COLUMN tipe_gaji VARCHAR(20) DEFAULT 'Bulanan'`); } catch (_) { }
+    try { await db.query(`ALTER TABLE karyawan ADD COLUMN upah_harian DECIMAL(15,2) DEFAULT 0`); } catch (_) { }
+    try { await db.query(`ALTER TABLE slip_gaji ADD COLUMN tipe_gaji VARCHAR(20) DEFAULT 'Bulanan'`); } catch (_) { }
+    try { await db.query(`ALTER TABLE slip_gaji ADD COLUMN upah_harian DECIMAL(15,2) DEFAULT 0`); } catch (_) { }
+
     // Bahan pembantu categories table & flexible kategori column
     try { await db.query(`ALTER TABLE bahan_pembantu MODIFY COLUMN kategori VARCHAR(100) DEFAULT 'Tinta Flexo'`); } catch (_) { }
     try {
@@ -885,9 +900,17 @@ app.post('/api/marketing/sales-orders', async (req, res) => {
     }
 
     const subtotal = items.reduce((sum, it) => sum + (Number(it.qty) * Number(it.harga_satuan)), 0);
-    const isPpn = req.body.is_ppn !== undefined 
-      ? Boolean(req.body.is_ppn) 
-      : (req.body.kenakan_ppn !== false && req.body.tipe_pajak !== 'Non-PPN');
+    
+    // Check customer PKP status from DB
+    const [custRows] = await connection.query('SELECT npwp FROM customers WHERE id = ?', [customer_id]);
+    const custNpwp = custRows.length ? (custRows[0].npwp || '').trim() : '';
+    const isCustomerNonPkp = !custNpwp || custNpwp === '-' || custNpwp.toLowerCase().includes('non');
+
+    const isPpn = isCustomerNonPkp
+      ? false
+      : (req.body.is_ppn !== undefined 
+          ? Boolean(req.body.is_ppn) 
+          : (req.body.kenakan_ppn !== false && req.body.tipe_pajak !== 'Non-PPN'));
     const ppn = isPpn ? (req.body.ppn !== undefined ? Number(req.body.ppn) : Math.round(subtotal * 0.11)) : 0;
     const total_nilai = subtotal + ppn;
     const nomor_so = `SO-${Date.now().toString().slice(-6)}`;
@@ -1835,7 +1858,7 @@ app.get('/api/purchasing/orders', async (req, res) => {
     }
     const countSql = `SELECT COUNT(*) as total FROM purchase_orders po LEFT JOIN suppliers s ON po.supplier_id = s.id ${whereSql}`;
     const selectSql = `
-      SELECT po.*, s.nama_supplier, s.kode_supplier 
+      SELECT po.*, s.nama_supplier, s.nama_supplier AS supplier_nama, s.kode_supplier 
       FROM purchase_orders po 
       LEFT JOIN suppliers s ON po.supplier_id = s.id 
       ${whereSql} 
@@ -1978,7 +2001,8 @@ app.get('/api/purchasing/penerimaan', async (req, res) => {
     }
     const countSql = `SELECT COUNT(*) as total FROM laporan_penerimaan_barang lpb LEFT JOIN suppliers s ON lpb.supplier_id = s.id ${whereSql}`;
     const selectSql = `
-      SELECT lpb.*, lpb.no_sj_supplier AS nomor_sj_supplier, lpb.nama_penerima AS penerima_nama, s.nama_supplier, po.nomor_po 
+      SELECT lpb.*, lpb.no_sj_supplier AS nomor_sj_supplier, lpb.nama_penerima AS penerima_nama, 
+             s.nama_supplier, s.nama_supplier AS supplier_nama, po.nomor_po 
       FROM laporan_penerimaan_barang lpb 
       LEFT JOIN suppliers s ON lpb.supplier_id = s.id 
       LEFT JOIN purchase_orders po ON lpb.po_id = po.id 
@@ -2675,12 +2699,18 @@ app.get('/api/produksi/ikat', async (req, res) => {
     let whereSql = '';
     let params = [];
     if (search) {
-      whereSql = 'WHERE pi.nomor_ikat LIKE ? OR pi.operator_nama LIKE ? OR spk.nomor_spk LIKE ?';
-      params = [`%${search}%`, `%${search}%`, `%${search}%`];
+      whereSql = 'WHERE COALESCE(pi.nomor_ikat, \'\') LIKE ? OR pi.operator_nama LIKE ? OR spk.nomor_spk LIKE ? OR spk.customer_nama LIKE ?';
+      params = [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`];
     }
     const countSql = `SELECT COUNT(*) as total FROM produksi_ikat pi LEFT JOIN spk_produksi spk ON pi.spk_id = spk.id ${whereSql}`;
     const selectSql = `
-      SELECT pi.*, spk.nomor_spk, spk.customer_nama, spk.nama_box 
+      SELECT pi.*, 
+             COALESCE(pi.nomor_ikat, CONCAT('IKAT-', pi.id)) AS nomor_ikat,
+             COALESCE(pi.jumlah_ikat, pi.total_ikat, 0) AS jumlah_ikat,
+             COALESCE(pi.total_barang_jadi, pi.total_pcs, 0) AS total_barang_jadi,
+             COALESCE(pi.total_ikat, pi.jumlah_ikat, 0) AS total_ikat,
+             COALESCE(pi.total_pcs, pi.total_barang_jadi, 0) AS total_pcs,
+             spk.nomor_spk, spk.customer_nama, spk.nama_box 
       FROM produksi_ikat pi 
       LEFT JOIN spk_produksi spk ON pi.spk_id = spk.id 
       ${whereSql} 
@@ -2695,13 +2725,36 @@ app.get('/api/produksi/ikat', async (req, res) => {
 
 app.post('/api/produksi/ikat', async (req, res) => {
   try {
-    const { spk_id, tanggal_proses, nomor_ikat, isi_per_ikat, total_ikat, total_pcs, operator_nama, catatan } = req.body;
+    const { spk_id, tanggal_proses, nomor_ikat, isi_per_ikat, total_ikat, jumlah_ikat, total_pcs, total_barang_jadi, operator_nama, catatan } = req.body;
     const noIkat = nomor_ikat || `IKAT-${Date.now().toString().slice(-6)}`;
-    const [result] = await db.query(
-      `INSERT INTO produksi_ikat (spk_id, tanggal_proses, nomor_ikat, isi_per_ikat, total_ikat, total_pcs, operator_nama, catatan, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Selesai')`,
-      [spk_id, tanggal_proses || new Date().toISOString().split('T')[0], noIkat, isi_per_ikat || 25, total_ikat || 0, total_pcs || 0, operator_nama || 'Endang Sujana', catatan || 'Siap kirim ke Gudang FG']
-    );
+    const isi = Number(isi_per_ikat) || 25;
+    const jmlIkat = total_ikat !== undefined && total_ikat !== null ? Number(total_ikat) : (jumlah_ikat !== undefined && jumlah_ikat !== null ? Number(jumlah_ikat) : 0);
+    const totPcs = total_pcs !== undefined && total_pcs !== null ? Number(total_pcs) : (total_barang_jadi !== undefined && total_barang_jadi !== null ? Number(total_barang_jadi) : (jmlIkat * isi));
+    const tgl = tanggal_proses || new Date().toISOString().split('T')[0];
+    const op = operator_nama || 'Endang Sujana';
+    const note = catatan || 'Siap kirim ke Gudang FG';
+
+    try {
+      await db.query(
+        `INSERT INTO produksi_ikat (spk_id, tanggal_proses, nomor_ikat, isi_per_ikat, jumlah_ikat, total_barang_jadi, total_ikat, total_pcs, operator_nama, catatan, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Selesai')`,
+        [spk_id, tgl, noIkat, isi, jmlIkat, totPcs, jmlIkat, totPcs, op, note]
+      );
+    } catch (_) {
+      try {
+        await db.query(
+          `INSERT INTO produksi_ikat (spk_id, tanggal_proses, operator_nama, isi_per_ikat, jumlah_ikat, total_barang_jadi, status)
+           VALUES (?, ?, ?, ?, ?, ?, 'Selesai')`,
+          [spk_id, tgl, op, isi, jmlIkat, totPcs]
+        );
+      } catch (err2) {
+        await db.query(
+          `INSERT INTO produksi_ikat (spk_id, tanggal_proses, nomor_ikat, isi_per_ikat, total_ikat, total_pcs, operator_nama, status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 'Selesai')`,
+          [spk_id, tgl, noIkat, isi, jmlIkat, totPcs, op]
+        );
+      }
+    }
     await db.query("UPDATE spk_produksi SET tahapan_sekarang = 'Selesai', status = 'Selesai' WHERE id = ?", [spk_id]);
     res.json({ success: true, message: 'Proses ikat strapping selesai dicatat' });
   } catch (err) {
@@ -2711,21 +2764,40 @@ app.post('/api/produksi/ikat', async (req, res) => {
 
 app.put('/api/produksi/ikat/:id', async (req, res) => {
   try {
-    const { spk_id, tanggal_proses, nomor_ikat, isi_per_ikat, total_ikat, total_pcs, operator_nama, catatan } = req.body;
-    const [result] = await db.query(
-      `UPDATE produksi_ikat 
-       SET spk_id = COALESCE(?, spk_id),
-           tanggal_proses = COALESCE(?, tanggal_proses),
-           nomor_ikat = COALESCE(?, nomor_ikat),
-           isi_per_ikat = COALESCE(?, isi_per_ikat),
-           total_ikat = COALESCE(?, total_ikat),
-           total_pcs = COALESCE(?, total_pcs),
-           operator_nama = COALESCE(?, operator_nama),
-           catatan = COALESCE(?, catatan)
-       WHERE id = ?`,
-      [spk_id, tanggal_proses, nomor_ikat, isi_per_ikat, total_ikat, total_pcs, operator_nama, catatan, req.params.id]
-    );
-    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Data ikat tidak ditemukan' });
+    const { spk_id, tanggal_proses, nomor_ikat, isi_per_ikat, total_ikat, jumlah_ikat, total_pcs, total_barang_jadi, operator_nama, catatan } = req.body;
+    const isi = isi_per_ikat !== undefined ? Number(isi_per_ikat) : null;
+    const jmlIkat = total_ikat !== undefined ? Number(total_ikat) : (jumlah_ikat !== undefined ? Number(jumlah_ikat) : null);
+    const totPcs = total_pcs !== undefined ? Number(total_pcs) : (total_barang_jadi !== undefined ? Number(total_barang_jadi) : null);
+
+    try {
+      await db.query(
+        `UPDATE produksi_ikat 
+         SET spk_id = COALESCE(?, spk_id),
+             tanggal_proses = COALESCE(?, tanggal_proses),
+             nomor_ikat = COALESCE(?, nomor_ikat),
+             isi_per_ikat = COALESCE(?, isi_per_ikat),
+             jumlah_ikat = COALESCE(?, jumlah_ikat),
+             total_barang_jadi = COALESCE(?, total_barang_jadi),
+             total_ikat = COALESCE(?, total_ikat),
+             total_pcs = COALESCE(?, total_pcs),
+             operator_nama = COALESCE(?, operator_nama),
+             catatan = COALESCE(?, catatan)
+         WHERE id = ?`,
+        [spk_id, tanggal_proses, nomor_ikat, isi, jmlIkat, totPcs, jmlIkat, totPcs, operator_nama, catatan, req.params.id]
+      );
+    } catch (_) {
+      await db.query(
+        `UPDATE produksi_ikat 
+         SET spk_id = COALESCE(?, spk_id),
+             tanggal_proses = COALESCE(?, tanggal_proses),
+             isi_per_ikat = COALESCE(?, isi_per_ikat),
+             jumlah_ikat = COALESCE(?, jumlah_ikat),
+             total_barang_jadi = COALESCE(?, total_barang_jadi),
+             operator_nama = COALESCE(?, operator_nama)
+         WHERE id = ?`,
+        [spk_id, tanggal_proses, isi, jmlIkat, totPcs, operator_nama, req.params.id]
+      );
+    }
     res.json({ success: true, message: 'Data ikat berhasil diperbarui' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
@@ -4085,15 +4157,27 @@ app.get('/api/payroll/karyawan', async (req, res) => {
 
 app.post('/api/payroll/karyawan', async (req, res) => {
   try {
-    const { nik, nama_lengkap, jabatan, departemen, status_karyawan, no_hp, no_rekening, bank, gaji_pokok, tunjangan_jabatan, uang_makan_perhari, tarif_lembur_perjam } = req.body;
+    const { nik, nama_lengkap, jabatan, departemen, status_karyawan, no_hp, no_rekening, bank, gaji_pokok, tunjangan_jabatan, uang_makan_perhari, tarif_lembur_perjam, tipe_gaji, upah_harian } = req.body;
     if (!nama_lengkap || !jabatan) return res.status(400).json({ success: false, message: 'Nama lengkap dan jabatan wajib diisi' });
 
     const empNik = nik || `EMP-${Date.now().toString().slice(-4)}`;
-    const [result] = await db.query(
-      `INSERT INTO karyawan (nik, nama_lengkap, jabatan, departemen, status_karyawan, no_hp, no_rekening, bank, gaji_pokok, tunjangan_jabatan, uang_makan_perhari, tarif_lembur_perjam)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [empNik, nama_lengkap, jabatan, departemen || 'Produksi', status_karyawan || 'Tetap', no_hp || '', no_rekening || '', bank || 'BCA', gaji_pokok || 4500000, tunjangan_jabatan || 500000, uang_makan_perhari || 25000, tarif_lembur_perjam || 25000]
-    );
+    const tipe = tipe_gaji || 'Bulanan';
+    const upah = Number(upah_harian || 0) > 0 ? Number(upah_harian) : Math.round(Number(gaji_pokok || 4500000) / 25);
+    const pokok = Number(gaji_pokok || 0) > 0 ? Number(gaji_pokok) : Math.round(upah * 25);
+
+    try {
+      await db.query(
+        `INSERT INTO karyawan (nik, nama_lengkap, jabatan, departemen, status_karyawan, no_hp, no_rekening, bank, gaji_pokok, tunjangan_jabatan, uang_makan_perhari, tarif_lembur_perjam, tipe_gaji, upah_harian)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [empNik, nama_lengkap, jabatan, departemen || 'Produksi', status_karyawan || 'Tetap', no_hp || '', no_rekening || '', bank || 'BCA', pokok, tunjangan_jabatan || 500000, uang_makan_perhari || 25000, tarif_lembur_perjam || 25000, tipe, upah]
+      );
+    } catch (_) {
+      await db.query(
+        `INSERT INTO karyawan (nik, nama_lengkap, jabatan, departemen, status_karyawan, no_hp, no_rekening, bank, gaji_pokok, tunjangan_jabatan, uang_makan_perhari, tarif_lembur_perjam)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [empNik, nama_lengkap, jabatan, departemen || 'Produksi', status_karyawan || 'Tetap', no_hp || '', no_rekening || '', bank || 'BCA', pokok, tunjangan_jabatan || 500000, uang_makan_perhari || 25000, tarif_lembur_perjam || 25000]
+      );
+    }
 
     res.json({ success: true, message: 'Data karyawan berhasil ditambahkan' });
   } catch (err) {
@@ -4103,12 +4187,34 @@ app.post('/api/payroll/karyawan', async (req, res) => {
 
 app.put('/api/payroll/karyawan/:id', async (req, res) => {
   try {
-    const { nama_lengkap, jabatan, departemen, status_karyawan, no_hp, no_rekening, bank, gaji_pokok, tunjangan_jabatan, uang_makan_perhari, tarif_lembur_perjam } = req.body;
-    const [result] = await db.query(
-      `UPDATE karyawan SET nama_lengkap = COALESCE(?, nama_lengkap), jabatan = COALESCE(?, jabatan), departemen = COALESCE(?, departemen), status_karyawan = COALESCE(?, status_karyawan), no_hp = COALESCE(?, no_hp), no_rekening = COALESCE(?, no_rekening), bank = COALESCE(?, bank), gaji_pokok = COALESCE(?, gaji_pokok), tunjangan_jabatan = COALESCE(?, tunjangan_jabatan), uang_makan_perhari = COALESCE(?, uang_makan_perhari), tarif_lembur_perjam = COALESCE(?, tarif_lembur_perjam) WHERE id = ?`,
-      [nama_lengkap, jabatan, departemen, status_karyawan, no_hp, no_rekening, bank, gaji_pokok, tunjangan_jabatan, uang_makan_perhari, tarif_lembur_perjam, req.params.id]
-    );
-    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Karyawan tidak ditemukan' });
+    const { nama_lengkap, jabatan, departemen, status_karyawan, no_hp, no_rekening, bank, gaji_pokok, tunjangan_jabatan, uang_makan_perhari, tarif_lembur_perjam, tipe_gaji, upah_harian } = req.body;
+    try {
+      const [result] = await db.query(
+        `UPDATE karyawan SET 
+           nama_lengkap = COALESCE(?, nama_lengkap), 
+           jabatan = COALESCE(?, jabatan), 
+           departemen = COALESCE(?, departemen), 
+           status_karyawan = COALESCE(?, status_karyawan), 
+           no_hp = COALESCE(?, no_hp), 
+           no_rekening = COALESCE(?, no_rekening), 
+           bank = COALESCE(?, bank), 
+           gaji_pokok = COALESCE(?, gaji_pokok), 
+           tunjangan_jabatan = COALESCE(?, tunjangan_jabatan), 
+           uang_makan_perhari = COALESCE(?, uang_makan_perhari), 
+           tarif_lembur_perjam = COALESCE(?, tarif_lembur_perjam),
+           tipe_gaji = COALESCE(?, tipe_gaji),
+           upah_harian = COALESCE(?, upah_harian)
+         WHERE id = ?`,
+        [nama_lengkap, jabatan, departemen, status_karyawan, no_hp, no_rekening, bank, gaji_pokok, tunjangan_jabatan, uang_makan_perhari, tarif_lembur_perjam, tipe_gaji, upah_harian, req.params.id]
+      );
+      if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Karyawan tidak ditemukan' });
+    } catch (_) {
+      const [result] = await db.query(
+        `UPDATE karyawan SET nama_lengkap = COALESCE(?, nama_lengkap), jabatan = COALESCE(?, jabatan), departemen = COALESCE(?, departemen), status_karyawan = COALESCE(?, status_karyawan), no_hp = COALESCE(?, no_hp), no_rekening = COALESCE(?, no_rekening), bank = COALESCE(?, bank), gaji_pokok = COALESCE(?, gaji_pokok), tunjangan_jabatan = COALESCE(?, tunjangan_jabatan), uang_makan_perhari = COALESCE(?, uang_makan_perhari), tarif_lembur_perjam = COALESCE(?, tarif_lembur_perjam) WHERE id = ?`,
+        [nama_lengkap, jabatan, departemen, status_karyawan, no_hp, no_rekening, bank, gaji_pokok, tunjangan_jabatan, uang_makan_perhari, tarif_lembur_perjam, req.params.id]
+      );
+      if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Karyawan tidak ditemukan' });
+    }
     res.json({ success: true, message: 'Data karyawan berhasil diperbarui' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Database error: ' + err.message, error: err.code });
@@ -4618,18 +4724,37 @@ app.post('/api/payroll/generate', async (req, res) => {
 
       const hariKerja = realHadir > 0 ? realHadir : 25;
       const jamLembur = realHadir > 0 ? realLembur : 10;
+      
+      // Sesuai Revisi Client Item 12: Gaji Pokok Harian (Hari Kerja * Upah Harian) vs Bulanan Tetap
+      const isHarian = (k.tipe_gaji || '').toLowerCase() === 'harian';
+      const upahHarian = Number(k.upah_harian || 0) > 0 
+        ? Number(k.upah_harian) 
+        : Math.round(Number(k.gaji_pokok || 0) / 25);
+      
+      const gajiPokokDihitung = isHarian 
+        ? Math.round(hariKerja * upahHarian) 
+        : Number(k.gaji_pokok || 0);
+
       const upahLembur = jamLembur * Number(k.tarif_lembur_perjam || 25000);
       const uangMakan = hariKerja * Number(k.uang_makan_perhari || 25000);
-      const bpjs = Math.round(Number(k.gaji_pokok) * 0.03);
-      const gajiBersih = Number(k.gaji_pokok) + Number(k.tunjangan_jabatan || 0) + uangMakan + upahLembur - bpjs;
+      const bpjs = Math.round(gajiPokokDihitung * 0.03);
+      const gajiBersih = gajiPokokDihitung + Number(k.tunjangan_jabatan || 0) + uangMakan + upahLembur - bpjs;
 
       totalAllGaji += gajiBersih;
 
-      await connection.query(
-        `INSERT INTO slip_gaji (payroll_id, karyawan_id, hari_kerja, jam_lembur, gaji_pokok, tunjangan, uang_makan, upah_lembur, potongan_bpjs, potongan_absen, total_gaji_bersih)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
-        [payrollId, k.id, hariKerja, jamLembur, k.gaji_pokok, k.tunjangan_jabatan || 0, uangMakan, upahLembur, bpjs, gajiBersih]
-      );
+      try {
+        await connection.query(
+          `INSERT INTO slip_gaji (payroll_id, karyawan_id, hari_kerja, jam_lembur, gaji_pokok, tunjangan, uang_makan, upah_lembur, potongan_bpjs, potongan_absen, total_gaji_bersih, tipe_gaji, upah_harian)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+          [payrollId, k.id, hariKerja, jamLembur, gajiPokokDihitung, k.tunjangan_jabatan || 0, uangMakan, upahLembur, bpjs, gajiBersih, isHarian ? 'Harian' : 'Bulanan', upahHarian]
+        );
+      } catch (_) {
+        await connection.query(
+          `INSERT INTO slip_gaji (payroll_id, karyawan_id, hari_kerja, jam_lembur, gaji_pokok, tunjangan, uang_makan, upah_lembur, potongan_bpjs, potongan_absen, total_gaji_bersih)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+          [payrollId, k.id, hariKerja, jamLembur, gajiPokokDihitung, k.tunjangan_jabatan || 0, uangMakan, upahLembur, bpjs, gajiBersih]
+        );
+      }
     }
 
     await connection.query('UPDATE payroll_periode SET total_gaji_dibayar = ? WHERE id = ?', [totalAllGaji, payrollId]);

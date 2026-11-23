@@ -6,9 +6,9 @@ export default function PrintPenawaranHarga({ data, onClose, customers = [] }) {
   if (!data) return null;
 
   const [customerName, setCustomerName] = useState(data.customer_nama || 'Pimpinan / Purchasing Dept.');
-  const [customerCompany, setCustomerCompany] = useState(data.customer_perusahaan || '');
   const [customerAddress, setCustomerAddress] = useState(data.customer_alamat || 'Di Tempat');
-  const [salesName, setSalesName] = useState(data.nama_sales || 'Marketing Executive');
+  const [salesName, setSalesName] = useState(data.nama_sales || 'SUBAGIO');
+  const [waktuPengerjaan, setWaktuPengerjaan] = useState('14 hari kerja');
 
   const handlePrint = () => {
     window.print();
@@ -52,12 +52,12 @@ export default function PrintPenawaranHarga({ data, onClose, customers = [] }) {
         </div>
       </div>
 
-      {/* Editor Cepat Penerima Surat di Modal (hidden on print) */}
+      {/* Editor Cepat Penerima & Waktu Pengerjaan di Modal (hidden on print) */}
       <div className="no-print mb-6 p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
         <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
-          Penyesuaian Penerima Surat Penawaran:
+          Penyesuaian Data Penawaran:
         </span>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
           <div>
             <label className="block text-slate-500 font-semibold mb-1">Nama Customer / Perusahaan:</label>
             <input
@@ -79,12 +79,22 @@ export default function PrintPenawaranHarga({ data, onClose, customers = [] }) {
             />
           </div>
           <div>
-            <label className="block text-slate-500 font-semibold mb-1">Nama Sales Penanggungjawab:</label>
+            <label className="block text-slate-500 font-semibold mb-1">Waktu Pengerjaan:</label>
+            <input
+              type="text"
+              value={waktuPengerjaan}
+              onChange={(e) => setWaktuPengerjaan(e.target.value)}
+              placeholder="14 hari kerja"
+              className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-800 font-medium"
+            />
+          </div>
+          <div>
+            <label className="block text-slate-500 font-semibold mb-1">Nama Penandatangan (Hormat Kami):</label>
             <input
               type="text"
               value={salesName}
               onChange={(e) => setSalesName(e.target.value)}
-              placeholder="Nama Sales"
+              placeholder="SUBAGIO"
               className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-800 font-medium"
             />
           </div>
@@ -104,13 +114,13 @@ export default function PrintPenawaranHarga({ data, onClose, customers = [] }) {
             />
             <div>
               <h1 className="text-xl font-black tracking-wider text-rose-700 leading-none">
-                MAHARANI
+                CV. MAHARANI UNTUNG ABADI
               </h1>
               <p className="text-[11px] font-black tracking-widest text-slate-900 uppercase mt-0.5">
                 PACKAGING CARTON BOX & OFFSET PRINTING
               </p>
               <p className="text-[10px] text-slate-700 font-medium">
-                Factory : Medokan Asri Tengah II Q / 23-24 Telp./Fax. (031) 8795150, 8713507 Surabaya
+                Factory : Medokan Asri Tengah II Q / 23-24 Telp. 085100918118, (031) 8795150 Surabaya
               </p>
             </div>
           </div>
@@ -139,11 +149,11 @@ export default function PrintPenawaranHarga({ data, onClose, customers = [] }) {
           </div>
           <p className="text-slate-700 leading-normal pt-1">
             Dengan hormat,<br />
-            Sehubungan dengan kebutuhan pengemasan produk pada perusahaan Bapak/Ibu, bersama surat ini kami CV. MAHARANI UNTUNG ABADI mengajukan penawaran harga terbaik untuk kemasan karton corrugated box dengan spesifikasi teknis dan rincian sebagai berikut:
+            Sehubungan dengan kebutuhan pengemasan produk pada perusahaan Bapak/Ibu, bersama surat ini kami CV. MAHARANI UNTUNG ABADI mengajukan penawaran harga terbaik untuk kemasan karton box dengan spesifikasi teknis dan rincian sebagai berikut:
           </p>
         </div>
 
-        {/* Tabel Rincian Spesifikasi & Harga */}
+        {/* Tabel Rincian Spesifikasi & Harga (Dimensi lembaran dihilangkan sesuai permintaan client) */}
         <div className="border border-slate-300 rounded-lg overflow-hidden mb-4">
           <table className="w-full text-xs">
             <thead>
@@ -151,7 +161,7 @@ export default function PrintPenawaranHarga({ data, onClose, customers = [] }) {
                 <th className="p-2.5 text-center w-10 border-r border-slate-300">No</th>
                 <th className="p-2.5 text-left border-r border-slate-300">Deskripsi Barang & Spesifikasi Teknis</th>
                 <th className="p-2.5 text-center w-24 border-r border-slate-300">Jumlah (Qty)</th>
-                <th className="p-2.5 text-right w-32 border-r border-slate-300">Harga Satuan (Rp)</th>
+                <th className="p-2.5 text-right w-36 border-r border-slate-300">Harga Satuan (Rp)</th>
                 <th className="p-2.5 text-right w-36">Total Nilai (Rp)</th>
               </tr>
             </thead>
@@ -167,7 +177,6 @@ export default function PrintPenawaranHarga({ data, onClose, customers = [] }) {
                     <p>• Ukuran Box Luar: <span className="font-semibold text-slate-800">{data.panjang} × {data.lebar} × {data.tinggi} mm</span></p>
                     <p>• Tipe Flute: <span className="font-semibold text-slate-800">{data.tipe_flute} ({data.nama_flute || ''})</span></p>
                     <p>• Substansi Bahan: <span className="font-semibold text-slate-800">{data.substansi || 'K125/M125/K125'}</span></p>
-                    <p>• Dimensi Lembaran Sheet: <span className="font-semibold text-slate-800">{data.P_sheet} × {data.L_sheet} mm ({data.luas_m2} m²)</span></p>
                     <p>• Sambungan: <span className="font-semibold text-slate-800">{data.jenis_sambungan || 'Stitching (Kawat Jahit)'}</span></p>
                   </div>
                 </td>
@@ -176,6 +185,7 @@ export default function PrintPenawaranHarga({ data, onClose, customers = [] }) {
                 </td>
                 <td className="p-3 text-right border-r border-slate-300 font-black text-slate-900 text-sm">
                   Rp {Number(data.hargaJualPerPcs || 0).toLocaleString('id-ID')}
+                  <span className="block text-[10px] text-emerald-700 font-semibold">(Include PPN)</span>
                 </td>
                 <td className="p-3 text-right font-black text-brand-700 text-sm">
                   Rp {Number(data.totalOmset || 0).toLocaleString('id-ID')}
@@ -185,7 +195,7 @@ export default function PrintPenawaranHarga({ data, onClose, customers = [] }) {
             <tfoot>
               <tr className="bg-slate-50 border-t-2 border-slate-300 font-bold text-slate-900">
                 <td colSpan={3} className="p-2.5 text-right uppercase border-r border-slate-300">
-                  Total Estimasi Nilai Penawaran:
+                  Total Estimasi Nilai Penawaran (Include PPN):
                 </td>
                 <td colSpan={2} className="p-2.5 text-right font-black text-brand-700 text-base">
                   Rp {Number(data.totalOmset || 0).toLocaleString('id-ID')}
@@ -195,36 +205,19 @@ export default function PrintPenawaranHarga({ data, onClose, customers = [] }) {
           </table>
         </div>
 
-        {/* Syarat & Ketentuan (Terms & Conditions) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4 text-xs">
+        {/* Syarat & Ketentuan Sesuai Revisi Client (Instruksi pembayaran dihapus) */}
+        <div className="mb-4 text-xs">
           <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-1.5">
             <p className="font-bold text-slate-800 uppercase tracking-wider text-[11px]">
-              Syarat & Ketentuan Penawaran (T & C):
+              Syarat & Ketentuan Penawaran:
             </p>
-            <ul className="list-disc list-inside text-slate-600 space-y-1 text-[11px] leading-relaxed">
-              <li>Harga satuan di atas <strong>belum termasuk PPN 11%</strong> (jika dibutuhkan penerbitan faktur pajak).</li>
-              <li>Waktu pengerjaan produksi: <strong>7 – 10 hari kerja</strong> terhitung sejak PO resmi diterima dan approval layout disetujui.</li>
-              <li>Toleransi kuantitas pengiriman adalah <strong>±10%</strong> dari jumlah pesanan yang disepakati (standar industri pabrik karton).</li>
-              <li>Pengiriman <strong>Franco Area Jabodetabek</strong> untuk minimum pemesanan 1 rit armada pabrik.</li>
-              <li>Penawaran harga ini berlaku selama <strong>14 (empat belas) hari kalender</strong> sejak diterbitkan.</li>
+            <ul className="list-disc list-inside text-slate-700 space-y-1 text-[11px] leading-relaxed">
+              <li>Harga satuan di atas <strong>sudah termasuk PPN (Include)</strong>.</li>
+              <li>Waktu pengerjaan: <strong>{waktuPengerjaan}</strong>.</li>
+              <li>Pengiriman: <strong>Franco Surabaya</strong>.</li>
+              <li>Penawaran harga sewaktu-waktu dapat berubah tanpa pemberitahuan terlebih dahulu.</li>
+              <li>Masa berlaku penawaran harga selama <strong>14 (empat belas) hari kalender</strong> sejak tanggal diterbitkan.</li>
             </ul>
-          </div>
-
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
-            <p className="font-bold text-slate-800 uppercase tracking-wider text-[11px]">
-              Instruksi Pembayaran & Konfirmasi:
-            </p>
-            <p className="text-slate-600 text-[11px]">
-              Pembayaran dapat ditransfer melalui rekening resmi bank perusahaan:
-            </p>
-            <div className="p-2 bg-white border border-slate-200 rounded text-[11px] font-mono space-y-0.5">
-              <p className="font-bold text-slate-900">Bank Central Asia (BCA): 4567-8901</p>
-              <p className="font-bold text-slate-900">Bank Mandiri: 123-00-987654-0</p>
-              <p className="text-slate-500 font-sans text-[10px]">Atas Nama: <strong>CV. MAHARANI UNTUNG ABADI</strong></p>
-            </div>
-            <p className="text-[10px] text-slate-500 italic">
-              * Harap konfirmasikan bukti transfer atau kirimkan Purchase Order (PO) balasan kepada tim marketing kami.
-            </p>
           </div>
         </div>
 
@@ -233,7 +226,7 @@ export default function PrintPenawaranHarga({ data, onClose, customers = [] }) {
           <div>
             <p className="font-semibold text-slate-600 mb-1">Diterima & Disetujui Oleh Customer,</p>
             <p className="text-[10px] text-slate-400 mb-14">Purchase Order (PO) Confirmation</p>
-            <p className="font-bold border-t border-slate-400 pt-1 text-slate-800">
+            <p className="font-bold border-t border-slate-400 pt-1 text-slate-900 inline-block px-10">
               ( .................................................... )
             </p>
             <p className="text-[10px] text-slate-400">Nama & Cap Perusahaan</p>
@@ -242,7 +235,7 @@ export default function PrintPenawaranHarga({ data, onClose, customers = [] }) {
           <div>
             <p className="font-semibold text-slate-600 mb-1">Hormat Kami,</p>
             <p className="text-[10px] text-slate-400 mb-14">CV. MAHARANI UNTUNG ABADI</p>
-            <p className="font-bold border-t border-slate-400 pt-1 text-slate-800">
+            <p className="font-bold border-t border-slate-400 pt-1 text-slate-900 inline-block px-10">
               ( {salesName} )
             </p>
             <p className="text-[10px] text-slate-400">Bagian Penjualan & Pemasaran</p>

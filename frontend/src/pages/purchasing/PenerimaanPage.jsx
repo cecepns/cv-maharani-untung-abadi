@@ -207,7 +207,7 @@ export default function PenerimaanPage() {
                       <div className="text-xs text-slate-500 mt-0.5">{l.tanggal_terima}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="font-bold text-slate-800">{l.supplier_nama}</div>
+                      <div className="font-bold text-slate-800">{l.supplier_nama || l.nama_supplier || 'Supplier'}</div>
                       <div className="text-xs font-mono text-brand-600 mt-0.5">{l.nomor_po}</div>
                     </td>
                     <td className="px-6 py-4 font-mono font-semibold text-slate-700 text-xs">
@@ -284,7 +284,7 @@ export default function PenerimaanPage() {
               onChange={(val) => setFormData({ ...formData, po_id: val })}
               options={orders.map((po) => ({
                 value: po.id,
-                label: `${po.nomor_po} - ${po.supplier_nama} (Rp ${Number(po.total_nilai).toLocaleString('id-ID')})`,
+                label: `${po.nomor_po} - ${po.supplier_nama || po.nama_supplier || 'Supplier'} (Rp ${Number(po.total_nilai).toLocaleString('id-ID')})`,
               }))}
               placeholder="Cari & pilih nomor PO..."
             />

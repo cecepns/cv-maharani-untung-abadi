@@ -249,7 +249,7 @@ export default function PurchaseOrdersPage() {
                       <div className="text-xs text-slate-500 mt-0.5">{po.tanggal_po}</div>
                     </td>
                     <td className="px-6 py-4 font-bold text-slate-800">
-                      {po.supplier_nama}
+                      {po.supplier_nama || po.nama_supplier || 'Supplier'}
                     </td>
                     <td className="px-6 py-4">
                       {(po.items || []).map((it, idx) => (

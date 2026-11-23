@@ -124,10 +124,15 @@ export default function IkatPage() {
     e.preventDefault();
     try {
       setFormLoading(true);
+      const jmlIkat = Number(formData.jumlah_ikat || 0);
+      const totalPcs = Number(formData.total_barang_jadi || 0);
       const payload = {
         ...formData,
-        total_ikat: formData.jumlah_ikat,
-        total_pcs: formData.total_barang_jadi,
+        isi_per_ikat: Number(formData.isi_per_ikat || 25),
+        jumlah_ikat: jmlIkat,
+        total_ikat: jmlIkat,
+        total_barang_jadi: totalPcs,
+        total_pcs: totalPcs,
       };
       if (isEditing) {
         await request.put(API_ENDPOINTS.PRODUKSI.IKAT_DETAIL(editingId), payload);
@@ -214,10 +219,10 @@ export default function IkatPage() {
                       {i.isi_per_ikat} Pcs / Ikat
                     </td>
                     <td className="px-6 py-4 font-bold text-purple-700">
-                      {Number(i.jumlah_ikat).toLocaleString('id-ID')} Ikat
+                      {Number(i.jumlah_ikat || i.total_ikat || 0).toLocaleString('id-ID')} Ikat
                     </td>
                     <td className="px-6 py-4 font-black text-emerald-700 text-sm">
-                      {Number(i.total_barang_jadi).toLocaleString('id-ID')} Pcs
+                      {Number(i.total_barang_jadi || i.total_pcs || 0).toLocaleString('id-ID')} Pcs
                     </td>
                     <td className="px-6 py-4">
                       <Badge variant="success">

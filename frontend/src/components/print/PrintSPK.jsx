@@ -1,11 +1,14 @@
 import React, { useState, useRef } from 'react';
-import { Printer, X, Factory, Upload, Image as ImageIcon, Trash2, CheckCircle2 } from 'lucide-react';
+import { Printer, X, Factory, Upload, Image as ImageIcon, Trash2, CheckCircle2, PenTool, LayoutGrid } from 'lucide-react';
 import PrintModalWrapper from './PrintModalWrapper';
 
 export default function PrintSPK({ data, onClose }) {
   if (!data) return null;
 
   const [designImage, setDesignImage] = useState(data.gambar_desain || null);
+  const [boxModel, setBoxModel] = useState('a1'); // 'a1', 'diecut', 'manual'
+  const [signerName, setSignerName] = useState('SUBAGIO');
+  const [deliveryTime, setDeliveryTime] = useState(data.waktu_pengiriman || '3 minggu');
   const fileInputRef = useRef(null);
 
   const handlePrint = () => {
@@ -26,7 +29,6 @@ export default function PrintSPK({ data, onClose }) {
   // Safe Fallback Calculations
   const customerName = data.nama_customer || data.customer_nama || 'Cik A Cen / Pelanggan';
   const customerAddress = data.alamat_customer || data.customer_alamat || 'Jl. Klampis Anom 33 Surabaya';
-  const customerPhone = data.telepon_customer || data.customer_telepon || '-';
   const boxName = data.nama_box || data.nama_barang || data.nama_produk || 'Karton Box Packaging Corrugated';
 
   const pBox = Number(data.panjang_mm || data.panjang || 390);
@@ -40,7 +42,6 @@ export default function PrintSPK({ data, onClose }) {
   const printing = data.warna_cetak || data.desain_cetak || 'Merah, Hitam';
   const qtyNum = Number(data.qty_target || data.qty || 10000);
   const hargaSatuan = Number(data.harga_satuan || 3850);
-  const waktuKirim = data.waktu_pengiriman || '3 minggu';
   const syaratBayar = data.syarat_pembayaran || data.termin_bayar || '1 bulan setelah barang terima';
   const sambungan = data.sambungan || data.jenis_sambungan || 'Stitching (Jahit Kawat)';
 
@@ -55,67 +56,147 @@ export default function PrintSPK({ data, onClose }) {
     : `${lSheet} x ${pSheet} mm`;
 
   const tanggalOrder = data.tanggal_so || data.tanggal_mulai || new Date().toISOString().split('T')[0];
-  const deadlineStr = data.target_selesai || data.tanggal_selesai || '3 minggu setelah SPK';
+
+  // Editable Routing Steps (Revisi Client Item 6: Instruksi Kerja bisa diisi sendiri)
+  const [routingSteps, setRoutingSteps] = useState([
+    {
+      no: 1,
+      tahapan: 'POTONG SHEET',
+      instruksi: `Slitter Rotary / Corrugator: Ukuran Sheet ${ukuranSheet}`,
+      targetQty: qtyNum.toLocaleString('id-ID'),
+    },
+    {
+      no: 2,
+      tahapan: 'CETAK FLEXO',
+      instruksi: `Flexo Printing: Warna ${printing}, cek nozzling & ketajaman teks`,
+      targetQty: qtyNum.toLocaleString('id-ID'),
+    },
+    {
+      no: 3,
+      tahapan: 'FINISHING',
+      instruksi: `Slotter Pisau Pond: Creasing lipat + ${sambungan}`,
+      targetQty: qtyNum.toLocaleString('id-ID'),
+    },
+    {
+      no: 4,
+      tahapan: 'IKAT & PACKING',
+      instruksi: `Strapping kuning, 25 pcs per ikat, cek QC kebersihan dus`,
+      targetQty: qtyNum.toLocaleString('id-ID'),
+    },
+  ]);
+
+  const handleStepChange = (index, field, value) => {
+    setRoutingSteps((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
 
   return (
     <PrintModalWrapper onClose={onClose} isOpen={!!data} maxWidth="max-w-4xl">
-      {/* Action Bar (hidden on print) */}
-      <div className="no-print sticky top-0 z-20 flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-6 bg-white/95 backdrop-blur-xs border-b border-slate-200 pt-1 gap-2">
-        <div className="flex items-center gap-2">
-          <Factory className="w-5 h-5 text-brand-600" />
-          <div>
-            <span className="text-sm font-bold text-slate-800 block">Surat Perintah Kerja (Job Order Produksi)</span>
-            <span className="text-xs text-slate-500">Format Order Pesanan & Kontrak Kerja Resmi Pabrik</span>
+      {/* Action Bar & Customization Toolbar (hidden on print) */}
+      <div className="no-print sticky top-0 z-20 flex flex-col gap-3 pb-3 mb-4 bg-white/95 backdrop-blur-xs border-b border-slate-200 pt-1">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Factory className="w-5 h-5 text-brand-600" />
+            <div>
+              <span className="text-sm font-bold text-slate-800 block">Surat Perintah Kerja (Job Order Produksi)</span>
+              <span className="text-xs text-slate-500">Format Order Pesanan & Kontrak Kerja Resmi Pabrik</span>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleImageUpload}
-            accept="image/*"
-            className="hidden"
-          />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
-            title="Upload gambar desain / artwork dus"
-          >
-            <Upload className="w-3.5 h-3.5" />
-            {designImage ? 'Ganti Desain Dus' : '+ Upload Desain Dus'}
-          </button>
-          {designImage && (
+          <div className="flex items-center gap-2">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleImageUpload}
+              accept="image/*"
+              className="hidden"
+            />
             <button
               type="button"
-              onClick={() => setDesignImage(null)}
-              className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
-              title="Hapus Desain"
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+              title="Upload gambar desain / artwork dus"
             >
-              <Trash2 className="w-4 h-4" />
+              <Upload className="w-3.5 h-3.5" />
+              {designImage ? 'Ganti Desain Dus' : '+ Upload Desain Dus'}
             </button>
-          )}
-          <button
-            onClick={handlePrint}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs sm:text-sm font-semibold shadow-sm transition-colors cursor-pointer"
-          >
-            <Printer className="w-4 h-4" />
-            Cetak SPK
-          </button>
-          <button
-            onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
-            title="Tutup Pratinjau"
-          >
-            <X className="w-5 h-5" />
-          </button>
+            {designImage && (
+              <button
+                type="button"
+                onClick={() => setDesignImage(null)}
+                className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
+                title="Hapus Desain"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+            <button
+              onClick={handlePrint}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs sm:text-sm font-semibold shadow-sm transition-colors cursor-pointer"
+            >
+              <Printer className="w-4 h-4" />
+              Cetak SPK
+            </button>
+            <button
+              onClick={onClose}
+              className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              title="Tutup Pratinjau"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Customization Toolbar: Pilihan Model Dus, Waktu Pengiriman, dan Nama Subagio */}
+        <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+              Model Dus Bentangan (Revisi 5):
+            </label>
+            <select
+              value={boxModel}
+              onChange={(e) => setBoxModel(e.target.value)}
+              className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800"
+            >
+              <option value="a1">Model A1 (RSC Standard 4-Flap)</option>
+              <option value="diecut">Model Die-Cut / Pond</option>
+              <option value="manual">Tulis / Gambar Manual (Kanvas Kosong)</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+              Waktu Pengiriman (Revisi 10):
+            </label>
+            <input
+              type="text"
+              value={deliveryTime}
+              onChange={(e) => setDeliveryTime(e.target.value)}
+              placeholder="Contoh: 3 minggu / 14 hari kerja"
+              className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+              Penandatangan Pabrik (Revisi 9):
+            </label>
+            <input
+              type="text"
+              value={signerName}
+              onChange={(e) => setSignerName(e.target.value)}
+              placeholder="Nama Penandatangan (SUBAGIO)"
+              className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800"
+            />
+          </div>
         </div>
       </div>
 
-      <div className="print-area font-sans text-slate-900 text-xs leading-relaxed max-w-3xl mx-auto">
-        {/* Kop Surat Resmi CV. MAHARANI (Sesuai Gambar 2) */}
-        <div className="border-b-2 border-slate-900 pb-3 mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+      {/* Printable Area Sesuai Format Fisik Maharani (Gambar 2 & Gambar 3) */}
+      <div className="print-area font-sans text-slate-900 leading-relaxed text-xs max-w-3xl mx-auto">
+        {/* Kop Surat Maharani (Sesuai Gambar 2 & Revisi Item 8) */}
+        <div className="border-b-2 border-slate-900 pb-3 mb-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
             <img
               src="/logo.png"
               alt="Logo Maharani"
@@ -130,7 +211,7 @@ export default function PrintSPK({ data, onClose }) {
                 PACKAGING CARTON BOX & OFFSET PRINTING
               </p>
               <p className="text-[11px] text-slate-700 font-medium mt-0.5">
-                Factory : Medokan Asri Tengah II Q / 23-24 Telp./Fax. (031) 8795150, 8713507 Surabaya
+                Factory : Medokan Asri Tengah II Q / 23-24 Telp. 085100918118, (031) 8795150 Surabaya
               </p>
             </div>
           </div>
@@ -144,7 +225,7 @@ export default function PrintSPK({ data, onClose }) {
         </div>
 
         {/* Title */}
-        <div className="text-center mb-4">
+        <div className="text-center mb-3">
           <h2 className="text-sm font-extrabold tracking-wider uppercase underline underline-offset-4 text-slate-900">
             ORDER PESANAN (KONTRAK KERJA)
           </h2>
@@ -152,202 +233,229 @@ export default function PrintSPK({ data, onClose }) {
         </div>
 
         {/* Spesifikasi Order Pesanan (Sesuai Gambar 2) */}
-        <div className="border border-slate-400 rounded-lg p-3.5 mb-4 bg-slate-50/60">
+        <div className="border border-slate-400 rounded-lg p-3 mb-3 bg-slate-50/60">
           <table className="w-full text-xs">
             <tbody>
               <tr>
-                <td className="w-36 py-1 font-semibold text-slate-600">Pemesan</td>
-                <td className="w-4 py-1 text-center font-bold">:</td>
-                <td className="py-1 font-bold text-slate-900">{customerName}</td>
+                <td className="w-36 py-0.5 font-semibold text-slate-600">Pemesan</td>
+                <td className="w-4 py-0.5 text-center font-bold">:</td>
+                <td className="py-0.5 font-bold text-slate-900">{customerName}</td>
               </tr>
               <tr>
-                <td className="py-1 font-semibold text-slate-600">Alamat Pemesan</td>
-                <td className="py-1 text-center font-bold">:</td>
-                <td className="py-1 text-slate-800">{customerAddress}</td>
+                <td className="py-0.5 font-semibold text-slate-600">Alamat Pemesan</td>
+                <td className="py-0.5 text-center font-bold">:</td>
+                <td className="py-0.5 text-slate-800">{customerAddress}</td>
               </tr>
               <tr>
-                <td className="py-1 font-semibold text-slate-600">Nama Box</td>
-                <td className="py-1 text-center font-bold">:</td>
-                <td className="py-1 font-extrabold text-slate-900 text-sm text-brand-900">{boxName}</td>
+                <td className="py-0.5 font-semibold text-slate-600">Nama Box</td>
+                <td className="py-0.5 text-center font-bold">:</td>
+                <td className="py-0.5 font-extrabold text-slate-900 text-sm text-brand-900">{boxName}</td>
               </tr>
               <tr>
-                <td className="py-1 font-semibold text-slate-600">Ukuran Jadi (P x L x T)</td>
-                <td className="py-1 text-center font-bold">:</td>
-                <td className="py-1 font-mono font-bold text-slate-900">{ukuranBox}</td>
+                <td className="py-0.5 font-semibold text-slate-600">Ukuran Jadi (P x L x T)</td>
+                <td className="py-0.5 text-center font-bold">:</td>
+                <td className="py-0.5 font-mono font-bold text-slate-900">{ukuranBox}</td>
               </tr>
               <tr>
-                <td className="py-1 font-semibold text-slate-600">Target Ukuran Sheet</td>
-                <td className="py-1 text-center font-bold">:</td>
-                <td className="py-1 font-mono font-bold text-emerald-800 bg-emerald-50/80 px-1.5 py-0.5 rounded inline-block">
+                <td className="py-0.5 font-semibold text-slate-600">Target Ukuran Sheet</td>
+                <td className="py-0.5 text-center font-bold">:</td>
+                <td className="py-0.5 font-mono font-bold text-emerald-800 bg-emerald-50/80 px-1.5 py-0.5 rounded inline-block">
                   {ukuranSheet}
                 </td>
               </tr>
               <tr>
-                <td className="py-1 font-semibold text-slate-600">Kwalitas / Substansi</td>
-                <td className="py-1 text-center font-bold">:</td>
-                <td className="py-1 font-bold text-slate-800">{substance}</td>
+                <td className="py-0.5 font-semibold text-slate-600">Kwalitas / Substansi</td>
+                <td className="py-0.5 text-center font-bold">:</td>
+                <td className="py-0.5 font-bold text-slate-800">{substance}</td>
               </tr>
               <tr>
-                <td className="py-1 font-semibold text-slate-600">Printing / Warna</td>
-                <td className="py-1 text-center font-bold">:</td>
-                <td className="py-1 text-slate-800">{printing}</td>
+                <td className="py-0.5 font-semibold text-slate-600">Printing / Warna</td>
+                <td className="py-0.5 text-center font-bold">:</td>
+                <td className="py-0.5 text-slate-800">{printing}</td>
               </tr>
               <tr>
-                <td className="py-1 font-semibold text-slate-600">Jumlah Order</td>
-                <td className="py-1 text-center font-bold">:</td>
-                <td className="py-1 font-black text-slate-900 text-sm">{qtyNum.toLocaleString('id-ID')} Box</td>
+                <td className="py-0.5 font-semibold text-slate-600">Jumlah Order</td>
+                <td className="py-0.5 text-center font-bold">:</td>
+                <td className="py-0.5 font-black text-slate-900 text-sm">{qtyNum.toLocaleString('id-ID')} Box</td>
               </tr>
               <tr>
-                <td className="py-1 font-semibold text-slate-600">Harga Satuan</td>
-                <td className="py-1 text-center font-bold">:</td>
-                <td className="py-1 font-bold text-slate-900">Rp {hargaSatuan.toLocaleString('id-ID')} / pcs</td>
+                <td className="py-0.5 font-semibold text-slate-600">Harga Satuan</td>
+                <td className="py-0.5 text-center font-bold">:</td>
+                <td className="py-0.5 font-bold text-slate-900">Rp {hargaSatuan.toLocaleString('id-ID')} / pcs</td>
               </tr>
               <tr>
-                <td className="py-1 font-semibold text-slate-600">Waktu Pengiriman</td>
-                <td className="py-1 text-center font-bold">:</td>
-                <td className="py-1 text-slate-800">{waktuKirim} ({deadlineStr})</td>
+                <td className="py-0.5 font-semibold text-slate-600">Waktu Pengiriman</td>
+                <td className="py-0.5 text-center font-bold">:</td>
+                <td className="py-0.5 font-bold text-slate-900">{deliveryTime}</td>
               </tr>
               <tr>
-                <td className="py-1 font-semibold text-slate-600">Alamat Penerima</td>
-                <td className="py-1 text-center font-bold">:</td>
-                <td className="py-1 text-slate-800">{customerAddress}</td>
+                <td className="py-0.5 font-semibold text-slate-600">Alamat Penerima</td>
+                <td className="py-0.5 text-center font-bold">:</td>
+                <td className="py-0.5 text-slate-800">{customerAddress}</td>
               </tr>
               <tr>
-                <td className="py-1 font-semibold text-slate-600">Syarat Pembayaran</td>
-                <td className="py-1 text-center font-bold">:</td>
-                <td className="py-1 font-semibold text-slate-800">{syaratBayar}</td>
+                <td className="py-0.5 font-semibold text-slate-600">Syarat Pembayaran</td>
+                <td className="py-0.5 text-center font-bold">:</td>
+                <td className="py-0.5 font-semibold text-slate-800">{syaratBayar}</td>
               </tr>
               <tr>
-                <td className="py-1 font-semibold text-slate-600">Stitching / Glue</td>
-                <td className="py-1 text-center font-bold">:</td>
-                <td className="py-1 font-bold text-slate-800">{sambungan}</td>
+                <td className="py-0.5 font-semibold text-slate-600">Stitching / Glue</td>
+                <td className="py-0.5 text-center font-bold">:</td>
+                <td className="py-0.5 font-bold text-slate-800">{sambungan}</td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        {/* Slot Design Dos & Model Dos (Sesuai Gambar 3) */}
-        <div className="border border-slate-300 rounded-lg p-3 mb-4 bg-white">
-          <div className="flex items-center justify-between mb-2">
-            <span className="font-extrabold text-slate-900 text-xs uppercase tracking-wide">
-              Design Dos & Model Bentangan Dos:
+        {/* Slot Design Dos & Model Dos (DIPERBESAR & FLEKSIBEL SESUAI REVISI ITEM 5) */}
+        <div className="border-2 border-slate-400 rounded-lg p-3 mb-3 bg-white">
+          <div className="flex items-center justify-between mb-1.5 pb-1 border-b border-slate-200">
+            <span className="font-extrabold text-slate-900 text-xs uppercase tracking-wide flex items-center gap-1.5">
+              <PenTool className="w-3.5 h-3.5 text-brand-600" />
+              Design Dos & Model Bentangan Dos (Ukuran Diperbesar):
             </span>
-            <span className="text-[10px] text-slate-400 font-mono">Pola Standard RSC (A1)</span>
+            <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-700 rounded border border-slate-300">
+              {boxModel === 'a1' && 'Pola Standard RSC (A1)'}
+              {boxModel === 'diecut' && 'Pola Pisau Pond / Die-Cut'}
+              {boxModel === 'manual' && 'Sketsa / Tulis Manual'}
+            </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-            {/* Box Schematic Layout SVG */}
-            <div className="border border-slate-200 rounded p-2 bg-slate-50 text-center">
-              <span className="text-[10px] font-bold text-slate-500 block mb-1">Model Bentangan Dos (Sheet Pattern)</span>
-              <svg viewBox="0 0 280 120" className="w-full h-24 mx-auto stroke-slate-800 fill-white">
-                {/* Flaps Top */}
-                <rect x="25" y="10" width="50" height="25" strokeWidth="1.5" strokeDasharray="3 2" fill="#f8fafc" />
-                <rect x="75" y="10" width="60" height="25" strokeWidth="1.5" strokeDasharray="3 2" fill="#f8fafc" />
-                <rect x="135" y="10" width="50" height="25" strokeWidth="1.5" strokeDasharray="3 2" fill="#f8fafc" />
-                <rect x="185" y="10" width="60" height="25" strokeWidth="1.5" strokeDasharray="3 2" fill="#f8fafc" />
-                
-                {/* Main Body */}
-                <rect x="25" y="35" width="50" height="50" strokeWidth="1.5" fill="#f1f5f9" />
-                <rect x="75" y="35" width="60" height="50" strokeWidth="1.5" fill="#ffffff" />
-                <rect x="135" y="35" width="50" height="50" strokeWidth="1.5" fill="#f1f5f9" />
-                <rect x="185" y="35" width="60" height="50" strokeWidth="1.5" fill="#ffffff" />
-                
-                {/* Joint Flap / Kupingan */}
-                <polygon points="245,38 260,42 260,78 245,82" strokeWidth="1.5" fill="#e2e8f0" />
-                <text x="252" y="63" fontSize="7" fill="#64748b" textAnchor="middle" transform="rotate(90 252 63)">KUPING</text>
-
-                {/* Flaps Bottom */}
-                <rect x="25" y="85" width="50" height="25" strokeWidth="1.5" strokeDasharray="3 2" fill="#f8fafc" />
-                <rect x="75" y="85" width="60" height="25" strokeWidth="1.5" strokeDasharray="3 2" fill="#f8fafc" />
-                <rect x="135" y="85" width="50" height="25" strokeWidth="1.5" strokeDasharray="3 2" fill="#f8fafc" />
-                <rect x="185" y="85" width="60" height="25" strokeWidth="1.5" strokeDasharray="3 2" fill="#f8fafc" />
-
-                {/* Dimension Annotations */}
-                <text x="50" y="62" fontSize="9" fontWeight="bold" fill="#0f172a" textAnchor="middle">L: {lBox}</text>
-                <text x="105" y="62" fontSize="9" fontWeight="bold" fill="#0f172a" textAnchor="middle">P: {pBox}</text>
-                <text x="160" y="62" fontSize="9" fontWeight="bold" fill="#0f172a" textAnchor="middle">L: {lBox}</text>
-                <text x="215" y="62" fontSize="9" fontWeight="bold" fill="#0f172a" textAnchor="middle">P: {pBox}</text>
-                <text x="8" y="62" fontSize="8" fontWeight="bold" fill="#0f172a" textAnchor="middle">T: {tBox}</text>
-              </svg>
-              <div className="text-[10px] text-slate-500 font-mono mt-1">
-                Bentangan: {ukuranSheet}
+          {/* Area Desain / Bentangan yang Luas & Jelas */}
+          <div className="min-h-[160px] flex items-center justify-center p-2 rounded bg-slate-50/50 border border-dashed border-slate-300 relative">
+            {designImage ? (
+              <div className="w-full flex flex-col items-center justify-center">
+                <img
+                  src={designImage}
+                  alt="Desain Dus"
+                  className="max-h-56 max-w-full object-contain rounded shadow-xs"
+                />
+                <span className="text-[10px] text-slate-500 mt-1 italic">Artwork Desain Dus Terlampir</span>
               </div>
-            </div>
+            ) : boxModel === 'a1' ? (
+              <div className="w-full text-center">
+                <svg viewBox="0 0 540 160" className="w-full h-36 mx-auto stroke-slate-800 fill-white">
+                  {/* Flaps Atas */}
+                  <rect x="30" y="10" width="110" height="35" strokeWidth="1.5" strokeDasharray="4 2" fill="#f8fafc" />
+                  <rect x="140" y="10" width="130" height="35" strokeWidth="1.5" strokeDasharray="4 2" fill="#f8fafc" />
+                  <rect x="270" y="10" width="110" height="35" strokeWidth="1.5" strokeDasharray="4 2" fill="#f8fafc" />
+                  <rect x="380" y="10" width="130" height="35" strokeWidth="1.5" strokeDasharray="4 2" fill="#f8fafc" />
+                  
+                  {/* Body Utama Dus (4 Panel) */}
+                  <rect x="30" y="45" width="110" height="70" strokeWidth="1.5" fill="#f1f5f9" />
+                  <rect x="140" y="45" width="130" height="70" strokeWidth="1.5" fill="#f1f5f9" />
+                  <rect x="270" y="45" width="110" height="70" strokeWidth="1.5" fill="#f1f5f9" />
+                  <rect x="380" y="45" width="130" height="70" strokeWidth="1.5" fill="#f1f5f9" />
+                  
+                  {/* Kupingan Tab Sambungan Flap */}
+                  <polygon points="510,50 535,55 535,105 510,110" strokeWidth="1.5" fill="#e2e8f0" />
 
-            {/* Design / Artwork Slot */}
-            <div className="border border-dashed border-slate-300 rounded p-2 text-center flex flex-col items-center justify-center min-h-[110px] bg-slate-50">
-              {designImage ? (
-                <div className="space-y-1">
-                  <img
-                    src={designImage}
-                    alt="Design Dus Customer"
-                    className="max-h-24 max-w-full object-contain rounded border border-slate-200 mx-auto"
-                  />
-                  <span className="text-[10px] text-emerald-700 font-bold block">✓ Desain Cetakan Terlampir</span>
+                  {/* Flaps Bawah */}
+                  <rect x="30" y="115" width="110" height="35" strokeWidth="1.5" strokeDasharray="4 2" fill="#f8fafc" />
+                  <rect x="140" y="115" width="130" height="35" strokeWidth="1.5" strokeDasharray="4 2" fill="#f8fafc" />
+                  <rect x="270" y="115" width="110" height="35" strokeWidth="1.5" strokeDasharray="4 2" fill="#f8fafc" />
+                  <rect x="380" y="115" width="130" height="35" strokeWidth="1.5" strokeDasharray="4 2" fill="#f8fafc" />
+
+                  {/* Labels Dimensi */}
+                  <text x="85" y="85" textAnchor="middle" className="text-[10px] font-bold fill-slate-700">L: {lBox} mm</text>
+                  <text x="205" y="85" textAnchor="middle" className="text-[10px] font-bold fill-slate-700">P: {pBox} mm</text>
+                  <text x="325" y="85" textAnchor="middle" className="text-[10px] font-bold fill-slate-700">L: {lBox} mm</text>
+                  <text x="445" y="85" textAnchor="middle" className="text-[10px] font-bold fill-slate-700">P: {pBox} mm</text>
+                  <text x="522" y="85" textAnchor="middle" className="text-[8px] font-bold fill-slate-500">Tab</text>
+                  <text x="270" y="32" textAnchor="middle" className="text-[9px] fill-slate-500">Tinggi Dus: {tBox} mm</text>
+                </svg>
+                <p className="text-[10px] text-slate-500 mt-1 font-semibold">
+                  Bentangan Standard RSC A1 • Ukuran Sheet: {ukuranSheet}
+                </p>
+              </div>
+            ) : boxModel === 'diecut' ? (
+              <div className="w-full text-center">
+                <svg viewBox="0 0 540 160" className="w-full h-36 mx-auto stroke-slate-800 fill-white">
+                  {/* Die-cut Base & Side Flaps */}
+                  <rect x="180" y="35" width="180" height="90" strokeWidth="1.5" fill="#f1f5f9" />
+                  <rect x="60" y="35" width="120" height="90" strokeWidth="1.5" strokeDasharray="3 2" fill="#f8fafc" />
+                  <rect x="360" y="35" width="120" height="90" strokeWidth="1.5" strokeDasharray="3 2" fill="#f8fafc" />
+                  {/* Top Cover with Tuck Flap */}
+                  <rect x="180" y="10" width="180" height="25" strokeWidth="1.5" strokeDasharray="3 2" fill="#f8fafc" />
+                  <rect x="180" y="125" width="180" height="25" strokeWidth="1.5" strokeDasharray="3 2" fill="#f8fafc" />
+                  {/* Locking Ears */}
+                  <polygon points="60,45 35,55 35,105 60,115" strokeWidth="1.5" fill="#e2e8f0" />
+                  <polygon points="480,45 505,55 505,105 480,115" strokeWidth="1.5" fill="#e2e8f0" />
+                  <text x="270" y="85" textAnchor="middle" className="text-[11px] font-bold fill-slate-800">Alas Dus Die-Cut: {pBox} x {lBox} mm</text>
+                </svg>
+                <p className="text-[10px] text-slate-500 mt-1 font-semibold">
+                  Pola Pisau Pond Die-Cut • Creasing & Locking Tab Khusus
+                </p>
+              </div>
+            ) : (
+              <div className="w-full h-40 flex flex-col items-center justify-center bg-white rounded border border-slate-300 p-2">
+                <div className="w-full h-full border border-slate-200 rounded flex flex-col items-center justify-center text-slate-400">
+                  <LayoutGrid className="w-8 h-8 text-slate-300 mb-1" />
+                  <span className="text-[11px] font-bold text-slate-600">
+                    Area Kanvas Sketsa Desain & Bentangan Manual
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    (Bisa digambar / ditulis tangan langsung di lembar cetak SPK oleh Tim QC / Desain)
+                  </span>
                 </div>
-              ) : (
-                <div className="text-slate-400 space-y-1 py-3">
-                  <ImageIcon className="w-7 h-7 mx-auto text-slate-300" />
-                  <span className="text-[11px] block text-slate-500 font-semibold">Design Dus (Sample / Film Sablon)</span>
-                  <span className="text-[10px] block text-slate-400">Gunakan tombol upload di atas untuk melampirkan gambar design</span>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Work Order Routing Process Table */}
-        <div className="border border-slate-400 rounded-lg overflow-hidden mb-4">
-          <table className="w-full text-xs">
+        {/* Tabel Routing Kerja & Mesin (REVISI CLIENT ITEM 6: DAPAT DIISI / DIUBAH SENDIRI) */}
+        <div className="mb-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="font-extrabold text-slate-900 text-xs uppercase tracking-wide">
+              Instruksi Kerja & Parameter Mesin (Bisa Diisi / Diedit Langsung):
+            </span>
+            <span className="no-print text-[10px] text-brand-600 font-semibold">
+              *Klik teks pada tabel untuk mengedit instruksi sebelum dicetak
+            </span>
+          </div>
+
+          <table className="w-full text-xs border border-slate-400">
             <thead>
               <tr className="bg-slate-100 border-b border-slate-400 font-bold text-slate-800">
                 <th className="p-1.5 text-center w-8 border-r border-slate-400">No</th>
-                <th className="p-1.5 text-left w-28 border-r border-slate-400">Tahapan Mesin</th>
-                <th className="p-1.5 text-left border-r border-slate-400">Instruksi Kerja & Parameter</th>
-                <th className="p-1.5 text-center w-20 border-r border-slate-400">Target Qty</th>
+                <th className="p-1.5 text-left w-32 border-r border-slate-400">Tahapan Mesin</th>
+                <th className="p-1.5 text-left border-r border-slate-400">Instruksi Kerja & Parameter Mesin</th>
+                <th className="p-1.5 text-center w-24 border-r border-slate-400">Target Qty</th>
                 <th className="p-1.5 text-center w-20 border-r border-slate-400">Hasil Baik</th>
                 <th className="p-1.5 text-center w-16">Reject</th>
               </tr>
             </thead>
             <tbody>
-              <tr className="border-b border-slate-300">
-                <td className="p-1.5 text-center font-bold border-r border-slate-400">1</td>
-                <td className="p-1.5 font-bold border-r border-slate-400">POTONG SHEET</td>
-                <td className="p-1.5 border-r border-slate-400">Slitter Rotary / Corrugator: Ukuran Sheet {ukuranSheet}</td>
-                <td className="p-1.5 text-center font-bold border-r border-slate-400">{qtyNum.toLocaleString('id-ID')}</td>
-                <td className="p-1.5 text-center border-r border-slate-400">_______</td>
-                <td className="p-1.5 text-center">_____</td>
-              </tr>
-              <tr className="border-b border-slate-300">
-                <td className="p-1.5 text-center font-bold border-r border-slate-400">2</td>
-                <td className="p-1.5 font-bold border-r border-slate-400">CETAK FLEXO</td>
-                <td className="p-1.5 border-r border-slate-400">Flexo Printing: Warna {printing}, cek nozzling & ketajaman teks</td>
-                <td className="p-1.5 text-center font-bold border-r border-slate-400">{qtyNum.toLocaleString('id-ID')}</td>
-                <td className="p-1.5 text-center border-r border-slate-400">_______</td>
-                <td className="p-1.5 text-center">_____</td>
-              </tr>
-              <tr className="border-b border-slate-300">
-                <td className="p-1.5 text-center font-bold border-r border-slate-400">3</td>
-                <td className="p-1.5 font-bold border-r border-slate-400">FINISHING</td>
-                <td className="p-1.5 border-r border-slate-400">Slotter Pisau Pond: Creasing lipat + {sambungan}</td>
-                <td className="p-1.5 text-center font-bold border-r border-slate-400">{qtyNum.toLocaleString('id-ID')}</td>
-                <td className="p-1.5 text-center border-r border-slate-400">_______</td>
-                <td className="p-1.5 text-center">_____</td>
-              </tr>
-              <tr>
-                <td className="p-1.5 text-center font-bold border-r border-slate-400">4</td>
-                <td className="p-1.5 font-bold border-r border-slate-400">IKAT & PACKING</td>
-                <td className="p-1.5 border-r border-slate-400">Strapping kuning, 25 pcs per ikat, cek QC kebersihan dus</td>
-                <td className="p-1.5 text-center font-bold border-r border-slate-400">{qtyNum.toLocaleString('id-ID')}</td>
-                <td className="p-1.5 text-center border-r border-slate-400">_______</td>
-                <td className="p-1.5 text-center">_____</td>
-              </tr>
+              {routingSteps.map((step, idx) => (
+                <tr key={step.no} className="border-b border-slate-300">
+                  <td className="p-1 text-center font-bold border-r border-slate-400">{step.no}</td>
+                  <td className="p-1 font-bold border-r border-slate-400">{step.tahapan}</td>
+                  <td className="p-1 border-r border-slate-400">
+                    <input
+                      type="text"
+                      value={step.instruksi}
+                      onChange={(e) => handleStepChange(idx, 'instruksi', e.target.value)}
+                      className="w-full bg-transparent border-none p-0 focus:ring-1 focus:ring-brand-500 rounded text-xs text-slate-800"
+                    />
+                  </td>
+                  <td className="p-1 text-center font-bold border-r border-slate-400">
+                    <input
+                      type="text"
+                      value={step.targetQty}
+                      onChange={(e) => handleStepChange(idx, 'targetQty', e.target.value)}
+                      className="w-full bg-transparent border-none p-0 focus:ring-1 focus:ring-brand-500 rounded text-xs text-center font-bold text-slate-800"
+                    />
+                  </td>
+                  <td className="p-1 text-center border-r border-slate-400 text-slate-400">_______</td>
+                  <td className="p-1 text-center text-slate-400">_____</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
 
         {/* Keterangan & Ketentuan Packaging (Sesuai Gambar 2) */}
-        <div className="border border-slate-300 rounded-lg p-2.5 mb-4 text-[11px] bg-slate-50/70">
+        <div className="border border-slate-300 rounded-lg p-2.5 mb-3 text-[11px] bg-slate-50/70">
           <p className="font-bold text-slate-800 mb-0.5">Keterangan Standar Packaging Pabrik:</p>
           <ol className="list-decimal pl-4 space-y-0.5 text-slate-700">
             <li>Toleransi pengiriman 10% dari jumlah order pesanan.</li>
@@ -356,20 +464,22 @@ export default function PrintSPK({ data, onClose }) {
           </ol>
         </div>
 
-        {/* Kolom Tanda Tangan (Sesuai Gambar 2) */}
-        <div className="grid grid-cols-2 gap-10 text-center mt-6 pt-2">
+        {/* Kolom Tanda Tangan (Sesuai Gambar 2 & Revisi Item 9: Nama Subagio Bisa Diubah) */}
+        <div className="grid grid-cols-2 gap-10 text-center mt-5 pt-1">
           <div>
             <p className="font-semibold text-slate-700">Pemesan,</p>
-            <div className="h-16"></div>
+            <div className="h-14"></div>
             <p className="font-bold border-t border-slate-500 pt-1 text-slate-900 inline-block px-8">
               ( {customerName} )
             </p>
           </div>
           <div>
             <p className="font-semibold text-slate-700">Penerima Pesanan,</p>
-            <div className="h-16"></div>
+            <div className="h-14 flex items-center justify-center">
+              <span className="font-black text-rose-800 text-sm tracking-wider uppercase">{signerName}</span>
+            </div>
             <p className="font-bold border-t border-slate-500 pt-1 text-slate-900 inline-block px-8">
-              ( SUBAGIO )
+              ( {signerName} )
             </p>
             <p className="text-[10px] text-slate-500">MAHARANI CARTON BOX</p>
           </div>

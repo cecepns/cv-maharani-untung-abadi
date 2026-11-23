@@ -29,6 +29,8 @@ export default function KaryawanPage() {
     jabatan: '',
     departemen: 'Produksi',
     status_karyawan: 'Tetap',
+    tipe_gaji: 'Bulanan',
+    upah_harian: 180000,
     no_hp: '',
     no_rekening: '',
     bank: 'BCA',
@@ -74,6 +76,8 @@ export default function KaryawanPage() {
       jabatan: 'Operator Mesin Flexo',
       departemen: 'Produksi',
       status_karyawan: 'Tetap',
+      tipe_gaji: 'Bulanan',
+      upah_harian: 180000,
       no_hp: '',
       no_rekening: '',
       bank: 'BCA',
@@ -94,6 +98,8 @@ export default function KaryawanPage() {
       jabatan: item.jabatan,
       departemen: item.departemen || 'Produksi',
       status_karyawan: item.status_karyawan || 'Tetap',
+      tipe_gaji: item.tipe_gaji || 'Bulanan',
+      upah_harian: Number(item.upah_harian || Math.round((item.gaji_pokok || 4500000) / 25)),
       no_hp: item.no_hp || '',
       no_rekening: item.no_rekening || '',
       bank: item.bank || 'BCA',
@@ -226,8 +232,19 @@ export default function KaryawanPage() {
                         <Phone className="w-3 h-3 text-slate-400" /> {k.no_hp || '-'}
                       </div>
                     </td>
-                    <td className="px-6 py-4 font-bold text-slate-900">
-                      Rp {Number(k.gaji_pokok).toLocaleString('id-ID')}
+                    <td className="px-6 py-4">
+                      <div className="font-bold text-slate-900">
+                        Rp {Number(k.gaji_pokok).toLocaleString('id-ID')}
+                      </div>
+                      <div className="text-[11px] mt-0.5">
+                        {k.tipe_gaji === 'Harian' ? (
+                          <span className="text-amber-700 font-semibold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                            Upah Harian: Rp {Number(k.upah_harian || Math.round(k.gaji_pokok / 25)).toLocaleString('id-ID')}/hr
+                          </span>
+                        ) : (
+                          <span className="text-slate-500 font-medium">Bulanan Tetap</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-xs space-y-0.5">
                       <div className="text-slate-700 font-semibold">Tunj: Rp {Number(k.tunjangan_jabatan).toLocaleString('id-ID')}</div>
@@ -364,14 +381,48 @@ export default function KaryawanPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Gaji Pokok (Rp)</label>
-              <input
-                type="number"
-                value={formData.gaji_pokok}
-                onChange={(e) => setFormData({ ...formData, gaji_pokok: Number(e.target.value) })}
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Skema Gaji / Upah</label>
+              <select
+                value={formData.tipe_gaji || 'Bulanan'}
+                onChange={(e) => {
+                  const tipe = e.target.value;
+                  const upah = tipe === 'Harian' ? (formData.upah_harian || Math.round(formData.gaji_pokok / 25)) : formData.upah_harian;
+                  const pokok = tipe === 'Harian' ? upah * 25 : formData.gaji_pokok;
+                  setFormData({ ...formData, tipe_gaji: tipe, upah_harian: upah, gaji_pokok: pokok });
+                }}
                 className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl font-bold"
-              />
+              >
+                <option value="Bulanan">Bulanan Tetap (Prorata)</option>
+                <option value="Harian">Harian (Hari Kerja × Upah Harian)</option>
+              </select>
             </div>
+            {formData.tipe_gaji === 'Harian' ? (
+              <div>
+                <label className="block text-xs font-semibold text-amber-800 mb-1">Upah Harian (Rp / Hari Kerja)</label>
+                <input
+                  type="number"
+                  value={formData.upah_harian}
+                  onChange={(e) => {
+                    const upah = Number(e.target.value);
+                    setFormData({ ...formData, upah_harian: upah, gaji_pokok: upah * 25 });
+                  }}
+                  className="w-full px-3 py-2 text-sm bg-amber-50 border border-amber-300 rounded-xl font-bold text-amber-900"
+                />
+                <span className="text-[10px] text-slate-500 mt-0.5 block">
+                  Estimasi 25 hari kerja: Rp {(formData.upah_harian * 25).toLocaleString('id-ID')}
+                </span>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Gaji Pokok Bulanan (Rp)</label>
+                <input
+                  type="number"
+                  value={formData.gaji_pokok}
+                  onChange={(e) => setFormData({ ...formData, gaji_pokok: Number(e.target.value) })}
+                  className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl font-bold"
+                />
+              </div>
+            )}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Tunjangan Jabatan (Rp)</label>
               <input

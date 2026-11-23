@@ -23,6 +23,8 @@ function angkaTerbilang(angka) {
 export default function PrintInvoice({ data, onClose }) {
   if (!data) return null;
 
+  const [signerName, setSignerName] = useState('SUBAGIO');
+
   const handlePrint = () => {
     window.print();
   };
@@ -43,9 +45,19 @@ export default function PrintInvoice({ data, onClose }) {
   return (
     <PrintModalWrapper onClose={onClose} isOpen={!!data} maxWidth="max-w-4xl">
       {/* Action Bar (hidden on print) */}
-      <div className="no-print sticky top-0 z-20 flex items-center justify-between pb-3 mb-6 bg-white/95 backdrop-blur-xs border-b border-slate-200 pt-1">
+      <div className="no-print sticky top-0 z-20 flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-6 bg-white/95 backdrop-blur-xs border-b border-slate-200 pt-1 gap-2">
         <span className="text-sm font-bold text-slate-800">Pratinjau Faktur / Nota Penjualan Resmi</span>
         <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 mr-2">
+            <label className="text-xs font-bold text-slate-600">Penandatangan:</label>
+            <input
+              type="text"
+              value={signerName}
+              onChange={(e) => setSignerName(e.target.value)}
+              placeholder="SUBAGIO"
+              className="px-2 py-1 text-xs border border-slate-300 rounded-lg font-bold text-slate-800 w-32"
+            />
+          </div>
           <button
             onClick={handlePrint}
             className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-semibold shadow-sm transition-colors cursor-pointer"
@@ -82,7 +94,7 @@ export default function PrintInvoice({ data, onClose }) {
                 PACKAGING CARTON BOX & OFFSET PRINTING
               </p>
               <p className="text-[10px] text-slate-700 font-medium">
-                Factory : Medokan Asri Tengah II Q / 23-24 Telp./Fax. (031) 8795150, 8713507 Surabaya
+                Factory : Medokan Asri Tengah II Q / 23-24 Telp. 085100918118, (031) 8795150 Surabaya
               </p>
             </div>
           </div>
@@ -229,10 +241,10 @@ export default function PrintInvoice({ data, onClose }) {
           <div className="text-center text-xs">
             <p className="font-semibold text-slate-700">Hormat kami,</p>
             <div className="h-16 flex items-center justify-center">
-              <span className="font-black text-rose-800 text-sm tracking-wider">SUBAGIO</span>
+              <span className="font-black text-rose-800 text-sm tracking-wider uppercase">{signerName}</span>
             </div>
             <p className="font-bold border-t border-slate-500 pt-1 text-slate-900 inline-block px-10">
-              ( SUBAGIO )
+              ( {signerName} )
             </p>
             <p className="text-[10px] text-slate-500 font-semibold">MAHARANI CARTON BOX</p>
           </div>
