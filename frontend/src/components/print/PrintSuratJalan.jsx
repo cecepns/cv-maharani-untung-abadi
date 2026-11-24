@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Printer, X, Truck, Edit3 } from 'lucide-react';
 import PrintModalWrapper from './PrintModalWrapper';
+import KopSuratMaharani from '../common/KopSuratMaharani';
 
 export default function PrintSuratJalan({ data, onClose }) {
   if (!data) return null;
@@ -113,35 +114,12 @@ export default function PrintSuratJalan({ data, onClose }) {
 
       {/* Printable Area Sesuai Format Fisik Maharani (Gambar 4) */}
       <div className="print-area font-sans text-slate-900 leading-relaxed text-xs max-w-3xl mx-auto">
-        {/* Kop Surat Resmi (Sesuai Gambar 4 & Revisi Item 8) */}
-        <div className="border-b-2 border-slate-900 pb-3 mb-3 flex items-center justify-between">
-          <div className="flex items-center gap-3.5">
-            <img
-              src="/logo.png"
-              alt="Logo Maharani"
-              className="w-14 h-14 object-contain shrink-0"
-              onError={(e) => { e.target.style.display = 'none'; }}
-            />
-            <div>
-              <h1 className="text-xl font-black tracking-wider text-rose-700 leading-none">
-                MAHARANI
-              </h1>
-              <p className="text-[11px] font-black tracking-widest text-slate-900 uppercase mt-0.5">
-                PACKAGING CARTON BOX & OFFSET PRINTING
-              </p>
-              <p className="text-[10px] text-slate-700 font-medium">
-                Factory : Medokan Asri Tengah II Q / 23-24 Telp. 085100918118, (031) 8795150 Surabaya
-              </p>
-            </div>
-          </div>
-          <div className="text-right">
-            <span className="inline-block px-2.5 py-0.5 bg-slate-900 text-white font-black text-xs uppercase tracking-wider rounded">
-              SURAT JALAN
-            </span>
-            <p className="font-bold text-xs mt-1">No: {data.nomor_sj || 'SJ-202611-001'}</p>
-            <p className="text-[10px] font-bold text-rose-600">FAKTUR MENYUSUL</p>
-          </div>
-        </div>
+        {/* Kop Surat Resmi Maharani (Sesuai Gambar 1) */}
+        <KopSuratMaharani
+          badge="SURAT JALAN"
+          nomor={`No: ${data.nomor_sj || 'SJ-202611-001'}`}
+          extra={<span className="font-bold text-rose-600 uppercase text-[11px]">FAKTUR MENYUSUL</span>}
+        />
 
         {/* Metadata Pengiriman (Sesuai Gambar 4) */}
         <div className="grid grid-cols-2 gap-4 mb-3 border border-slate-300 p-2.5 rounded bg-slate-50/50">

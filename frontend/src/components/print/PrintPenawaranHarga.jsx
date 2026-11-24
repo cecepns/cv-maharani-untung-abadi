@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Printer, X, Building2, User, Calendar, FileText, CheckCircle2 } from 'lucide-react';
 import PrintModalWrapper from './PrintModalWrapper';
+import KopSuratMaharani from '../common/KopSuratMaharani';
 
 export default function PrintPenawaranHarga({ data, onClose, customers = [] }) {
   if (!data) return null;
@@ -103,36 +104,13 @@ export default function PrintPenawaranHarga({ data, onClose, customers = [] }) {
 
       {/* Printable Area */}
       <div className="print-area font-sans text-slate-900 leading-relaxed text-sm">
-        {/* Kop Surat Resmi */}
-        <div className="flex justify-between items-start border-b-2 border-slate-900 pb-3 mb-4">
-          <div className="flex items-center gap-3.5">
-            <img
-              src="/logo.png"
-              alt="Logo Maharani"
-              className="w-14 h-14 object-contain shrink-0"
-              onError={(e) => { e.target.style.display = 'none'; }}
-            />
-            <div>
-              <h1 className="text-xl font-black tracking-wider text-rose-700 leading-none">
-                CV. MAHARANI UNTUNG ABADI
-              </h1>
-              <p className="text-[11px] font-black tracking-widest text-slate-900 uppercase mt-0.5">
-                PACKAGING CARTON BOX & OFFSET PRINTING
-              </p>
-              <p className="text-[10px] text-slate-700 font-medium">
-                Factory : Medokan Asri Tengah II Q / 23-24 Telp. 085100918118, (031) 8795150 Surabaya
-              </p>
-            </div>
-          </div>
-          <div className="text-right shrink-0">
-            <span className="inline-block px-3 py-1 bg-brand-600 text-white font-black text-xs tracking-wider uppercase rounded print:border print:border-brand-600 print:text-brand-700 print:bg-white">
-              SURAT PENAWARAN HARGA
-            </span>
-            <p className="mt-2 text-xs font-bold text-slate-800">No: {nomorPenawaran}</p>
-            <p className="text-xs text-slate-600">Tanggal: {todayStr}</p>
-            <p className="text-xs font-semibold text-emerald-700">Masa Berlaku: 14 Hari</p>
-          </div>
-        </div>
+        {/* Kop Surat Resmi Maharani (Sesuai Gambar 1) */}
+        <KopSuratMaharani
+          badge="SURAT PENAWARAN HARGA"
+          nomor={`No: ${nomorPenawaran}`}
+          tanggal={`Tanggal: ${todayStr}`}
+          extra="Masa Berlaku: 14 Hari"
+        />
 
         {/* Penerima Surat & Pembuka */}
         <div className="mb-4 text-xs space-y-2">

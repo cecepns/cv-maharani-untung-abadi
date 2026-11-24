@@ -15,7 +15,7 @@ export default function ReportPrintFooter({
   return (
     <div className="mt-8 pt-4 border-t border-slate-200 break-inside-avoid">
       <div className="text-right text-xs text-slate-500 mb-4 font-medium">
-        Jakarta, {currentDate}
+        Surabaya, {currentDate}
       </div>
       <div className="grid grid-cols-3 gap-4 text-center text-xs">
         <div>

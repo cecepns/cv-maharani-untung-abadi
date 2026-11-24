@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Printer, X } from 'lucide-react';
 import PrintModalWrapper from './PrintModalWrapper';
+import KopSuratMaharani from '../common/KopSuratMaharani';
 
 export default function PrintSlipGaji({ data, onClose }) {
   if (!data) return null;
@@ -48,33 +49,12 @@ export default function PrintSlipGaji({ data, onClose }) {
       </div>
 
       <div className="print-area font-sans text-slate-900 text-xs leading-relaxed">
-        {/* Header Resmi CV Maharani */}
-        <div className="text-center border-b-2 border-slate-800 pb-3 mb-4">
-          <div className="flex items-center justify-center gap-3 mb-1">
-            <img
-              src="/logo.png"
-              alt="Logo Maharani"
-              className="w-12 h-12 object-contain"
-              onError={(e) => { e.target.style.display = 'none'; }}
-            />
-            <div className="text-left">
-              <h1 className="text-base font-extrabold uppercase tracking-wide text-rose-700 leading-none">
-                CV. MAHARANI UNTUNG ABADI
-              </h1>
-              <p className="text-[10px] text-slate-600 font-bold uppercase mt-0.5">
-                PACKAGING CARTON BOX & OFFSET PRINTING
-              </p>
-              <p className="text-[10px] text-slate-500">
-                Factory : Medokan Asri Tengah II Q / 23-24 Telp. 085100918118, (031) 8795150 Surabaya
-              </p>
-            </div>
-          </div>
-          <div className="mt-2 pt-1 border-t border-slate-200">
-            <span className="inline-block px-3 py-0.5 bg-slate-900 text-white font-black text-xs uppercase tracking-wider rounded">
-              SLIP GAJI KARYAWAN
-            </span>
-          </div>
-        </div>
+        {/* Kop Surat Resmi Maharani (Sesuai Gambar 1) */}
+        <KopSuratMaharani
+          badge="SLIP GAJI KARYAWAN"
+          nomor={`No: ${data.nomor_slip || `SLIP-${data.id || '001'}`}`}
+          tanggal={`Periode: ${data.bulan || 'November'} ${data.tahun || '2026'}`}
+        />
 
         {/* Employee Meta */}
         <div className="grid grid-cols-2 gap-4 mb-4 p-3 bg-slate-50 border border-slate-200 rounded-lg">

@@ -3,6 +3,11 @@
   "name": "CV. Maharani Untung Abadi - Packaging & Corrugated ERP",
   "icons": [
     {
+      "src": "/logo.png",
+      "type": "image/png",
+      "sizes": "192x192 512x512"
+    },
+    {
       "src": "/logo.svg",
       "type": "image/svg+xml",
       "sizes": "192x192 512x512"

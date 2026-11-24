@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Printer, X, Factory, Upload, Image as ImageIcon, Trash2, CheckCircle2, PenTool, LayoutGrid } from 'lucide-react';
 import PrintModalWrapper from './PrintModalWrapper';
+import KopSuratMaharani from '../common/KopSuratMaharani';
 
 export default function PrintSPK({ data, onClose }) {
   if (!data) return null;
@@ -194,35 +195,12 @@ export default function PrintSPK({ data, onClose }) {
 
       {/* Printable Area Sesuai Format Fisik Maharani (Gambar 2 & Gambar 3) */}
       <div className="print-area font-sans text-slate-900 leading-relaxed text-xs max-w-3xl mx-auto">
-        {/* Kop Surat Maharani (Sesuai Gambar 2 & Revisi Item 8) */}
-        <div className="border-b-2 border-slate-900 pb-3 mb-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img
-              src="/logo.png"
-              alt="Logo Maharani"
-              className="w-16 h-16 object-contain shrink-0"
-              onError={(e) => { e.target.style.display = 'none'; }}
-            />
-            <div>
-              <h1 className="text-2xl font-black tracking-wider text-rose-700 leading-none">
-                MAHARANI
-              </h1>
-              <p className="text-xs font-black tracking-widest text-slate-900 uppercase mt-1">
-                PACKAGING CARTON BOX & OFFSET PRINTING
-              </p>
-              <p className="text-[11px] text-slate-700 font-medium mt-0.5">
-                Factory : Medokan Asri Tengah II Q / 23-24 Telp. 085100918118, (031) 8795150 Surabaya
-              </p>
-            </div>
-          </div>
-          <div className="text-right shrink-0">
-            <span className="inline-block px-2.5 py-1 bg-slate-900 text-white font-extrabold text-[11px] uppercase tracking-wider rounded">
-              SPK PRODUKSI
-            </span>
-            <p className="font-bold text-xs text-slate-900 mt-1">No: {data.nomor_spk || 'SPK-314560'}</p>
-            <p className="text-[11px] text-slate-500">Tgl: {tanggalOrder}</p>
-          </div>
-        </div>
+        {/* Kop Surat Resmi Maharani (Sesuai Gambar 1) */}
+        <KopSuratMaharani
+          badge="SPK PRODUKSI"
+          nomor={`No: ${data.nomor_spk || 'SPK-314560'}`}
+          tanggal={`Tgl: ${tanggalOrder}`}
+        />
 
         {/* Title */}
         <div className="text-center mb-3">
