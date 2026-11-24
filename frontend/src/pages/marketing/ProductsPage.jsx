@@ -575,6 +575,44 @@ export default function ProductsPage() {
             </div>
           )}
 
+          {formData.jenis_barang === 'Box' && Number(formData.panjang_mm) > 0 && Number(formData.lebar_mm) > 0 && (
+            <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl text-xs space-y-1.5 text-amber-950">
+              <div className="flex items-center justify-between font-bold text-amber-900">
+                <span>Kalkulasi Rumus Standar Pabrik:</span>
+                <span className="text-[10px] px-2 py-0.5 bg-amber-100 text-amber-900 rounded font-bold">
+                  {formData.tipe_flute === 'B/C' ? 'Double Wall A2' : 'Single Wall A1'}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] font-mono">
+                <div className="p-1.5 bg-white/90 rounded border border-amber-200">
+                  <span className="text-[10px] text-slate-500 font-sans block">Estimasi Size Luar:</span>
+                  <strong className="text-slate-900">
+                    {formData.tipe_flute === 'B/C'
+                      ? `${Number(formData.panjang_mm) + 6} x ${Number(formData.lebar_mm) + 6} x ${Number(formData.tinggi_mm) + 12} mm`
+                      : `${Number(formData.panjang_mm) + 3} x ${Number(formData.lebar_mm) + 3} x ${Number(formData.tinggi_mm) + 6} mm`}
+                  </strong>
+                </div>
+                <div className="p-1.5 bg-white/90 rounded border border-amber-200">
+                  <span className="text-[10px] text-slate-500 font-sans block">Tutup Flap & Tab:</span>
+                  <strong className="text-blue-700">
+                    Tutup: {formData.tipe_flute === 'B/C' ? Math.round(Number(formData.lebar_mm) / 2 + 6) : Math.round(Number(formData.lebar_mm) / 2 + 3)} mm
+                  </strong>
+                  <span className="text-amber-700 block text-[10px]">
+                    Tab: {formData.tipe_flute === 'B/C' ? '3,9 cm (39mm)' : '3,1 cm (31mm)'}
+                  </span>
+                </div>
+                <div className="p-1.5 bg-white/90 rounded border border-amber-200">
+                  <span className="text-[10px] text-slate-500 font-sans block">Target Ukuran Sheet:</span>
+                  <strong className="text-emerald-700">
+                    {formData.tipe_flute === 'B/C'
+                      ? `${Number(formData.lebar_mm) + Number(formData.tinggi_mm) + 12} x ${(Number(formData.panjang_mm) + Number(formData.lebar_mm)) * 2 + 39} mm`
+                      : `${Number(formData.lebar_mm) + Number(formData.tinggi_mm) + 6} x ${(Number(formData.panjang_mm) + Number(formData.lebar_mm)) * 2 + 31} mm`}
+                  </strong>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">

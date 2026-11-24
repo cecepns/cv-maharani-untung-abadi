@@ -36,12 +36,17 @@ import SearchableSelect from '@/components/common/SearchableSelect';
 import PrintPenawaranHarga from '@/components/print/PrintPenawaranHarga';
 
 // Spesifikasi standar industri & rumus toleransi karton gelombang CV. Maharani
+// Sesuai Revisi Resmi Client 1 & 2:
+// - Single Wall A1: Tab 3.1 cm (31 mm), Tutup Flap (L/2 + 3 mm) -> Creasing Lebar Sheet +6 mm
+// - Double Wall A2: Tab 3.9 cm (39 mm), Tutup Flap (L/2 + 6 mm) -> Creasing Lebar Sheet +12 mm
 export const FLUTE_SPECS = {
   'B/F': {
     kode: 'B/F',
     nama: 'B-Flute Single Wall (~3mm)',
-    kupingan: 43,
-    creasing: 12,
+    kupingan: 31,
+    creasing: 6,
+    tabCm: 3.1,
+    flapExtra: 3,
     defaultGsm: 420,
     kategori: 'Corrugated',
     deskripsi: 'Standar packaging umum & ekspedisi (Daya lipat baik)'
@@ -49,8 +54,10 @@ export const FLUTE_SPECS = {
   'C/F': {
     kode: 'C/F',
     nama: 'C-Flute Single Wall (~4mm)',
-    kupingan: 47,
-    creasing: 18,
+    kupingan: 31,
+    creasing: 6,
+    tabCm: 3.1,
+    flapExtra: 3,
     defaultGsm: 435,
     kategori: 'Corrugated',
     deskripsi: 'Daya tumpuk (stacking) lebih kuat untuk barang berat'
@@ -58,8 +65,10 @@ export const FLUTE_SPECS = {
   'B/C': {
     kode: 'B/C',
     nama: 'B/C Double Wall 2 Gelombang (~7mm)',
-    kupingan: 63,
-    creasing: 24,
+    kupingan: 39,
+    creasing: 12,
+    tabCm: 3.9,
+    flapExtra: 6,
     defaultGsm: 680,
     kategori: 'Corrugated',
     deskripsi: 'Dus tebal industri berat, sparepart mesin & buah ekspor'
@@ -67,8 +76,10 @@ export const FLUTE_SPECS = {
   'E/F': {
     kode: 'E/F',
     nama: 'E-Flute Micro Single Wall (~1.5mm)',
-    kupingan: 35,
-    creasing: 8,
+    kupingan: 31,
+    creasing: 6,
+    tabCm: 3.1,
+    flapExtra: 3,
     defaultGsm: 410,
     kategori: 'Corrugated',
     deskripsi: 'Kotak pizza, kosmetik, hampers & dus die-cut halus'
@@ -244,13 +255,14 @@ export default function EstimasiHargaPage() {
     const spec = FLUTE_SPECS[fluteType] || FLUTE_SPECS['B/C'];
     const isDoubleWall = fluteType === 'B/C';
     if (!useCustomAllowance) {
-      // Sesuai Catatan Kertas Client (Gambar 7):
-      // Double Joint (2 Sambungan): Single Wall = +83mm, Double Wall = +103mm
-      // Single Joint (1 Sambungan): Single Wall = +40mm, Double Wall = +50mm
-      const kupingVal = jointType === 'double'
-        ? (isDoubleWall ? 103 : 83)
-        : (isDoubleWall ? 50 : 40);
-      setCustomAllowance({ kupingan: kupingVal, creasing: spec.creasing });
+      // Sesuai Revisi Resmi Client 1 & 2:
+      // Single Wall A1: Tab 3.1 cm (31 mm), Tutup Flap (L/2 + 3 mm) -> Crease Sheet +6 mm
+      // Double Wall A2: Tab 3.9 cm (39 mm), Tutup Flap (L/2 + 6 mm) -> Crease Sheet +12 mm
+      // Double Joint (2 Sambungan): Tab dikali 2
+      const tabBase = isDoubleWall ? 39 : 31;
+      const kupingVal = jointType === 'double' ? tabBase * 2 : tabBase;
+      const creaseVal = isDoubleWall ? 12 : 6;
+      setCustomAllowance({ kupingan: kupingVal, creasing: creaseVal });
     }
     setGsm(spec.defaultGsm);
 
@@ -334,16 +346,24 @@ export default function EstimasiHargaPage() {
 
       const spec = FLUTE_SPECS[fluteType] || FLUTE_SPECS['B/C'];
       const isDoubleWall = fluteType === 'B/C';
+      const tabBase = isDoubleWall ? 39 : 31;
       const kupingan = useCustomAllowance
         ? Number(customAllowance.kupingan) || 0
         : jointType === 'double'
-        ? (isDoubleWall ? 103 : 83)
-        : (isDoubleWall ? 50 : 40);
-      const creasing = useCustomAllowance ? Number(customAllowance.creasing) || 0 : spec.creasing;
+        ? tabBase * 2
+        : tabBase;
+      const creasing = useCustomAllowance
+        ? Number(customAllowance.creasing) || 0
+        : (isDoubleWall ? 12 : 6);
 
-      // Single Joint vs Double Joint (Gambar 7):
-      // Single Joint: P_sheet = ((P + L) * 2) + kupingan (Single Wall +40mm, Double Wall +50mm). 1 box = 1 lembar sheet.
-      // Double Joint: P_sheet = (((P + L) * 2) + kupingan) / 2 (Single Wall +83mm, Double Wall +103mm). 1 box = 2 lembar sheet!
+      // Rumus Standar Resmi Client 1 & 2:
+      // Single Wall A1: Size Luar P+3, L+3, T+6 mm. Tutup Flap (L/2 + 3 mm). Tab 3.1 cm (31 mm).
+      // Double Wall A2: Size Luar P+6, L+6, T+12 mm. Tutup Flap (L/2 + 6 mm). Tab 3.9 cm (39 mm).
+      const pLuar = isDoubleWall ? P_box + 6 : P_box + 3;
+      const lLuar = isDoubleWall ? L_box + 6 : L_box + 3;
+      const tLuar = isDoubleWall ? T_box + 12 : T_box + 6;
+      const flapTutup = isDoubleWall ? Math.round((L_box / 2) + 6) : Math.round((L_box / 2) + 3);
+
       const isDouble = jointType === 'double';
       const rawPanjangBentangan = (P_box + L_box) * 2 + kupingan;
       const P_sheet = isDouble ? Math.round(rawPanjangBentangan / 2) : rawPanjangBentangan;
@@ -408,6 +428,12 @@ export default function EstimasiHargaPage() {
         P_box,
         L_box,
         T_box,
+        pLuar,
+        lLuar,
+        tLuar,
+        flapTutup,
+        tabMm: kupingan,
+        tabCm: (kupingan / 10).toFixed(1),
         jointType,
         isDouble,
         sheetsPerBox,
@@ -1036,7 +1062,7 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
                         {jointType === 'single' && <Check className="w-3.5 h-3.5 text-brand-600" />}
                       </div>
                       <div className="text-[11px] text-slate-500 mt-0.5">
-                        {fluteType === 'B/C' ? 'Double Wall: Kuping +50mm' : 'Single Wall: Kuping +40mm'} • 1 Sheet/Box
+                        {fluteType === 'B/C' ? 'Double Wall: Tab 3,9cm (39mm)' : 'Single Wall: Tab 3,1cm (31mm)'} • 1 Sheet/Box
                       </div>
                     </button>
 
@@ -1054,7 +1080,7 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
                         {jointType === 'double' && <Check className="w-3.5 h-3.5 text-indigo-600" />}
                       </div>
                       <div className="text-[11px] text-slate-500 mt-0.5">
-                        {fluteType === 'B/C' ? 'Double Wall: Kuping +103mm' : 'Single Wall: Kuping +83mm'} • 2 Sheet/Box
+                        {fluteType === 'B/C' ? 'Double Wall: 2 Tab = 78mm' : 'Single Wall: 2 Tab = 62mm'} • 2 Sheet/Box
                       </div>
                     </button>
                   </div>
@@ -1084,28 +1110,47 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
                     ))}
                   </div>
 
-                  {/* Rumus visual dari kertas client */}
-                  <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl text-xs space-y-1.5 text-amber-950">
-                    <div className="flex items-center gap-1.5 font-bold text-amber-900">
-                      <Sparkles className="w-3.5 h-3.5 text-amber-700" />
-                      Rumus Bentangan Sheet ({fluteType} - {jointType === 'double' ? 'Double Joint' : 'Single Joint'}):
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono">
-                      <div className="p-1.5 bg-white/80 rounded border border-amber-200">
-                        <strong>Lebar Sheet (L):</strong> L + T + {calculation.creasing} ={' '}
-                        <span className="font-bold text-brand-700">{calculation.L_sheet} mm</span>
+                  {/* Rumus visual dari aturan revisi client */}
+                  <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl text-xs space-y-2 text-amber-950">
+                    <div className="flex items-center justify-between font-bold text-amber-900">
+                      <div className="flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-700" />
+                        <span>Rumus Standar Pabrik ({fluteType === 'B/C' ? 'Double Wall A2' : 'Single Wall A1'} - {jointType === 'double' ? 'Double Joint' : 'Single Joint'}):</span>
                       </div>
-                      <div className="p-1.5 bg-white/80 rounded border border-amber-200">
-                        <strong>Panjang Sheet (P):</strong>{' '}
-                        {calculation.isDouble
-                          ? `(((P+L)×2)+${calculation.kupingan})/2 = `
-                          : `((P+L)×2)+${calculation.kupingan} = `}
-                        <span className="font-bold text-brand-700">{calculation.P_sheet} mm</span>
-                        {calculation.isDouble && (
-                          <span className="text-[10px] text-indigo-700 block font-sans font-bold">
-                            (2 Lembar / Dus)
-                          </span>
-                        )}
+                      <span className="text-[10px] px-2 py-0.5 bg-amber-100 text-amber-900 rounded font-bold">
+                        {fluteType === 'B/C' ? 'Double Wall (A2)' : 'Single Wall (A1)'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] font-mono">
+                      <div className="p-2 bg-white/90 rounded border border-amber-200">
+                        <div className="text-[10px] text-slate-500 font-sans font-semibold">Estimasi Size Luar:</div>
+                        <div className="font-bold text-slate-900 mt-0.5">
+                          {calculation.pLuar} × {calculation.lLuar} × {calculation.tLuar} mm
+                        </div>
+                        <div className="text-[9.5px] text-slate-500 font-sans mt-0.5">
+                          {fluteType === 'B/C' ? '(P+6, L+6, T+12 mm)' : '(P+3, L+3, T+6 mm)'}
+                        </div>
+                      </div>
+
+                      <div className="p-2 bg-white/90 rounded border border-amber-200">
+                        <div className="text-[10px] text-slate-500 font-sans font-semibold">Tutup Flap & Tab:</div>
+                        <div className="font-bold text-blue-800 mt-0.5">
+                          Tutup: {calculation.flapTutup} mm
+                        </div>
+                        <div className="text-[9.5px] text-amber-700 font-sans font-semibold mt-0.5">
+                          Tab: {fluteType === 'B/C' ? '3,9 cm (39 mm)' : '3,1 cm (31 mm)'}
+                        </div>
+                      </div>
+
+                      <div className="p-2 bg-white/90 rounded border border-amber-200">
+                        <div className="text-[10px] text-slate-500 font-sans font-semibold">Ukuran Sheet Bentangan:</div>
+                        <div className="font-bold text-emerald-800 mt-0.5">
+                          {calculation.L_sheet} × {calculation.P_sheet} mm
+                        </div>
+                        <div className="text-[9.5px] text-slate-500 font-sans mt-0.5">
+                          L+T+{calculation.creasing} × ((P+L)×2)+{calculation.kupingan}
+                        </div>
                       </div>
                     </div>
                   </div>

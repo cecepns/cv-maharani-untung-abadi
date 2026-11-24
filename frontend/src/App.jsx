@@ -75,6 +75,9 @@ import SlipGajiPage from '@/pages/payroll/SlipGajiPage';
 // Settings & Users
 import UsersPage from '@/pages/settings/UsersPage';
 
+// Buku Panduan Aplikasi
+import PanduanPage from '@/pages/panduan/PanduanPage';
+
 function ProtectedLayout() {
   const { isAuthenticated } = useAuth();
   if (!isAuthenticated) {
@@ -188,6 +191,9 @@ export default function App() {
 
             {/* Pengaturan & User Management */}
             <Route path="/settings/users" element={<UsersPage />} />
+
+            {/* Buku Panduan Aplikasi ERP */}
+            <Route path="/panduan" element={<PanduanPage />} />
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />

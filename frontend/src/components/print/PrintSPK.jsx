@@ -46,13 +46,23 @@ export default function PrintSPK({ data, onClose }) {
   const syaratBayar = data.syarat_pembayaran || data.termin_bayar || '1 bulan setelah barang terima';
   const sambungan = data.sambungan || data.jenis_sambungan || 'Stitching (Jahit Kawat)';
 
-  // Ukuran Sheet Estimasi
-  const isDoubleWall = substance.includes('BC') || substance.includes('B/C');
-  const kuping = isDoubleWall ? 63 : 43;
-  const crease = isDoubleWall ? 24 : 12;
-  const lSheet = lBox + tBox + crease;
-  const pSheet = ((pBox + lBox) * 2) + kuping;
-  const ukuranSheet = data.ukuran_sheet && data.ukuran_sheet !== '-'
+  // Rumus Standar Resmi Pabrik (Sesuai Revisi Client 1 & 2):
+  // 1. Single Wall A1: Size Luar (P+3, L+3, T+6 mm), Tutup Flap (L/2 + 3 mm), Tab 3.1 cm (31 mm)
+  //    Lebar Sheet = L + T + 6 mm, Panjang Sheet = (P + L) * 2 + 31 mm
+  // 2. Double Wall A2: Size Luar (P+6, L+6, T+12 mm), Tutup Flap (L/2 + 6 mm), Tab 3.9 cm (39 mm)
+  //    Lebar Sheet = L + T + 12 mm, Panjang Sheet = (P + L) * 2 + 39 mm
+  const isDoubleWall = (substance.toUpperCase().includes('BC') || substance.toUpperCase().includes('B/C') || (data.nama_box || '').toUpperCase().includes('DOUBLE') || (data.tipe_karton || '').toUpperCase().includes('A2') || (data.tipe_karton || '').toUpperCase().includes('DW'));
+  const tabMm = isDoubleWall ? 39 : 31;
+  const tabCm = (tabMm / 10).toFixed(1);
+  const tutupFlap = isDoubleWall ? Math.round((lBox / 2) + 6) : Math.round((lBox / 2) + 3);
+  const creaseSheet = isDoubleWall ? 12 : 6;
+  const pLuar = isDoubleWall ? pBox + 6 : pBox + 3;
+  const lLuar = isDoubleWall ? lBox + 6 : lBox + 3;
+  const tLuar = isDoubleWall ? tBox + 12 : tBox + 6;
+
+  const lSheet = lBox + tBox + creaseSheet;
+  const pSheet = ((pBox + lBox) * 2) + tabMm;
+  const ukuranSheet = data.ukuran_sheet && data.ukuran_sheet !== '-' && !data.ukuran_sheet.includes('NaN')
     ? data.ukuran_sheet
     : `${lSheet} x ${pSheet} mm`;
 
@@ -232,7 +242,19 @@ export default function PrintSPK({ data, onClose }) {
               <tr>
                 <td className="py-0.5 font-semibold text-slate-600">Ukuran Jadi (P x L x T)</td>
                 <td className="py-0.5 text-center font-bold">:</td>
-                <td className="py-0.5 font-mono font-bold text-slate-900">{ukuranBox}</td>
+                <td className="py-0.5 font-mono font-bold text-slate-900">
+                  {ukuranBox}
+                  <span className="ml-2 text-[11px] font-sans font-semibold text-slate-600">
+                    (Size Luar: <span className="font-bold text-slate-900 font-mono">{pLuar} x {lLuar} x {tLuar} mm</span>)
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td className="py-0.5 font-semibold text-slate-600">Tutup Flap & Tab Sambungan</td>
+                <td className="py-0.5 text-center font-bold">:</td>
+                <td className="py-0.5 font-semibold text-slate-800 text-[11px]">
+                  Tutup Flap: <span className="font-bold text-blue-700">{tutupFlap} mm</span> ({isDoubleWall ? 'L/2 + 6' : 'L/2 + 3'}) • Tab: <span className="font-bold text-amber-700">{tabMm} mm ({tabCm} cm)</span>
+                </td>
               </tr>
               <tr>
                 <td className="py-0.5 font-semibold text-slate-600">Target Ukuran Sheet</td>
@@ -285,66 +307,66 @@ export default function PrintSPK({ data, onClose }) {
           </table>
         </div>
 
-        {/* Slot Design Dos & Model Dos (DIPERBESAR & FLEKSIBEL SESUAI REVISI ITEM 5) */}
-        <div className="border-2 border-slate-400 rounded-lg p-3 mb-3 bg-white">
+        {/* Slot Model Bentangan Dos (SELALU TAMPIL, LENGKAP DENGAN UKURAN P, L, T, TUTUP, TAB) */}
+        <div className="border-2 border-slate-400 rounded-lg p-3 mb-3 bg-white break-inside-avoid">
           <div className="flex items-center justify-between mb-1.5 pb-1 border-b border-slate-200">
             <span className="font-extrabold text-slate-900 text-xs uppercase tracking-wide flex items-center gap-1.5">
               <PenTool className="w-3.5 h-3.5 text-brand-600" />
-              Design Dos & Model Bentangan Dos (Ukuran Diperbesar):
+              Model Bentangan Dos & Spesifikasi Ukuran Sheet:
             </span>
             <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-700 rounded border border-slate-300">
-              {boxModel === 'a1' && 'Pola Standard RSC (A1)'}
+              {boxModel === 'a1' && (isDoubleWall ? 'Pola Double Wall (A2)' : 'Pola Single Wall (A1)')}
               {boxModel === 'diecut' && 'Pola Pisau Pond / Die-Cut'}
               {boxModel === 'manual' && 'Sketsa / Tulis Manual'}
             </span>
           </div>
 
-          {/* Area Desain / Bentangan yang Luas & Jelas */}
+          {/* Area Diagram Bentangan Dus (Tetap Ada & Tidak Hilang Saat Upload Desain) */}
           <div className="min-h-[160px] flex items-center justify-center p-2 rounded bg-slate-50/50 border border-dashed border-slate-300 relative">
-            {designImage ? (
-              <div className="w-full flex flex-col items-center justify-center">
-                <img
-                  src={designImage}
-                  alt="Desain Dus"
-                  className="max-h-56 max-w-full object-contain rounded shadow-xs"
-                />
-                <span className="text-[10px] text-slate-500 mt-1 italic">Artwork Desain Dus Terlampir</span>
-              </div>
-            ) : boxModel === 'a1' ? (
+            {boxModel === 'a1' ? (
               <div className="w-full text-center">
-                <svg viewBox="0 0 540 160" className="w-full h-36 mx-auto stroke-slate-800 fill-white">
+                <svg viewBox="0 0 540 170" className="w-full h-40 mx-auto stroke-slate-800 fill-white">
                   {/* Flaps Atas */}
-                  <rect x="30" y="10" width="110" height="35" strokeWidth="1.5" strokeDasharray="4 2" fill="#f8fafc" />
-                  <rect x="140" y="10" width="130" height="35" strokeWidth="1.5" strokeDasharray="4 2" fill="#f8fafc" />
-                  <rect x="270" y="10" width="110" height="35" strokeWidth="1.5" strokeDasharray="4 2" fill="#f8fafc" />
-                  <rect x="380" y="10" width="130" height="35" strokeWidth="1.5" strokeDasharray="4 2" fill="#f8fafc" />
+                  <rect x="25" y="10" width="110" height="35" strokeWidth="1.5" strokeDasharray="4 2" fill="#f8fafc" />
+                  <rect x="135" y="10" width="130" height="35" strokeWidth="1.5" strokeDasharray="4 2" fill="#f8fafc" />
+                  <rect x="265" y="10" width="110" height="35" strokeWidth="1.5" strokeDasharray="4 2" fill="#f8fafc" />
+                  <rect x="375" y="10" width="130" height="35" strokeWidth="1.5" strokeDasharray="4 2" fill="#f8fafc" />
                   
-                  {/* Body Utama Dus (4 Panel) */}
-                  <rect x="30" y="45" width="110" height="70" strokeWidth="1.5" fill="#f1f5f9" />
-                  <rect x="140" y="45" width="130" height="70" strokeWidth="1.5" fill="#f1f5f9" />
-                  <rect x="270" y="45" width="110" height="70" strokeWidth="1.5" fill="#f1f5f9" />
-                  <rect x="380" y="45" width="130" height="70" strokeWidth="1.5" fill="#f1f5f9" />
+                  {/* Body Utama Dus (4 Panel: L, P, L, P) */}
+                  <rect x="25" y="45" width="110" height="75" strokeWidth="1.5" fill="#f1f5f9" />
+                  <rect x="135" y="45" width="130" height="75" strokeWidth="1.5" fill="#f1f5f9" />
+                  <rect x="265" y="45" width="110" height="75" strokeWidth="1.5" fill="#f1f5f9" />
+                  <rect x="375" y="45" width="130" height="75" strokeWidth="1.5" fill="#f1f5f9" />
                   
-                  {/* Kupingan Tab Sambungan Flap */}
-                  <polygon points="510,50 535,55 535,105 510,110" strokeWidth="1.5" fill="#e2e8f0" />
+                  {/* Kupingan Tab Sambungan */}
+                  <polygon points="505,50 535,55 535,115 505,120" strokeWidth="1.5" fill="#fed7aa" />
 
                   {/* Flaps Bawah */}
-                  <rect x="30" y="115" width="110" height="35" strokeWidth="1.5" strokeDasharray="4 2" fill="#f8fafc" />
-                  <rect x="140" y="115" width="130" height="35" strokeWidth="1.5" strokeDasharray="4 2" fill="#f8fafc" />
-                  <rect x="270" y="115" width="110" height="35" strokeWidth="1.5" strokeDasharray="4 2" fill="#f8fafc" />
-                  <rect x="380" y="115" width="130" height="35" strokeWidth="1.5" strokeDasharray="4 2" fill="#f8fafc" />
+                  <rect x="25" y="120" width="110" height="35" strokeWidth="1.5" strokeDasharray="4 2" fill="#f8fafc" />
+                  <rect x="135" y="120" width="130" height="35" strokeWidth="1.5" strokeDasharray="4 2" fill="#f8fafc" />
+                  <rect x="265" y="120" width="110" height="35" strokeWidth="1.5" strokeDasharray="4 2" fill="#f8fafc" />
+                  <rect x="375" y="120" width="130" height="35" strokeWidth="1.5" strokeDasharray="4 2" fill="#f8fafc" />
 
                   {/* Labels Dimensi */}
-                  <text x="85" y="85" textAnchor="middle" className="text-[10px] font-bold fill-slate-700">L: {lBox} mm</text>
-                  <text x="205" y="85" textAnchor="middle" className="text-[10px] font-bold fill-slate-700">P: {pBox} mm</text>
-                  <text x="325" y="85" textAnchor="middle" className="text-[10px] font-bold fill-slate-700">L: {lBox} mm</text>
-                  <text x="445" y="85" textAnchor="middle" className="text-[10px] font-bold fill-slate-700">P: {pBox} mm</text>
-                  <text x="522" y="85" textAnchor="middle" className="text-[8px] font-bold fill-slate-500">Tab</text>
-                  <text x="270" y="32" textAnchor="middle" className="text-[9px] fill-slate-500">Tinggi Dus: {tBox} mm</text>
+                  <text x="80" y="88" textAnchor="middle" className="text-[11px] font-bold fill-slate-800">L: {lBox} mm</text>
+                  <text x="200" y="88" textAnchor="middle" className="text-[11px] font-bold fill-slate-800">P: {pBox} mm</text>
+                  <text x="320" y="88" textAnchor="middle" className="text-[11px] font-bold fill-slate-800">L: {lBox} mm</text>
+                  <text x="440" y="88" textAnchor="middle" className="text-[11px] font-bold fill-slate-800">P: {pBox} mm</text>
+                  <text x="520" y="88" textAnchor="middle" className="text-[8.5px] font-black fill-amber-800">Tab {tabMm}mm</text>
+                  <text x="270" y="32" textAnchor="middle" className="text-[9.5px] font-semibold fill-slate-600">
+                    Tutup Flap Atas: (L/2 + {isDoubleWall ? '6' : '3'}) = {tutupFlap} mm
+                  </text>
+                  <text x="270" y="142" textAnchor="middle" className="text-[9.5px] font-semibold fill-slate-600">
+                    Tutup Flap Bawah: (L/2 + {isDoubleWall ? '6' : '3'}) = {tutupFlap} mm
+                  </text>
                 </svg>
-                <p className="text-[10px] text-slate-500 mt-1 font-semibold">
-                  Bentangan Standard RSC A1 • Ukuran Sheet: {ukuranSheet}
-                </p>
+                <div className="mt-1 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10px] text-slate-600 font-semibold bg-white p-1.5 rounded border border-slate-200">
+                  <span><strong>Tipe:</strong> {isDoubleWall ? 'Double Wall A2' : 'Single Wall A1'}</span>
+                  <span><strong>Target Sheet:</strong> <span className="font-mono text-emerald-700 font-bold">{ukuranSheet}</span></span>
+                  <span><strong>Tab Kuping:</strong> <span className="text-amber-700 font-bold">{tabMm} mm ({tabCm} cm)</span></span>
+                  <span><strong>Tutup Flap:</strong> <span className="text-blue-700 font-bold">{tutupFlap} mm</span></span>
+                  <span><strong>Size Luar:</strong> <span className="font-mono font-bold">{pLuar} x {lLuar} x {tLuar} mm</span></span>
+                </div>
               </div>
             ) : boxModel === 'diecut' ? (
               <div className="w-full text-center">
@@ -380,6 +402,37 @@ export default function PrintSPK({ data, onClose }) {
             )}
           </div>
         </div>
+
+        {/* Slot Desain Dus / Artwork Cetakan Dus (TAMPIL TERSENDIRI SEHINGGA BENTANGAN DOS TIDAK HILANG!) */}
+        {designImage && (
+          <div className="border-2 border-slate-400 rounded-lg p-3 mb-3 bg-white break-inside-avoid">
+            <div className="flex items-center justify-between mb-1.5 pb-1 border-b border-slate-200">
+              <span className="font-extrabold text-slate-900 text-xs uppercase tracking-wide flex items-center gap-1.5">
+                <ImageIcon className="w-3.5 h-3.5 text-brand-600" />
+                Artwork & Desain Cetakan Dus:
+              </span>
+              <button
+                type="button"
+                onClick={() => setDesignImage(null)}
+                className="no-print text-[11px] font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 cursor-pointer"
+                title="Hapus gambar desain"
+              >
+                <Trash2 className="w-3 h-3" />
+                Hapus Desain
+              </button>
+            </div>
+            <div className="flex flex-col items-center justify-center p-2 rounded bg-slate-50/50 border border-dashed border-slate-300">
+              <img
+                src={designImage}
+                alt="Artwork Desain Dus"
+                className="max-h-72 sm:max-h-96 max-w-full object-contain rounded shadow-xs"
+              />
+              <span className="text-[10px] text-slate-500 mt-1 italic">
+                Artwork Desain Cetakan Dus Terlampir • Sesuai Approval Client
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Tabel Routing Kerja & Mesin (REVISI CLIENT ITEM 6: DAPAT DIISI / DIUBAH SENDIRI) */}
         <div className="mb-3">

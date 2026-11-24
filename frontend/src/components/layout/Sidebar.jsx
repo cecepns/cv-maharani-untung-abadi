@@ -53,6 +53,7 @@ export default function Sidebar({ isOpen, onClose }) {
       category: 'UTAMA',
       items: [
         { name: 'Dashboard Analitik', path: '/', icon: LayoutDashboard },
+        { name: 'Buku Panduan Aplikasi', path: '/panduan', icon: BookOpen },
       ],
     },
     {
@@ -129,6 +130,7 @@ export default function Sidebar({ isOpen, onClose }) {
     {
       category: 'PENGATURAN',
       items: [
+        { name: 'Buku Panduan ERP', path: '/panduan', icon: BookOpen },
         { name: 'Manajemen Akun User', path: '/settings/users', icon: ShieldCheck },
       ],
     },
