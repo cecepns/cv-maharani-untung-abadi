@@ -37,6 +37,24 @@ export default function Sidebar({ isOpen, onClose }) {
   const { user, logout } = useAuth();
   const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false);
 
+  // Auto-tutup sidebar saat navigasi/pindah route di perangkat mobile & tablet
+  React.useEffect(() => {
+    if (onClose) {
+      onClose();
+    }
+  }, [location.pathname]);
+
+  // Tutup sidebar saat tekan tombol Escape
+  React.useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isOpen && onClose) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   const handleLogout = () => {
     setConfirmLogoutOpen(false);
     logout();
@@ -191,7 +209,7 @@ export default function Sidebar({ isOpen, onClose }) {
                       key={item.path}
                       to={item.path}
                       onClick={() => {
-                        if (window.innerWidth < 1024) onClose();
+                        if (onClose) onClose();
                       }}
                       className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                         isActive

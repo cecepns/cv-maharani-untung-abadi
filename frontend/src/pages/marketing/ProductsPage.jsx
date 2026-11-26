@@ -267,14 +267,14 @@ export default function ProductsPage() {
             <table className="w-full text-left text-sm text-slate-600">
               <thead className="bg-slate-50/80 text-xs uppercase font-semibold text-slate-500 border-b border-slate-100">
                 <tr>
-                  <th className="px-6 py-4">Kode & Nama Dus</th>
-                  <th className="px-6 py-4">Jenis & Flute</th>
-                  <th className="px-6 py-4">Dimensi / Berat</th>
-                  <th className="px-6 py-4">Substansi Kertas</th>
-                  <th className="px-6 py-4">Sambungan</th>
-                  <th className="px-6 py-4">Harga Jual</th>
-                  <th className="px-6 py-4">Stok Saat Ini</th>
-                  <th className="px-6 py-4 text-center">Aksi</th>
+                  <th className="px-6 py-4 min-w-[240px] whitespace-nowrap">Kode & Nama Dus</th>
+                  <th className="px-6 py-4 min-w-[150px] whitespace-nowrap">Jenis & Flute</th>
+                  <th className="px-6 py-4 min-w-[180px] whitespace-nowrap">Dimensi / Berat</th>
+                  <th className="px-6 py-4 min-w-[150px] whitespace-nowrap">Substansi Kertas</th>
+                  <th className="px-6 py-4 min-w-[130px] whitespace-nowrap">Sambungan</th>
+                  <th className="px-6 py-4 min-w-[160px] whitespace-nowrap">Harga Jual</th>
+                  <th className="px-6 py-4 min-w-[140px] whitespace-nowrap">Stok Saat Ini</th>
+                  <th className="px-6 py-4 min-w-[100px] text-center whitespace-nowrap">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -284,10 +284,12 @@ export default function ProductsPage() {
                   return (
                     <tr key={p.id} className="hover:bg-slate-50/60 transition-colors">
                       <td className="px-6 py-4">
-                        <div className="font-bold text-slate-900">{p.nama_barang}</div>
-                        <div className="text-xs font-mono text-amber-700 mt-0.5">{p.kode_barang}</div>
+                        <div className="font-bold text-slate-900 text-sm">{p.nama_barang}</div>
+                        <div className="inline-block text-xs font-mono font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/60 mt-1 whitespace-nowrap">
+                          {p.kode_barang}
+                        </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <Badge
                           variant={
                             p.jenis_barang === 'Box'
@@ -296,12 +298,13 @@ export default function ProductsPage() {
                               ? 'purple'
                               : 'warning'
                           }
+                          className="whitespace-nowrap"
                         >
                           {p.jenis_barang}
                         </Badge>
-                        <div className="text-xs font-semibold text-slate-700 mt-1">{p.tipe_flute}</div>
+                        <div className="text-xs font-semibold text-slate-700 mt-1 whitespace-nowrap">{p.tipe_flute}</div>
                       </td>
-                      <td className="px-6 py-4 text-xs font-mono text-slate-700">
+                      <td className="px-6 py-4 text-xs font-mono text-slate-700 whitespace-nowrap">
                         {isSingleFace ? (
                           <div>
                             <span className="font-bold text-purple-700">{p.berat_roll_kg ? `${p.berat_roll_kg} Kg / Roll` : '1 Roll'}</span>
@@ -311,47 +314,47 @@ export default function ProductsPage() {
                           `${p.panjang_mm} x ${p.lebar_mm} ${p.tinggi_mm > 0 ? `x ${p.tinggi_mm}` : ''} mm`
                         )}
                       </td>
-                      <td className="px-6 py-4 text-xs font-semibold text-slate-800">
+                      <td className="px-6 py-4 text-xs font-semibold text-slate-800 whitespace-nowrap">
                         {p.substansi}
                       </td>
-                      <td className="px-6 py-4 text-xs text-slate-600">
+                      <td className="px-6 py-4 text-xs text-slate-600 whitespace-nowrap">
                         {p.jenis_sambungan}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <div className="font-bold text-slate-900">
                           Rp {Number(p.harga_jual).toLocaleString('id-ID')}
                           <span className="text-xs font-normal text-slate-400 ml-1">/ {p.satuan || 'Pcs'}</span>
                         </div>
                         {isSingleFace && p.harga_per_kg > 0 && (
-                          <div className="text-[11px] font-semibold text-purple-600">
+                          <div className="text-[11px] font-semibold text-purple-600 mt-0.5">
                             (Rp {Number(p.harga_per_kg).toLocaleString('id-ID')} / kg)
                           </div>
                         )}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <span className={`font-bold ${isLowStock ? 'text-rose-600' : 'text-emerald-700'}`}>
                             {Number(p.stok_qty).toLocaleString('id-ID')} {p.satuan}
                           </span>
                           {isLowStock && (
-                            <span className="text-[10px] bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded font-semibold">
+                            <span className="text-[10px] bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded font-semibold whitespace-nowrap">
                               Min Stok
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-6 py-4 text-center whitespace-nowrap">
                         <div className="flex items-center justify-center gap-1.5">
                           <button
                             onClick={() => handleOpenEdit(p)}
-                            className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                            className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
                             title="Edit Produk"
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => setDeleteDialog({ isOpen: true, id: p.id, name: p.nama_barang })}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                             title="Hapus Produk"
                           >
                             <Trash2 className="w-4 h-4" />

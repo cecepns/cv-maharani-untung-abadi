@@ -61,11 +61,11 @@ export default function Navbar({ onToggleSidebar }) {
             <div className="w-9 h-9 rounded-xl bg-white border border-slate-200/80 p-0.5 flex items-center justify-center shrink-0 overflow-hidden shadow-xs">
               <img src="/logo.png" alt="CV. Maharani Logo" className="w-full h-full object-contain" />
             </div>
-            <div className="hidden sm:block text-left">
-              <h2 className="text-xs font-extrabold text-slate-800 tracking-wider uppercase">
+            <div className="hidden sm:block text-left min-w-0">
+              <h2 className="text-xs font-extrabold text-slate-800 tracking-wider uppercase truncate max-w-[280px] sm:max-w-md lg:max-w-xl">
                 SISTEM INFORMASI MANUFAKTUR & PACKAGING TERINTEGRASI
               </h2>
-              <p className="text-[11px] font-medium text-slate-500">
+              <p className="text-[11px] font-medium text-slate-500 truncate max-w-[280px] sm:max-w-md lg:max-w-xl">
                 CV. Maharani Untung Abadi • Pabrik Corrugated Box & Karton Gelombang
               </p>
             </div>

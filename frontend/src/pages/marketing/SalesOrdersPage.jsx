@@ -343,46 +343,48 @@ export default function SalesOrdersPage() {
             <table className="w-full text-left text-sm text-slate-600">
               <thead className="bg-slate-50/80 text-xs uppercase font-semibold text-slate-500 border-b border-slate-100">
                 <tr>
-                  <th className="px-6 py-4">Nomor & Tanggal SO</th>
-                  <th className="px-6 py-4">Customer & Sales</th>
-                  <th className="px-6 py-4">Item Dus Pesanan</th>
-                  <th className="px-6 py-4">Total Nilai (+PPN)</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4 text-center">Tindakan Produksi & Aksi</th>
+                  <th className="px-6 py-4 min-w-[200px] whitespace-nowrap">Nomor & Tanggal SO</th>
+                  <th className="px-6 py-4 min-w-[220px] whitespace-nowrap">Customer & Sales</th>
+                  <th className="px-6 py-4 min-w-[220px]">Item Dus Pesanan</th>
+                  <th className="px-6 py-4 min-w-[170px] whitespace-nowrap">Total Nilai (+PPN)</th>
+                  <th className="px-6 py-4 min-w-[110px] whitespace-nowrap">Status</th>
+                  <th className="px-6 py-4 min-w-[190px] text-center whitespace-nowrap">Tindakan Produksi & Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {salesOrders.map((so) => (
                   <tr key={so.id} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="font-bold text-slate-900">{so.nomor_so}</div>
-                      <div className="text-xs text-slate-500 mt-0.5">{so.tanggal_so}</div>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="font-bold text-slate-900 font-mono text-xs text-brand-700 bg-brand-50 px-2 py-0.5 rounded border border-brand-200/60 inline-block">
+                        {so.nomor_so}
+                      </div>
+                      <div className="text-xs text-slate-500 mt-1">{so.tanggal_so}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="font-bold text-slate-800">{so.nama_customer || so.customer_nama || 'Customer'}</div>
-                      <div className="text-xs text-brand-600 mt-0.5 font-medium">Sales: {so.nama_sales || so.sales_nama || '-'}</div>
+                      <div className="font-bold text-slate-800 text-sm">{so.nama_customer || so.customer_nama || 'Customer'}</div>
+                      <div className="text-xs text-brand-600 mt-0.5 font-medium whitespace-nowrap">Sales: {so.nama_sales || so.sales_nama || '-'}</div>
                     </td>
                     <td className="px-6 py-4">
                       {(so.items || []).map((it, idx) => (
-                        <div key={idx} className="text-xs text-slate-700">
-                          <span className="font-semibold text-slate-900">{Number(it.qty).toLocaleString('id-ID')} Pcs</span> - {it.nama_barang}
+                        <div key={idx} className="text-xs text-slate-700 leading-relaxed">
+                          <span className="font-bold text-slate-900">{Number(it.qty).toLocaleString('id-ID')} Pcs</span> - {it.nama_barang}
                         </div>
                       ))}
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="font-bold text-emerald-700 text-sm">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="font-bold text-emerald-700 text-sm whitespace-nowrap">
                         Rp {Number(so.total_nilai).toLocaleString('id-ID')}
                       </div>
-                      <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
+                      <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5 whitespace-nowrap">
                         <span>Subtotal: Rp {Number(so.subtotal).toLocaleString('id-ID')}</span>
                         {Number(so.ppn) > 0 ? (
-                          <span className="px-1.5 py-0.2 bg-blue-50 text-blue-700 font-semibold rounded text-[10px]">PPN 11%</span>
+                          <span className="px-1.5 py-0.2 bg-blue-50 text-blue-700 font-semibold rounded text-[10px] whitespace-nowrap">PPN 11%</span>
                         ) : (
-                          <span className="px-1.5 py-0.2 bg-slate-100 text-slate-600 font-semibold rounded text-[10px]">Non-PPN</span>
+                          <span className="px-1.5 py-0.2 bg-slate-100 text-slate-600 font-semibold rounded text-[10px] whitespace-nowrap">Non-PPN</span>
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <Badge
                         variant={
                           so.status === 'Selesai'
@@ -391,32 +393,33 @@ export default function SalesOrdersPage() {
                             ? 'warning'
                             : 'primary'
                         }
+                        className="whitespace-nowrap"
                       >
                         {so.status}
                       </Badge>
                     </td>
-                    <td className="px-6 py-4 text-center">
-                      <div className="flex items-center justify-center gap-2">
+                    <td className="px-6 py-4 text-center whitespace-nowrap">
+                      <div className="flex items-center justify-center gap-2 whitespace-nowrap">
                         {so.status !== 'Selesai' && (
                           <button
                             onClick={() => handleGenerateSPK(so)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-semibold rounded-lg shadow-2xs transition-colors"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-semibold rounded-lg shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
                             title="Terbitkan SPK Produksi Otomatis"
                           >
-                            <Factory className="w-3.5 h-3.5 text-amber-600" />
+                            <Factory className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                             Terbitkan SPK
                           </button>
                         )}
                         <button
                           onClick={() => handleOpenEdit(so)}
-                          className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors cursor-pointer"
                           title="Ubah Sales Order & Sales Person"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => setDeleteDialog({ isOpen: true, id: so.id, name: so.nomor_so })}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                           title="Hapus Sales Order"
                         >
                           <Trash2 className="w-4 h-4" />

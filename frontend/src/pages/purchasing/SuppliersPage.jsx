@@ -191,22 +191,24 @@ export default function SuppliersPage() {
             <table className="w-full text-left text-sm text-slate-600">
               <thead className="bg-slate-50/80 text-xs uppercase font-semibold text-slate-500 border-b border-slate-100">
                 <tr>
-                  <th className="px-6 py-4">Nama Supplier & Kode</th>
-                  <th className="px-6 py-4">Kategori Bahan</th>
-                  <th className="px-6 py-4">Kontak & PIC</th>
-                  <th className="px-6 py-4">Alamat Pabrik / Gudang</th>
-                  <th className="px-6 py-4">Termin Bayar</th>
-                  <th className="px-6 py-4 text-center">Aksi</th>
+                  <th className="px-6 py-4 min-w-[240px] whitespace-nowrap">Nama Supplier & Kode</th>
+                  <th className="px-6 py-4 min-w-[160px] whitespace-nowrap">Kategori Bahan</th>
+                  <th className="px-6 py-4 min-w-[180px] whitespace-nowrap">Kontak & PIC</th>
+                  <th className="px-6 py-4 min-w-[220px] max-w-xs">Alamat Pabrik / Gudang</th>
+                  <th className="px-6 py-4 min-w-[130px] whitespace-nowrap">Termin Bayar</th>
+                  <th className="px-6 py-4 min-w-[100px] text-center whitespace-nowrap">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {suppliers.map((s) => (
                   <tr key={s.id} className="hover:bg-slate-50/60 transition-colors">
                     <td className="px-6 py-4">
-                      <div className="font-bold text-slate-900">{s.nama_supplier}</div>
-                      <div className="text-xs font-mono text-amber-700 mt-0.5">{s.kode_supplier}</div>
+                      <div className="font-bold text-slate-900 text-sm">{s.nama_supplier}</div>
+                      <div className="inline-block text-xs font-mono font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/60 mt-1 whitespace-nowrap">
+                        {s.kode_supplier}
+                      </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <Badge
                         variant={
                           s.kategori === 'Sheet Kertas'
@@ -215,34 +217,46 @@ export default function SuppliersPage() {
                             ? 'primary'
                             : 'purple'
                         }
+                        className="whitespace-nowrap"
                       >
                         {s.kategori}
                       </Badge>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="font-medium text-slate-800">{s.kontak || '-'}</div>
-                      <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                        <Phone className="w-3 h-3 text-slate-400" /> {s.telepon || '-'}
+                      <div className="font-semibold text-slate-800 text-xs whitespace-nowrap">{s.kontak || '-'}</div>
+                      <div className="text-xs text-slate-500 flex items-center gap-1.5 mt-1 whitespace-nowrap">
+                        <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span>{s.telepon || '-'}</span>
                       </div>
+                      {s.email && (
+                        <div className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5 whitespace-nowrap">
+                          <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate max-w-[160px]">{s.email}</span>
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 max-w-xs">
-                      <p className="text-xs text-slate-600 line-clamp-2">{s.alamat || '-'}</p>
+                      <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed" title={s.alamat || '-'}>
+                        {s.alamat || '-'}
+                      </p>
                     </td>
-                    <td className="px-6 py-4 font-semibold text-slate-700">
-                      {s.termin_bayar}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200/80 whitespace-nowrap">
+                        {s.termin_bayar}
+                      </span>
                     </td>
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-6 py-4 text-center whitespace-nowrap">
                       <div className="flex items-center justify-center gap-1.5">
                         <button
                           onClick={() => handleOpenEdit(s)}
-                          className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors cursor-pointer"
                           title="Edit Supplier"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => setDeleteDialog({ isOpen: true, id: s.id, name: s.nama_supplier })}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                           title="Hapus Supplier"
                         >
                           <Trash2 className="w-4 h-4" />

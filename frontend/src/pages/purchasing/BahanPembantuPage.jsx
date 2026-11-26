@@ -267,12 +267,12 @@ export default function BahanPembantuPage() {
             <table className="w-full text-left text-sm text-slate-600">
               <thead className="bg-slate-50/80 text-xs uppercase font-semibold text-slate-500 border-b border-slate-100">
                 <tr>
-                  <th className="px-6 py-4">Kode & Nama Material</th>
-                  <th className="px-6 py-4">Kategori Bahan</th>
-                  <th className="px-6 py-4">Satuan Ukur</th>
-                  <th className="px-6 py-4">Harga Beli Standar</th>
-                  <th className="px-6 py-4">Stok Terkini</th>
-                  <th className="px-6 py-4 text-center">Aksi</th>
+                  <th className="px-6 py-4 min-w-[240px] whitespace-nowrap">Kode & Nama Material</th>
+                  <th className="px-6 py-4 min-w-[160px] whitespace-nowrap">Kategori Bahan</th>
+                  <th className="px-6 py-4 min-w-[120px] whitespace-nowrap">Satuan Ukur</th>
+                  <th className="px-6 py-4 min-w-[160px] whitespace-nowrap">Harga Beli Standar</th>
+                  <th className="px-6 py-4 min-w-[150px] whitespace-nowrap">Stok Terkini</th>
+                  <th className="px-6 py-4 min-w-[100px] text-center whitespace-nowrap">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -281,10 +281,12 @@ export default function BahanPembantuPage() {
                   return (
                     <tr key={b.id} className="hover:bg-slate-50/60 transition-colors">
                       <td className="px-6 py-4">
-                        <div className="font-bold text-slate-900">{b.nama_bahan}</div>
-                        <div className="text-xs font-mono text-brand-600 mt-0.5">{b.kode_bahan}</div>
+                        <div className="font-bold text-slate-900 text-sm">{b.nama_bahan}</div>
+                        <div className="inline-block text-xs font-mono font-bold text-brand-700 bg-brand-50 px-2 py-0.5 rounded border border-brand-200/60 mt-1 whitespace-nowrap">
+                          {b.kode_bahan}
+                        </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <Badge
                           variant={
                             b.kategori === 'Tinta Flexo'
@@ -295,36 +297,41 @@ export default function BahanPembantuPage() {
                               ? 'purple'
                               : 'slate'
                           }
+                          className="whitespace-nowrap"
                         >
                           {b.kategori}
                         </Badge>
                       </td>
-                      <td className="px-6 py-4 font-semibold text-slate-700">
-                        {b.satuan}
+                      <td className="px-6 py-4 font-semibold text-slate-700 whitespace-nowrap">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200/80">
+                          {b.satuan}
+                        </span>
                       </td>
-                      <td className="px-6 py-4 font-bold text-slate-900">
-                        Rp {Number(b.harga_satuan).toLocaleString('id-ID')} / {b.satuan}
+                      <td className="px-6 py-4 font-bold text-slate-900 whitespace-nowrap">
+                        Rp {Number(b.harga_satuan).toLocaleString('id-ID')} <span className="text-xs font-normal text-slate-400">/ {b.satuan}</span>
                       </td>
-                      <td className="px-6 py-4">
-                        <span className={`font-bold ${isLow ? 'text-rose-600' : 'text-emerald-700'}`}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`text-base font-extrabold ${isLow ? 'text-rose-600' : 'text-emerald-700'}`}>
                           {Number(b.stok).toLocaleString('id-ID')} {b.satuan}
                         </span>
-                        {isLow && (
-                          <div className="text-[10px] text-rose-500 font-semibold mt-0.5">Segera Restock</div>
+                        {isLow ? (
+                          <div className="text-[10px] text-rose-500 font-semibold mt-0.5 whitespace-nowrap">Min: {b.min_stok} {b.satuan} (Restock)</div>
+                        ) : (
+                          <div className="text-[10px] text-slate-400 mt-0.5 whitespace-nowrap">Min: {b.min_stok} {b.satuan}</div>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-6 py-4 text-center whitespace-nowrap">
                         <div className="flex items-center justify-center gap-1.5">
                           <button
                             onClick={() => handleOpenEdit(b)}
-                            className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+                            className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors cursor-pointer"
                             title="Edit Bahan"
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => setDeleteDialog({ isOpen: true, id: b.id, name: b.nama_bahan })}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                             title="Hapus Bahan"
                           >
                             <Trash2 className="w-4 h-4" />

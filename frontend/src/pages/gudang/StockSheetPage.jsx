@@ -84,12 +84,12 @@ export default function StockSheetPage() {
             <table className="w-full text-left text-sm text-slate-600">
               <thead className="bg-slate-50/80 text-xs uppercase font-semibold text-slate-500 border-b border-slate-100">
                 <tr>
-                  <th className="px-6 py-4">Kode & Deskripsi Sheet</th>
-                  <th className="px-6 py-4">Dimensi (P x L mm)</th>
-                  <th className="px-6 py-4">Tipe Flute</th>
-                  <th className="px-6 py-4">Substansi Kertas</th>
-                  <th className="px-6 py-4">Stok Fisik Lembar</th>
-                  <th className="px-6 py-4">Status Ketersediaan</th>
+                  <th className="px-6 py-4 min-w-[240px] whitespace-nowrap">Kode & Deskripsi Sheet</th>
+                  <th className="px-6 py-4 min-w-[170px] whitespace-nowrap">Dimensi (P x L mm)</th>
+                  <th className="px-6 py-4 min-w-[110px] whitespace-nowrap">Tipe Flute</th>
+                  <th className="px-6 py-4 min-w-[150px] whitespace-nowrap">Substansi Kertas</th>
+                  <th className="px-6 py-4 min-w-[160px] whitespace-nowrap">Stok Fisik Lembar</th>
+                  <th className="px-6 py-4 min-w-[150px] whitespace-nowrap">Status Ketersediaan</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -98,33 +98,35 @@ export default function StockSheetPage() {
                   return (
                     <tr key={s.id} className="hover:bg-slate-50/60 transition-colors">
                       <td className="px-6 py-4">
-                        <div className="font-bold text-slate-900">{s.nama_sheet}</div>
-                        <div className="text-xs font-mono text-amber-700 mt-0.5">{s.kode_sheet}</div>
+                        <div className="font-bold text-slate-900 text-sm">{s.nama_sheet}</div>
+                        <div className="inline-block text-xs font-mono font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/60 mt-1 whitespace-nowrap">
+                          {s.kode_sheet}
+                        </div>
                       </td>
-                      <td className="px-6 py-4 font-mono font-bold text-slate-800 text-xs">
+                      <td className="px-6 py-4 font-mono font-bold text-slate-800 text-xs whitespace-nowrap">
                         {s.panjang_mm} x {s.lebar_mm} mm
                       </td>
-                      <td className="px-6 py-4">
-                        <Badge variant="warning">{s.flute}</Badge>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Badge variant="warning" className="whitespace-nowrap">{s.flute}</Badge>
                       </td>
-                      <td className="px-6 py-4 text-xs font-semibold text-slate-700">
+                      <td className="px-6 py-4 text-xs font-semibold text-slate-700 whitespace-nowrap">
                         {s.substansi}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`text-base font-extrabold ${isSafe ? 'text-slate-900' : 'text-rose-600'}`}>
                           {Number(s.stok_lembar).toLocaleString('id-ID')} Lembar
                         </span>
-                        <div className="text-[11px] text-slate-400">Min: {s.min_stok} Lbr</div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">Min: {s.min_stok} Lbr</div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         {isSafe ? (
-                          <Badge variant="success">
-                            <CheckCircle2 className="w-3 h-3 mr-1" />
+                          <Badge variant="success" className="whitespace-nowrap">
+                            <CheckCircle2 className="w-3.5 h-3.5 mr-1 shrink-0" />
                             Stok Aman
                           </Badge>
                         ) : (
-                          <Badge variant="danger">
-                            <AlertTriangle className="w-3 h-3 mr-1" />
+                          <Badge variant="danger" className="whitespace-nowrap">
+                            <AlertTriangle className="w-3.5 h-3.5 mr-1 shrink-0" />
                             Harus Beli (Min)
                           </Badge>
                         )}

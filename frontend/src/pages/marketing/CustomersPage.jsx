@@ -195,71 +195,85 @@ export default function CustomersPage() {
             <table className="w-full text-left text-sm text-slate-600">
               <thead className="bg-slate-50/80 text-xs uppercase font-semibold text-slate-500 border-b border-slate-100">
                 <tr>
-                  <th className="px-6 py-4">Kode & Nama Customer</th>
-                  <th className="px-6 py-4">Kontak & PIC</th>
-                  <th className="px-6 py-4">Alamat Pabrik/Gudang</th>
-                  <th className="px-6 py-4">Termin Bayar</th>
-                  <th className="px-6 py-4">Plafon Kredit</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4 text-center">Aksi</th>
+                  <th className="px-6 py-4 min-w-[240px] whitespace-nowrap">Kode & Nama Customer</th>
+                  <th className="px-6 py-4 min-w-[190px] whitespace-nowrap">Kontak & PIC</th>
+                  <th className="px-6 py-4 min-w-[220px] max-w-xs">Alamat Pabrik/Gudang</th>
+                  <th className="px-6 py-4 min-w-[130px] whitespace-nowrap">Termin Bayar</th>
+                  <th className="px-6 py-4 min-w-[150px] whitespace-nowrap">Plafon Kredit</th>
+                  <th className="px-6 py-4 min-w-[100px] whitespace-nowrap">Status</th>
+                  <th className="px-6 py-4 min-w-[100px] text-center whitespace-nowrap">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {customers.map((c) => (
                   <tr key={c.id} className="hover:bg-slate-50/60 transition-colors">
                     <td className="px-6 py-4">
-                      <div className="font-bold text-slate-900">{c.nama_customer}</div>
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <span className="text-xs font-mono text-brand-600 font-semibold">{c.kode_customer}</span>
+                      <div className="font-bold text-slate-900 text-sm">{c.nama_customer}</div>
+                      <div className="flex items-center gap-1.5 mt-1 whitespace-nowrap">
+                        <span className="text-xs font-mono font-bold text-brand-700 bg-brand-50 px-2 py-0.5 rounded border border-brand-200/60 whitespace-nowrap">
+                          {c.kode_customer}
+                        </span>
                         {c.npwp && c.npwp.trim() !== '' && c.npwp !== '-' ? (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                            PKP (Wajib PPN)
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap">
+                            PKP (PPN)
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
-                            Non-Pajak (Non-PKP)
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200 whitespace-nowrap">
+                            Non-PKP
                           </span>
                         )}
                       </div>
-                      {c.npwp && c.npwp !== '-' && <div className="text-[11px] text-slate-400 mt-0.5">NPWP: {c.npwp}</div>}
+                      {c.npwp && c.npwp !== '-' && (
+                        <div className="text-[11px] text-slate-400 mt-1 whitespace-nowrap font-mono">
+                          NPWP: {c.npwp}
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4">
-                      <div className="font-medium text-slate-800">{c.pic || '-'}</div>
-                      <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                        <Phone className="w-3 h-3 text-slate-400" /> {c.telepon || '-'}
+                      <div className="font-semibold text-slate-800 text-xs whitespace-nowrap">{c.pic || '-'}</div>
+                      <div className="text-xs text-slate-500 flex items-center gap-1.5 mt-1 whitespace-nowrap">
+                        <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span>{c.telepon || '-'}</span>
                       </div>
                       {c.email && (
-                        <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                          <Mail className="w-3 h-3 text-slate-400" /> {c.email}
+                        <div className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5 whitespace-nowrap">
+                          <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate max-w-[170px]">{c.email}</span>
                         </div>
                       )}
                     </td>
                     <td className="px-6 py-4 max-w-xs">
-                      <p className="text-xs text-slate-600 line-clamp-2">{c.alamat || '-'}</p>
+                      <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed" title={c.alamat || '-'}>
+                        {c.alamat || '-'}
+                      </p>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className="font-semibold text-slate-700">{c.termin_bayar}</span>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200/80 whitespace-nowrap">
+                        {c.termin_bayar}
+                      </span>
                     </td>
-                    <td className="px-6 py-4 font-semibold text-slate-800">
-                      Rp {Number(c.plafon_kredit || 0).toLocaleString('id-ID')}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="font-bold text-slate-800 text-sm whitespace-nowrap">
+                        Rp {Number(c.plafon_kredit || 0).toLocaleString('id-ID')}
+                      </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <Badge variant={c.status === 'Aktif' ? 'success' : 'neutral'}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <Badge variant={c.status === 'Aktif' ? 'success' : 'neutral'} className="whitespace-nowrap">
                         {c.status}
                       </Badge>
                     </td>
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-6 py-4 text-center whitespace-nowrap">
                       <div className="flex items-center justify-center gap-1.5">
                         <button
                           onClick={() => handleOpenEdit(c)}
-                          className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors cursor-pointer"
                           title="Edit Customer"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => setDeleteDialog({ isOpen: true, id: c.id, name: c.nama_customer })}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                           title="Hapus Customer"
                         >
                           <Trash2 className="w-4 h-4" />

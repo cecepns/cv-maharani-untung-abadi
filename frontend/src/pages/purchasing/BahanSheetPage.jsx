@@ -438,13 +438,13 @@ export default function BahanSheetPage() {
             <table className="w-full text-left text-sm text-slate-600">
               <thead className="bg-slate-50/80 text-xs uppercase font-semibold text-slate-500 border-b border-slate-100">
                 <tr>
-                  <th className="px-6 py-4">Kode & Deskripsi Sheet</th>
-                  <th className="px-6 py-4">Ukuran (P x L mm)</th>
-                  <th className="px-6 py-4">Tipe & Substansi</th>
-                  <th className="px-6 py-4">Supplier Utama</th>
-                  <th className="px-6 py-4">Harga Beli / Lembar</th>
-                  <th className="px-6 py-4">Stok Lembar</th>
-                  <th className="px-6 py-4 text-center">Aksi</th>
+                  <th className="px-6 py-4 min-w-[240px] whitespace-nowrap">Kode & Deskripsi Sheet</th>
+                  <th className="px-6 py-4 min-w-[170px] whitespace-nowrap">Ukuran (P x L mm)</th>
+                  <th className="px-6 py-4 min-w-[150px] whitespace-nowrap">Tipe & Substansi</th>
+                  <th className="px-6 py-4 min-w-[180px] whitespace-nowrap">Supplier Utama</th>
+                  <th className="px-6 py-4 min-w-[160px] whitespace-nowrap">Harga Beli / Lembar</th>
+                  <th className="px-6 py-4 min-w-[140px] whitespace-nowrap">Stok Lembar</th>
+                  <th className="px-6 py-4 min-w-[100px] text-center whitespace-nowrap">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -455,53 +455,57 @@ export default function BahanSheetPage() {
                     <tr key={s.id} className="hover:bg-slate-50/60 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900">{s.nama_sheet}</span>
+                          <span className="font-bold text-slate-900 text-sm">{s.nama_sheet}</span>
                           {isOffcut && (
-                            <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded">
+                            <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded whitespace-nowrap">
                               Sisa Offcut
                             </span>
                           )}
                         </div>
-                        <div className="text-xs font-mono text-amber-700 mt-0.5">{s.kode_sheet}</div>
+                        <div className="inline-block text-xs font-mono font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/60 mt-1 whitespace-nowrap">
+                          {s.kode_sheet}
+                        </div>
                       </td>
-                      <td className="px-6 py-4 font-mono font-semibold text-slate-800">
+                      <td className="px-6 py-4 font-mono font-bold text-slate-800 text-xs whitespace-nowrap">
                         {s.panjang_mm} x {s.lebar_mm} mm
                       </td>
-                      <td className="px-6 py-4">
-                        <Badge variant={getFluteBadgeVariant(s.flute)}>{s.flute}</Badge>
-                        <div className="text-xs font-medium text-slate-600 mt-0.5">{s.substansi}</div>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Badge variant={getFluteBadgeVariant(s.flute)} className="whitespace-nowrap">{s.flute}</Badge>
+                        <div className="text-xs font-medium text-slate-600 mt-1 whitespace-nowrap">{s.substansi}</div>
                       </td>
-                      <td className="px-6 py-4 text-slate-700 font-medium">
+                      <td className="px-6 py-4 text-slate-700 font-medium whitespace-nowrap">
                         {s.supplier_nama || 'PT. Fajar Surya Wisesa'}
                       </td>
-                      <td className="px-6 py-4 font-bold text-slate-900">
-                        <div>Rp {Number(s.harga_per_lembar).toLocaleString('id-ID')}</div>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="font-bold text-slate-900">Rp {Number(s.harga_per_lembar).toLocaleString('id-ID')}</div>
                         {s.nilai_index ? (
-                          <div className="text-[10px] text-emerald-700 font-semibold font-mono mt-0.5">
+                          <div className="text-[10px] text-emerald-700 font-semibold font-mono mt-0.5 whitespace-nowrap">
                             Idx: Rp {Number(s.nilai_index).toLocaleString('id-ID')}/{s.metode_index === 'kg' ? 'kg' : 'm²'}
                           </div>
                         ) : null}
                       </td>
-                      <td className="px-6 py-4">
-                        <span className={`font-bold ${isLow ? 'text-rose-600' : 'text-emerald-700'}`}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`text-base font-extrabold ${isLow ? 'text-rose-600' : 'text-emerald-700'}`}>
                           {Number(s.stok_lembar).toLocaleString('id-ID')} Lbr
                         </span>
-                        {isLow && (
-                          <div className="text-[10px] text-rose-500 font-semibold mt-0.5">Stok menipis</div>
+                        {isLow ? (
+                          <div className="text-[10px] text-rose-500 font-semibold mt-0.5 whitespace-nowrap">Stok menipis</div>
+                        ) : (
+                          <div className="text-[10px] text-slate-400 mt-0.5 whitespace-nowrap">Min: {s.min_stok} Lbr</div>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-6 py-4 text-center whitespace-nowrap">
                         <div className="flex items-center justify-center gap-1.5">
                           <button
                             onClick={() => handleOpenEdit(s)}
-                            className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                            className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
                             title="Edit Sheet"
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => setDeleteDialog({ isOpen: true, id: s.id, name: s.nama_sheet })}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                             title="Hapus Sheet"
                           >
                             <Trash2 className="w-4 h-4" />
