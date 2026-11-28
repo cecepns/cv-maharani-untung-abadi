@@ -464,7 +464,7 @@ export default function SalesOrdersPage() {
                 onChange={(val) => handleCustomerChange(val)}
                 options={customers.map((c) => ({
                   value: c.id,
-                  label: `${c.nama_customer} (${c.kode_customer}) ${c.npwp ? '• PKP' : '• Non-PKP'}`,
+                  label: `${c.nama_customer} (${c.kode_customer}) ${checkIsPkp(c) ? '• PKP' : '• Non-PKP'}`,
                 }))}
                 placeholder="Cari & pilih customer..."
               />
