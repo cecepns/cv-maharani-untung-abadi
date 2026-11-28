@@ -105,22 +105,24 @@ export default function BahanSheetPage() {
     const P_box = Number(p) || 0;
     const L_box = Number(l) || 0;
     const T_box = Number(t) || 0;
-    let kupingan = 43;
-    let creasing = 12;
-    if (flute === 'C/F') { kupingan = 47; creasing = 18; }
-    else if (flute === 'B/C') { kupingan = 63; creasing = 24; }
-    else if (flute === 'E/F') { kupingan = 35; creasing = 8; }
-    else if (flute === 'Duplex' || flute === 'Ivory') { kupingan = 25; creasing = 5; }
+    // Sesuai Catatan Resmi Client:
+    // EF (+39/+9), BF (+43/+12), CF (+47/+13), BCF (+63/+24)
+    let panjangExtra = 43;
+    let lebarExtra = 12;
+    if (flute === 'C/F') { panjangExtra = 47; lebarExtra = 13; }
+    else if (flute === 'B/C' || flute === 'B/C Double Wall') { panjangExtra = 63; lebarExtra = 24; }
+    else if (flute === 'E/F') { panjangExtra = 39; lebarExtra = 9; }
+    else if (flute === 'Duplex' || flute === 'Ivory') { panjangExtra = 25; lebarExtra = 5; }
 
-    const P_sheet = ((P_box + L_box) * 2) + kupingan;
-    const L_sheet = L_box + T_box + creasing;
+    const P_sheet = ((P_box + L_box) * 2) + panjangExtra;
+    const L_sheet = L_box + T_box + lebarExtra;
 
     setCalcForm((prev) => ({
       ...prev,
       panjang_mm: P_sheet,
       lebar_mm: L_sheet
     }));
-    toast.success(`Ukuran sheet otomatis dihitung: ${P_sheet} x ${L_sheet} mm`);
+    toast.success(`Ukuran sheet otomatis dihitung: ${L_sheet} x ${P_sheet} mm (LxP)`);
   };
 
   // Confirm Delete Sheet

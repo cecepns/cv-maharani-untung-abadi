@@ -12,6 +12,19 @@ import LoadingSpinner from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
 import SearchableSelect from '../../components/common/SearchableSelect';
 
+// Rumus Flute Resmi Sesuai Catatan Client:
+// - EF: P = (P+L)*2 + 39, L = (L+T) + 9 (Standar) / (L*2)+T+9 (Tutup Full)
+// - BF: P = (P+L)*2 + 43, L = (L+T) + 12 (Standar) / (L*2)+T+12 (Tutup Full)
+// - CF: P = (P+L)*2 + 47, L = (L+T) + 13 (Standar) / (L*2)+T+13 (Tutup Full)
+// - BCF / B/C: P = (P+L)*2 + 63, L = (L+T) + 24 (Standar) / (L*2)+T+24 (Tutup Full)
+const FLUTE_FORMULAS = {
+  'B/F': { pExtra: 43, lExtra: 12, tabMm: 31, tabCm: '3,1 cm', isDW: false, label: 'Single Wall A1' },
+  'C/F': { pExtra: 47, lExtra: 13, tabMm: 31, tabCm: '3,1 cm', isDW: false, label: 'Single Wall A1' },
+  'E/F': { pExtra: 39, lExtra: 9, tabMm: 31, tabCm: '3,1 cm', isDW: false, label: 'Micro Single Wall' },
+  'B/C': { pExtra: 63, lExtra: 24, tabMm: 39, tabCm: '3,9 cm', isDW: true, label: 'Double Wall A2' },
+  'B/C Double Wall': { pExtra: 63, lExtra: 24, tabMm: 39, tabCm: '3,9 cm', isDW: true, label: 'Double Wall A2' },
+};
+
 export default function ProductsPage() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,6 +38,7 @@ export default function ProductsPage() {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [modelTutup, setModelTutup] = useState('standar'); // 'standar' (A1) | 'full' (Tutup Full FOL)
   const [formData, setFormData] = useState({
     id: null,
     kode_barang: '',
@@ -76,6 +90,7 @@ export default function ProductsPage() {
 
   const handleOpenCreate = () => {
     setIsEditing(false);
+    setModelTutup('standar');
     setFormData({
       id: null,
       kode_barang: '',
@@ -99,6 +114,8 @@ export default function ProductsPage() {
 
   const handleOpenEdit = (item) => {
     setIsEditing(true);
+    const isFull = (item.nama_barang || '').toLowerCase().includes('tutup full') || (item.nama_barang || '').toLowerCase().includes('fol');
+    setModelTutup(isFull ? 'full' : 'standar');
     setFormData({
       id: item.id,
       kode_barang: item.kode_barang,
@@ -578,43 +595,97 @@ export default function ProductsPage() {
             </div>
           )}
 
-          {formData.jenis_barang === 'Box' && Number(formData.panjang_mm) > 0 && Number(formData.lebar_mm) > 0 && (
-            <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl text-xs space-y-1.5 text-amber-950">
-              <div className="flex items-center justify-between font-bold text-amber-900">
-                <span>Kalkulasi Rumus Standar Pabrik:</span>
-                <span className="text-[10px] px-2 py-0.5 bg-amber-100 text-amber-900 rounded font-bold">
-                  {formData.tipe_flute === 'B/C' ? 'Double Wall A2' : 'Single Wall A1'}
-                </span>
+          {formData.jenis_barang === 'Box' && Number(formData.panjang_mm) > 0 && Number(formData.lebar_mm) > 0 && (() => {
+            const P = Number(formData.panjang_mm) || 0;
+            const L = Number(formData.lebar_mm) || 0;
+            const T = Number(formData.tinggi_mm) || 0;
+            const fluteConfig = FLUTE_FORMULAS[formData.tipe_flute] || FLUTE_FORMULAS['B/F'];
+            const isDW = fluteConfig.isDW;
+            const pLuar = isDW ? P + 6 : P + 3;
+            const lLuar = isDW ? L + 6 : L + 3;
+            const tLuar = isDW ? T + 12 : T + 6;
+            const flapTutup = modelTutup === 'full' 
+              ? L 
+              : (isDW ? Math.round((L / 2) + 6) : Math.round((L / 2) + 3));
+
+            // Sesuai Catatan Resmi Client:
+            // Lebar Sheet = modelTutup === 'full' ? (L * 2) + T + lExtra : (L + T) + lExtra
+            // Panjang Sheet = (P + L) * 2 + pExtra
+            const lSheet = modelTutup === 'full'
+              ? (L * 2) + T + fluteConfig.lExtra
+              : (L + T) + fluteConfig.lExtra;
+            const pSheet = (P + L) * 2 + fluteConfig.pExtra;
+
+            return (
+              <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl text-xs space-y-2 text-amber-950">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 font-bold text-amber-900">
+                  <div className="flex items-center gap-1.5">
+                    <Box className="w-3.5 h-3.5 text-amber-700" />
+                    <span>Kalkulasi Rumus Standar Pabrik (Catatan Resmi Client):</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 self-start sm:self-auto">
+                    <span className="text-[10px] px-2 py-0.5 bg-amber-100 text-amber-900 rounded font-bold">
+                      {fluteConfig.label} ({formData.tipe_flute})
+                    </span>
+                    <div className="flex bg-white rounded-lg border border-amber-200 p-0.5 text-[10px]">
+                      <button
+                        type="button"
+                        onClick={() => setModelTutup('standar')}
+                        className={`px-2 py-0.5 rounded font-semibold transition-colors ${
+                          modelTutup === 'standar' ? 'bg-amber-600 text-white font-bold' : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Standar (A1)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setModelTutup('full')}
+                        className={`px-2 py-0.5 rounded font-semibold transition-colors ${
+                          modelTutup === 'full' ? 'bg-purple-600 text-white font-bold' : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Tutup Full (FOL)
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] font-mono">
+                  <div className="p-2 bg-white/90 rounded border border-amber-200">
+                    <span className="text-[10px] text-slate-500 font-sans block font-semibold">Estimasi Size Luar:</span>
+                    <strong className="text-slate-900 text-xs block mt-0.5">
+                      {pLuar} x {lLuar} x {tLuar} mm
+                    </strong>
+                    <span className="text-[9.5px] text-slate-400 font-sans block mt-0.5">
+                      {isDW ? 'P+6, L+6, T+12 mm' : 'P+3, L+3, T+6 mm'}
+                    </span>
+                  </div>
+
+                  <div className="p-2 bg-white/90 rounded border border-amber-200">
+                    <span className="text-[10px] text-slate-500 font-sans block font-semibold">Tutup Flap & Tab:</span>
+                    <strong className="text-blue-700 text-xs block mt-0.5">
+                      Tutup: {flapTutup} mm {modelTutup === 'full' ? '(Penuh FOL)' : ''}
+                    </strong>
+                    <span className="text-amber-700 block text-[9.5px] font-sans font-semibold mt-0.5">
+                      Tab: {fluteConfig.tabCm} ({fluteConfig.tabMm}mm)
+                    </span>
+                  </div>
+
+                  <div className="p-2 bg-white/90 rounded border border-amber-200">
+                    <span className="text-[10px] text-slate-500 font-sans block font-semibold">
+                      Target Ukuran Sheet (LxP):
+                    </span>
+                    <strong className="text-emerald-700 text-xs block mt-0.5">
+                      {lSheet} x {pSheet} mm
+                    </strong>
+                    <span className="text-[9.5px] text-slate-500 font-sans block mt-0.5">
+                      L: {modelTutup === 'full' ? `(Lx2)+T+${fluteConfig.lExtra}` : `(L+T)+${fluteConfig.lExtra}`} • P: ((P+L)x2)+{fluteConfig.pExtra}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] font-mono">
-                <div className="p-1.5 bg-white/90 rounded border border-amber-200">
-                  <span className="text-[10px] text-slate-500 font-sans block">Estimasi Size Luar:</span>
-                  <strong className="text-slate-900">
-                    {formData.tipe_flute === 'B/C'
-                      ? `${Number(formData.panjang_mm) + 6} x ${Number(formData.lebar_mm) + 6} x ${Number(formData.tinggi_mm) + 12} mm`
-                      : `${Number(formData.panjang_mm) + 3} x ${Number(formData.lebar_mm) + 3} x ${Number(formData.tinggi_mm) + 6} mm`}
-                  </strong>
-                </div>
-                <div className="p-1.5 bg-white/90 rounded border border-amber-200">
-                  <span className="text-[10px] text-slate-500 font-sans block">Tutup Flap & Tab:</span>
-                  <strong className="text-blue-700">
-                    Tutup: {formData.tipe_flute === 'B/C' ? Math.round(Number(formData.lebar_mm) / 2 + 6) : Math.round(Number(formData.lebar_mm) / 2 + 3)} mm
-                  </strong>
-                  <span className="text-amber-700 block text-[10px]">
-                    Tab: {formData.tipe_flute === 'B/C' ? '3,9 cm (39mm)' : '3,1 cm (31mm)'}
-                  </span>
-                </div>
-                <div className="p-1.5 bg-white/90 rounded border border-amber-200">
-                  <span className="text-[10px] text-slate-500 font-sans block">Target Ukuran Sheet:</span>
-                  <strong className="text-emerald-700">
-                    {formData.tipe_flute === 'B/C'
-                      ? `${Number(formData.lebar_mm) + Number(formData.tinggi_mm) + 12} x ${(Number(formData.panjang_mm) + Number(formData.lebar_mm)) * 2 + 39} mm`
-                      : `${Number(formData.lebar_mm) + Number(formData.tinggi_mm) + 6} x ${(Number(formData.panjang_mm) + Number(formData.lebar_mm)) * 2 + 31} mm`}
-                  </strong>
-                </div>
-              </div>
-            </div>
-          )}
+            );
+          })()}
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>

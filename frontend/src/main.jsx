@@ -9,6 +9,15 @@ window.addEventListener('vite:preloadError', (event) => {
   window.location.reload();
 });
 
+// Bersihkan Service Worker lama (jika pernah terdaftar) agar browser selalu memuat versi terbaru aplikasi
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    for (const registration of registrations) {
+      registration.unregister();
+    }
+  });
+}
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />

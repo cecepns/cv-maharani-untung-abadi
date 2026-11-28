@@ -36,15 +36,21 @@ import SearchableSelect from '@/components/common/SearchableSelect';
 import PrintPenawaranHarga from '@/components/print/PrintPenawaranHarga';
 
 // Spesifikasi standar industri & rumus toleransi karton gelombang CV. Maharani
-// Sesuai Revisi Resmi Client 1 & 2:
-// - Single Wall A1: Tab 3.1 cm (31 mm), Tutup Flap (L/2 + 3 mm) -> Creasing Lebar Sheet +6 mm
-// - Double Wall A2: Tab 3.9 cm (39 mm), Tutup Flap (L/2 + 6 mm) -> Creasing Lebar Sheet +12 mm
+// Sesuai Catatan Resmi Client:
+// - EF (Single Wall): P = (P+L)*2 + 39, L = (L+T) + 9 (Standar) / (L*2)+T+9 (Tutup Full)
+// - BF (Single Wall): P = (P+L)*2 + 43, L = (L+T) + 12 (Standar) / (L*2)+T+12 (Tutup Full)
+// - CF (Single Wall): P = (P+L)*2 + 47, L = (L+T) + 13 (Standar) / (L*2)+T+13 (Tutup Full)
+// - BCF (Double Wall B/C): P = (P+L)*2 + 63, L = (L+T) + 24 (Standar) / (L*2)+T+24 (Tutup Full)
+// - Double Joint (2 lembar): EF +79, BF +83, CF +87, BCF +103
 export const FLUTE_SPECS = {
   'B/F': {
     kode: 'B/F',
     nama: 'B-Flute Single Wall (~3mm)',
+    panjangExtra: 43,
+    lebarExtra: 12,
+    doubleJointExtra: 83,
     kupingan: 31,
-    creasing: 6,
+    creasing: 12,
     tabCm: 3.1,
     flapExtra: 3,
     defaultGsm: 420,
@@ -54,8 +60,11 @@ export const FLUTE_SPECS = {
   'C/F': {
     kode: 'C/F',
     nama: 'C-Flute Single Wall (~4mm)',
+    panjangExtra: 47,
+    lebarExtra: 13,
+    doubleJointExtra: 87,
     kupingan: 31,
-    creasing: 6,
+    creasing: 13,
     tabCm: 3.1,
     flapExtra: 3,
     defaultGsm: 435,
@@ -65,8 +74,11 @@ export const FLUTE_SPECS = {
   'B/C': {
     kode: 'B/C',
     nama: 'B/C Double Wall 2 Gelombang (~7mm)',
+    panjangExtra: 63,
+    lebarExtra: 24,
+    doubleJointExtra: 103,
     kupingan: 39,
-    creasing: 12,
+    creasing: 24,
     tabCm: 3.9,
     flapExtra: 6,
     defaultGsm: 680,
@@ -76,8 +88,11 @@ export const FLUTE_SPECS = {
   'E/F': {
     kode: 'E/F',
     nama: 'E-Flute Micro Single Wall (~1.5mm)',
+    panjangExtra: 39,
+    lebarExtra: 9,
+    doubleJointExtra: 79,
     kupingan: 31,
-    creasing: 6,
+    creasing: 9,
     tabCm: 3.1,
     flapExtra: 3,
     defaultGsm: 410,
@@ -156,8 +171,11 @@ export default function EstimasiHargaPage() {
     tinggi: 278,
   });
 
-  // Sambungan: 'single' (1 Sambungan Kuping +83mm) vs 'double' (2 Sambungan Kuping +103mm & sheet / 2) (Gambar 7)
+  // Sambungan: 'single' (1 Sambungan) vs 'double' (2 Sambungan Kuping)
   const [jointType, setJointType] = useState('single'); // 'single' | 'double'
+
+  // Model Tutup Box: 'standar' (A1 / RSC Normal) vs 'full' (Tutup Full / FOL) Sesuai Catatan Resmi Client
+  const [modelTutup, setModelTutup] = useState('standar'); // 'standar' | 'full'
 
   const [fluteType, setFluteType] = useState('B/C'); // B/C Double Wall
   const [useCustomAllowance, setUseCustomAllowance] = useState(false);
@@ -253,15 +271,12 @@ export default function EstimasiHargaPage() {
   useEffect(() => {
     if (paperMode !== 'corrugated') return;
     const spec = FLUTE_SPECS[fluteType] || FLUTE_SPECS['B/C'];
-    const isDoubleWall = fluteType === 'B/C';
     if (!useCustomAllowance) {
-      // Sesuai Revisi Resmi Client 1 & 2:
-      // Single Wall A1: Tab 3.1 cm (31 mm), Tutup Flap (L/2 + 3 mm) -> Crease Sheet +6 mm
-      // Double Wall A2: Tab 3.9 cm (39 mm), Tutup Flap (L/2 + 6 mm) -> Crease Sheet +12 mm
-      // Double Joint (2 Sambungan): Tab dikali 2
-      const tabBase = isDoubleWall ? 39 : 31;
-      const kupingVal = jointType === 'double' ? tabBase * 2 : tabBase;
-      const creaseVal = isDoubleWall ? 12 : 6;
+      // Sesuai Catatan Resmi Client:
+      // Standar Single: kupingan = spec.panjangExtra, creasing = spec.lebarExtra
+      // Double Joint: kupingan = spec.doubleJointExtra
+      const kupingVal = jointType === 'double' ? spec.doubleJointExtra : spec.panjangExtra;
+      const creaseVal = spec.lebarExtra;
       setCustomAllowance({ kupingan: kupingVal, creasing: creaseVal });
     }
     setGsm(spec.defaultGsm);
@@ -346,28 +361,47 @@ export default function EstimasiHargaPage() {
 
       const spec = FLUTE_SPECS[fluteType] || FLUTE_SPECS['B/C'];
       const isDoubleWall = fluteType === 'B/C';
-      const tabBase = isDoubleWall ? 39 : 31;
-      const kupingan = useCustomAllowance
-        ? Number(customAllowance.kupingan) || 0
-        : jointType === 'double'
-        ? tabBase * 2
-        : tabBase;
-      const creasing = useCustomAllowance
-        ? Number(customAllowance.creasing) || 0
-        : (isDoubleWall ? 12 : 6);
+      
+      const pExtra = useCustomAllowance
+        ? (Number(customAllowance.kupingan) || spec.panjangExtra)
+        : spec.panjangExtra;
+      const lExtra = useCustomAllowance
+        ? (Number(customAllowance.creasing) || spec.lebarExtra)
+        : spec.lebarExtra;
+      const djExtra = spec.doubleJointExtra;
 
-      // Rumus Standar Resmi Client 1 & 2:
-      // Single Wall A1: Size Luar P+3, L+3, T+6 mm. Tutup Flap (L/2 + 3 mm). Tab 3.1 cm (31 mm).
-      // Double Wall A2: Size Luar P+6, L+6, T+12 mm. Tutup Flap (L/2 + 6 mm). Tab 3.9 cm (39 mm).
+      // Estimasi Size Luar (P+3/6, L+3/6, T+6/12)
       const pLuar = isDoubleWall ? P_box + 6 : P_box + 3;
       const lLuar = isDoubleWall ? L_box + 6 : L_box + 3;
       const tLuar = isDoubleWall ? T_box + 12 : T_box + 6;
-      const flapTutup = isDoubleWall ? Math.round((L_box / 2) + 6) : Math.round((L_box / 2) + 3);
+      const flapTutup = modelTutup === 'full' 
+        ? L_box 
+        : (isDoubleWall ? Math.round((L_box / 2) + 6) : Math.round((L_box / 2) + 3));
 
       const isDouble = jointType === 'double';
-      const rawPanjangBentangan = (P_box + L_box) * 2 + kupingan;
+
+      // ========================================================
+      // RUMUS RESMI CATATAN CLIENT:
+      // 1. PANJANG SHEET:
+      //    - Standar Single Joint: (P + L) * 2 + panjangExtra
+      //      (EF: +39, BF: +43, CF: +47, BCF: +63)
+      //    - Double Joint (Stitch 2 sisi karena sheet terlalu panjang):
+      //      ((P + L) * 2 + doubleJointExtra) / 2 (2 Lembar/Box)
+      //      (EF: +79, BF: +83, CF: +87, BCF: +103)
+      // 2. LEBAR SHEET (L SHEET):
+      //    - Standar: (L + T) + lebarExtra
+      //      (EF: +9, BF: +12, CF: +13, BCF: +24)
+      //    - Tutup Full (FOL): (L * 2) + T + lebarExtra
+      //      (EF: +9, BF: +12, CF: +13, BCF: +24)
+      // ========================================================
+      const rawPanjangBentangan = isDouble
+        ? (P_box + L_box) * 2 + djExtra
+        : (P_box + L_box) * 2 + pExtra;
       const P_sheet = isDouble ? Math.round(rawPanjangBentangan / 2) : rawPanjangBentangan;
-      const L_sheet = L_box + T_box + creasing;
+
+      const L_sheet = modelTutup === 'full'
+        ? (L_box * 2) + T_box + lExtra
+        : (L_box + T_box) + lExtra;
       const sheetsPerBox = isDouble ? 2 : 1;
 
       // Luas 1 lembar sheet (m2)
@@ -432,13 +466,17 @@ export default function EstimasiHargaPage() {
         lLuar,
         tLuar,
         flapTutup,
-        tabMm: kupingan,
-        tabCm: (kupingan / 10).toFixed(1),
+        tabMm: spec.kupingan,
+        tabCm: spec.tabCm,
         jointType,
         isDouble,
+        modelTutup,
         sheetsPerBox,
-        kupingan,
-        creasing,
+        kupingan: pExtra,
+        creasing: lExtra,
+        panjangExtra: pExtra,
+        lebarExtra: lExtra,
+        doubleJointExtra: djExtra,
         P_sheet,
         L_sheet,
         outs,
@@ -615,6 +653,7 @@ export default function EstimasiHargaPage() {
     paperMode,
     boxDimensions,
     jointType,
+    modelTutup,
     fluteType,
     useCustomAllowance,
     customAllowance,
@@ -651,33 +690,65 @@ export default function EstimasiHargaPage() {
     }
   }, [calculation.L_sheet, rollOuts, useRollWidth, paperMode]);
 
-  // Handler Preset Contoh Client: Box Tepung 270x270x278 (B/C Maspion)
-  const applyClientExample = () => {
+  // Handler Preset 1: Contoh Resmi Client BF Single Wall (650x190x395 -> Sheet 597x1723 mm)
+  const applyClientExampleBF = () => {
     setPaperMode('corrugated');
-    setBoxDimensions({ panjang: 270, lebar: 270, tinggi: 278 });
+    setBoxDimensions({ panjang: 650, lebar: 190, tinggi: 395 });
     setJointType('single');
-    setFluteType('B/C');
+    setModelTutup('standar');
+    setFluteType('B/F');
     setSourceType('maspion');
-    handleSelectMaspionSubstance('125K/125M/125K');
-    setUseRollWidth(true);
-    setRollOuts(3);
-    setRollWidthMm(1750);
+    handleSelectMaspionSubstance('125K/125M/125M');
+    setUseRollWidth(false);
     setPosisiSupplierPersen(10);
     setBiayaCetak(0);
     setBiayaFinishing(0);
-    toast.success('Contoh "Box Tepung 270x270x278 B/C (Maspion)" berhasil dimuat!');
+    toast.success('Contoh Client "650x190x395 BF Single Wall" dimuat: Sheet 597 x 1723 mm!');
   };
 
-  // Handler Preset Double Joint Contoh Client (Gambar 7): 740x740x490
-  const applyDoubleJointExample = () => {
+  // Handler Preset 2: Contoh Resmi Client BCF Double Wall (650x190x395 -> Sheet 609x1743 mm)
+  const applyClientExampleBCF = () => {
     setPaperMode('corrugated');
-    setBoxDimensions({ panjang: 740, lebar: 740, tinggi: 490 });
-    setJointType('double');
+    setBoxDimensions({ panjang: 650, lebar: 190, tinggi: 395 });
+    setJointType('single');
+    setModelTutup('standar');
     setFluteType('B/C');
     setSourceType('maspion');
-    handleSelectMaspionSubstance('150K/125M/150K');
+    handleSelectMaspionSubstance('125K/125M/125M');
     setUseRollWidth(false);
-    toast.success('Contoh Dus Besar Double Joint (740x740x490) dimuat!');
+    setPosisiSupplierPersen(10);
+    setBiayaCetak(0);
+    setBiayaFinishing(0);
+    toast.success('Contoh Client "650x190x395 BCF Double Wall" dimuat: Sheet 609 x 1743 mm!');
+  };
+
+  // Handler Preset 3: Contoh Resmi Client Tutup Full BF (650x190x395 -> Sheet 787x1723 mm)
+  const applyClientExampleTutupFull = () => {
+    setPaperMode('corrugated');
+    setBoxDimensions({ panjang: 650, lebar: 190, tinggi: 395 });
+    setJointType('single');
+    setModelTutup('full');
+    setFluteType('B/F');
+    setSourceType('maspion');
+    handleSelectMaspionSubstance('125K/125M/125M');
+    setUseRollWidth(false);
+    setPosisiSupplierPersen(10);
+    setBiayaCetak(0);
+    setBiayaFinishing(0);
+    toast.success('Contoh Client "650x190x395 BF Tutup Full" dimuat: Sheet 787 x 1723 mm!');
+  };
+
+  // Handler Preset 4: Double Joint (Stitch 2 sisi)
+  const applyDoubleJointExample = () => {
+    setPaperMode('corrugated');
+    setBoxDimensions({ panjang: 650, lebar: 190, tinggi: 395 });
+    setJointType('double');
+    setModelTutup('standar');
+    setFluteType('B/F');
+    setSourceType('maspion');
+    handleSelectMaspionSubstance('125K/125M/125M');
+    setUseRollWidth(false);
+    toast.success('Contoh Double Joint "650x190x395 BF (2 Sambungan)" dimuat!');
   };
 
   // Salin Rincian ke WhatsApp
@@ -685,11 +756,11 @@ export default function EstimasiHargaPage() {
     let specText = '';
     if (paperMode === 'corrugated') {
       specText = `📦 *Spesifikasi Karton Box:*
-- Model: Karton Box Standar (${calculation.isDouble ? 'Double Joint (2 Sambungan)' : 'Single Joint (1 Sambungan)'})
+- Model: Karton Box ${calculation.modelTutup === 'full' ? 'Tutup Full (FOL)' : 'Standar A1/RSC'} (${calculation.isDouble ? 'Double Joint 2 Sambungan' : 'Single Joint 1 Sambungan'})
 - Ukuran Box: ${calculation.P_box} x ${calculation.L_box} x ${calculation.T_box} mm
 - Tipe Flute: ${fluteType} (${FLUTE_SPECS[fluteType]?.nama || ''})
 - Substansi: ${substansi}
-- Dimensi Sheet: ${calculation.P_sheet} x ${calculation.L_sheet} mm (${calculation.sheetsPerBox} lembar/dus)
+- Target Ukuran Sheet: ${calculation.L_sheet} x ${calculation.P_sheet} mm (Lebar x Panjang, ${calculation.sheetsPerBox} lembar/dus)
 ${useRollWidth ? `- Lebar Roll Supplier: ${calculation.rollWidth} mm (${calculation.outs} Out)` : ''}`;
     } else if (paperMode === 'duplex') {
       specText = `📦 *Spesifikasi Kemasan Duplex:*
@@ -860,21 +931,39 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
             <>
               <button
                 type="button"
-                onClick={applyClientExample}
-                className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition-colors shadow-2xs"
-                title="Klik untuk memuat contoh box tepung standar Maspion"
+                onClick={applyClientExampleBF}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition-colors shadow-2xs"
+                title="Contoh Resmi Client: 650x190x395 BF -> Sheet 597x1723 mm"
               >
                 <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                Contoh Box Tepung
+                BF Standar (597×1723)
+              </button>
+              <button
+                type="button"
+                onClick={applyClientExampleBCF}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-xl text-xs font-bold transition-colors shadow-2xs"
+                title="Contoh Resmi Client: 650x190x395 BCF -> Sheet 609x1743 mm"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                BCF Standar (609×1743)
+              </button>
+              <button
+                type="button"
+                onClick={applyClientExampleTutupFull}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-300 rounded-xl text-xs font-bold transition-colors shadow-2xs"
+                title="Contoh Resmi Client: 650x190x395 BF Tutup Full -> Sheet 787x1723 mm"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                BF Tutup Full (787×1723)
               </button>
               <button
                 type="button"
                 onClick={applyDoubleJointExample}
-                className="inline-flex items-center gap-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-300 rounded-xl text-xs font-bold transition-colors shadow-2xs"
-                title="Klik untuk memuat contoh dus besar Double Joint (Gambar 7)"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-300 rounded-xl text-xs font-bold transition-colors shadow-2xs"
+                title="Contoh Resmi Client: Double Joint (Stitch 2 Sisi)"
               >
                 <Split className="w-3.5 h-3.5 text-indigo-600" />
-                Contoh Double Joint
+                Double Joint
               </button>
             </>
           )}
@@ -1037,60 +1126,117 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
                   </div>
                 </div>
 
-                {/* TIPE SAMBUNGAN: SINGLE JOINT VS DOUBLE JOINT (GAMBAR 7) */}
-                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-800">
-                      Tipe Sambungan Dus (Gambar 7):
-                    </span>
-                    <span className="text-[11px] text-slate-500">
-                      Dus standar vs dus jumbo 2 sambungan
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setJointType('single')}
-                      className={`p-2.5 rounded-xl border text-left transition-all ${
-                        jointType === 'single'
-                          ? 'border-brand-600 bg-brand-50/70 text-brand-900 ring-2 ring-brand-500/20'
-                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className="font-bold text-xs flex items-center justify-between">
-                        <span>Single Joint (1 Sambungan)</span>
-                        {jointType === 'single' && <Check className="w-3.5 h-3.5 text-brand-600" />}
-                      </div>
-                      <div className="text-[11px] text-slate-500 mt-0.5">
-                        {fluteType === 'B/C' ? 'Double Wall: Tab 3,9cm (39mm)' : 'Single Wall: Tab 3,1cm (31mm)'} • 1 Sheet/Box
-                      </div>
-                    </button>
+                {/* PILIHAN MODEL DUS / TUTUP & TIPE SAMBUNGAN (SESUAI CATATAN RESMI CLIENT) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Model Tutup */}
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-800">
+                        Model Tutup Box:
+                      </span>
+                      <span className="text-[10px] text-brand-700 font-semibold">
+                        Catatan Client No. 4
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setModelTutup('standar')}
+                        className={`p-2 rounded-xl border text-left transition-all ${
+                          modelTutup === 'standar'
+                            ? 'border-brand-600 bg-brand-50/70 text-brand-900 ring-2 ring-brand-500/20'
+                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="font-bold text-xs flex items-center justify-between">
+                          <span>Standar (A1)</span>
+                          {modelTutup === 'standar' && <Check className="w-3.5 h-3.5 text-brand-600" />}
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">
+                          L Sheet = (L+T) + Crease
+                        </div>
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={() => setJointType('double')}
-                      className={`p-2.5 rounded-xl border text-left transition-all ${
-                        jointType === 'double'
-                          ? 'border-indigo-600 bg-indigo-50/70 text-indigo-900 ring-2 ring-indigo-500/20'
-                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className="font-bold text-xs flex items-center justify-between">
-                        <span>Double Joint (2 Sambungan)</span>
-                        {jointType === 'double' && <Check className="w-3.5 h-3.5 text-indigo-600" />}
-                      </div>
-                      <div className="text-[11px] text-slate-500 mt-0.5">
-                        {fluteType === 'B/C' ? 'Double Wall: 2 Tab = 78mm' : 'Single Wall: 2 Tab = 62mm'} • 2 Sheet/Box
-                      </div>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => setModelTutup('full')}
+                        className={`p-2 rounded-xl border text-left transition-all ${
+                          modelTutup === 'full'
+                            ? 'border-purple-600 bg-purple-50/70 text-purple-900 ring-2 ring-purple-500/20'
+                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="font-bold text-xs flex items-center justify-between">
+                          <span>Tutup Full (FOL)</span>
+                          {modelTutup === 'full' && <Check className="w-3.5 h-3.5 text-purple-600" />}
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">
+                          L Sheet = (Lx2)+T + Crease
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Tipe Sambungan */}
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-800">
+                        Tipe Sambungan Dus:
+                      </span>
+                      <span className="text-[10px] text-slate-500">
+                        Dus standar vs jumbo
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setJointType('single')}
+                        className={`p-2 rounded-xl border text-left transition-all ${
+                          jointType === 'single'
+                            ? 'border-brand-600 bg-brand-50/70 text-brand-900 ring-2 ring-brand-500/20'
+                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="font-bold text-xs flex items-center justify-between">
+                          <span>Single Joint</span>
+                          {jointType === 'single' && <Check className="w-3.5 h-3.5 text-brand-600" />}
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">
+                          1 Sheet / Dus
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setJointType('double')}
+                        className={`p-2 rounded-xl border text-left transition-all ${
+                          jointType === 'double'
+                            ? 'border-indigo-600 bg-indigo-50/70 text-indigo-900 ring-2 ring-indigo-500/20'
+                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="font-bold text-xs flex items-center justify-between">
+                          <span>Double Joint</span>
+                          {jointType === 'double' && <Check className="w-3.5 h-3.5 text-indigo-600" />}
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">
+                          2 Lembar / Dus
+                        </div>
+                      </button>
+                    </div>
                   </div>
                 </div>
 
                 {/* Tipe Flute */}
                 <div className="pt-2 border-t border-slate-100 space-y-3">
-                  <label className="block text-xs font-bold text-slate-700">
-                    Pilih Tipe Flute / Ketebalan Gelombang
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-slate-700">
+                      Pilih Tipe Flute / Ketebalan Gelombang (Catatan Client):
+                    </label>
+                    <span className="text-[11px] text-slate-500">
+                      EF (+39/+9), BF (+43/+12), CF (+47/+13), BCF (+63/+24)
+                    </span>
+                  </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {Object.values(FLUTE_SPECS).map((f) => (
                       <div
@@ -1104,6 +1250,9 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
                       >
                         <div className="flex items-center justify-between">
                           <span className="font-bold text-sm text-slate-800">{f.kode}</span>
+                          <span className="text-[10px] font-mono text-emerald-700 font-bold">
+                            +{f.panjangExtra} / +{f.lebarExtra}
+                          </span>
                         </div>
                         <div className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">{f.nama}</div>
                       </div>
@@ -1115,7 +1264,7 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
                     <div className="flex items-center justify-between font-bold text-amber-900">
                       <div className="flex items-center gap-1.5">
                         <Sparkles className="w-3.5 h-3.5 text-amber-700" />
-                        <span>Rumus Standar Pabrik ({fluteType === 'B/C' ? 'Double Wall A2' : 'Single Wall A1'} - {jointType === 'double' ? 'Double Joint' : 'Single Joint'}):</span>
+                        <span>Kalkulasi Rumus Resmi Client ({fluteType} - {modelTutup === 'full' ? 'Tutup Full (FOL)' : 'Standar A1'}):</span>
                       </div>
                       <span className="text-[10px] px-2 py-0.5 bg-amber-100 text-amber-900 rounded font-bold">
                         {fluteType === 'B/C' ? 'Double Wall (A2)' : 'Single Wall (A1)'}
@@ -1136,20 +1285,20 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
                       <div className="p-2 bg-white/90 rounded border border-amber-200">
                         <div className="text-[10px] text-slate-500 font-sans font-semibold">Tutup Flap & Tab:</div>
                         <div className="font-bold text-blue-800 mt-0.5">
-                          Tutup: {calculation.flapTutup} mm
+                          Tutup: {calculation.flapTutup} mm {modelTutup === 'full' ? '(Full Overlap)' : ''}
                         </div>
                         <div className="text-[9.5px] text-amber-700 font-sans font-semibold mt-0.5">
-                          Tab: {fluteType === 'B/C' ? '3,9 cm (39 mm)' : '3,1 cm (31 mm)'}
+                          Tab: {calculation.tabCm} cm ({calculation.tabMm} mm)
                         </div>
                       </div>
 
                       <div className="p-2 bg-white/90 rounded border border-amber-200">
-                        <div className="text-[10px] text-slate-500 font-sans font-semibold">Ukuran Sheet Bentangan:</div>
-                        <div className="font-bold text-emerald-800 mt-0.5">
+                        <div className="text-[10px] text-slate-500 font-sans font-semibold">Target Ukuran Sheet (LxP):</div>
+                        <div className="font-bold text-emerald-800 text-xs mt-0.5">
                           {calculation.L_sheet} × {calculation.P_sheet} mm
                         </div>
-                        <div className="text-[9.5px] text-slate-500 font-sans mt-0.5">
-                          L+T+{calculation.creasing} × ((P+L)×2)+{calculation.kupingan}
+                        <div className="text-[9.5px] text-slate-600 font-sans mt-0.5">
+                          {modelTutup === 'full' ? `(L×2)+T+${calculation.lebarExtra}` : `(L+T)+${calculation.lebarExtra}`} × {calculation.isDouble ? `(((P+L)×2)+${calculation.doubleJointExtra})/2` : `((P+L)×2)+${calculation.panjangExtra}`}
                         </div>
                       </div>
                     </div>
@@ -1884,8 +2033,8 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
                     <div className="p-2.5 bg-white/5 border border-white/10 rounded-xl">
                       <div className="text-[11px] text-slate-400">Lebar Sheet (L)</div>
                       <div className="text-sm font-black text-white mt-0.5">{calculation.L_sheet} mm</div>
-                      <div className="text-[10px] text-slate-400 font-mono">
-                        L + T + {calculation.creasing}
+                      <div className="text-[10px] text-slate-300 font-mono">
+                        {calculation.modelTutup === 'full' ? `(L×2)+T+${calculation.lebarExtra}` : `(L+T)+${calculation.lebarExtra}`}
                       </div>
                     </div>
                     <div className="p-2.5 bg-white/5 border border-white/10 rounded-xl">
@@ -1893,17 +2042,17 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
                         Panjang Sheet {calculation.isDouble ? '(½ Sheet)' : '(P)'}
                       </div>
                       <div className="text-sm font-black text-white mt-0.5">{calculation.P_sheet} mm</div>
-                      <div className="text-[10px] text-slate-400 font-mono">
-                        {calculation.isDouble ? '(((P+L)×2)+103)/2' : '((P+L)×2)+83'}
+                      <div className="text-[10px] text-slate-300 font-mono">
+                        {calculation.isDouble ? `(((P+L)×2)+${calculation.doubleJointExtra})/2` : `((P+L)×2)+${calculation.panjangExtra}`}
                       </div>
                     </div>
                   </div>
 
                   <div className="p-3 bg-white/5 border border-white/10 rounded-xl space-y-1.5">
                     <div className="flex justify-between">
-                      <span className="text-slate-400">Ukuran Bentangan Sheet:</span>
-                      <span className="font-bold text-white">
-                        {calculation.L_sheet} × {calculation.P_sheet} mm ({calculation.sheetsPerBox} Lembar/Dus)
+                      <span className="text-slate-400">Target Sheet (LxP):</span>
+                      <span className="font-bold text-emerald-400 font-mono">
+                        {calculation.L_sheet} × {calculation.P_sheet} mm ({calculation.sheetsPerBox} Lbr)
                       </span>
                     </div>
                     {useRollWidth && (

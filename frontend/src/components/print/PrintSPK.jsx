@@ -46,22 +46,43 @@ export default function PrintSPK({ data, onClose }) {
   const syaratBayar = data.syarat_pembayaran || data.termin_bayar || '1 bulan setelah barang terima';
   const sambungan = data.sambungan || data.jenis_sambungan || 'Stitching (Jahit Kawat)';
 
-  // Rumus Standar Resmi Pabrik (Sesuai Revisi Client 1 & 2):
-  // 1. Single Wall A1: Size Luar (P+3, L+3, T+6 mm), Tutup Flap (L/2 + 3 mm), Tab 3.1 cm (31 mm)
-  //    Lebar Sheet = L + T + 6 mm, Panjang Sheet = (P + L) * 2 + 31 mm
-  // 2. Double Wall A2: Size Luar (P+6, L+6, T+12 mm), Tutup Flap (L/2 + 6 mm), Tab 3.9 cm (39 mm)
-  //    Lebar Sheet = L + T + 12 mm, Panjang Sheet = (P + L) * 2 + 39 mm
+  // Rumus Standar Resmi Pabrik (Sesuai Catatan Resmi Client):
+  // 1. Single Wall:
+  //    - EF: P = (P+L)*2 + 39, L = (L+T) + 9 (Standar) / (L*2)+T+9 (Tutup Full)
+  //    - BF: P = (P+L)*2 + 43, L = (L+T) + 12 (Standar) / (L*2)+T+12 (Tutup Full)
+  //    - CF: P = (P+L)*2 + 47, L = (L+T) + 13 (Standar) / (L*2)+T+13 (Tutup Full)
+  // 2. Double Wall BCF (B/C):
+  //    - BCF: P = (P+L)*2 + 63, L = (L+T) + 24 (Standar) / (L*2)+T+24 (Tutup Full)
   const isDoubleWall = (substance.toUpperCase().includes('BC') || substance.toUpperCase().includes('B/C') || (data.nama_box || '').toUpperCase().includes('DOUBLE') || (data.tipe_karton || '').toUpperCase().includes('A2') || (data.tipe_karton || '').toUpperCase().includes('DW'));
-  const tabMm = isDoubleWall ? 39 : 31;
+  const isCF = (substance.toUpperCase().includes('CF') || substance.toUpperCase().includes('C/F') || (data.tipe_karton || '').toUpperCase().includes('C/F'));
+  const isEF = (substance.toUpperCase().includes('EF') || substance.toUpperCase().includes('E/F') || (data.tipe_karton || '').toUpperCase().includes('E/F'));
+
+  let pExtra = 43;
+  let lExtra = 12;
+  let tabMm = 31;
+  if (isDoubleWall) {
+    pExtra = 63;
+    lExtra = 24;
+    tabMm = 39;
+  } else if (isCF) {
+    pExtra = 47;
+    lExtra = 13;
+    tabMm = 31;
+  } else if (isEF) {
+    pExtra = 39;
+    lExtra = 9;
+    tabMm = 31;
+  }
+
+  const isFullOverlap = (data.nama_box || '').toUpperCase().includes('FULL') || (data.model_dus || '').toUpperCase().includes('FULL');
   const tabCm = (tabMm / 10).toFixed(1);
-  const tutupFlap = isDoubleWall ? Math.round((lBox / 2) + 6) : Math.round((lBox / 2) + 3);
-  const creaseSheet = isDoubleWall ? 12 : 6;
+  const tutupFlap = isFullOverlap ? lBox : (isDoubleWall ? Math.round((lBox / 2) + 6) : Math.round((lBox / 2) + 3));
   const pLuar = isDoubleWall ? pBox + 6 : pBox + 3;
   const lLuar = isDoubleWall ? lBox + 6 : lBox + 3;
   const tLuar = isDoubleWall ? tBox + 12 : tBox + 6;
 
-  const lSheet = lBox + tBox + creaseSheet;
-  const pSheet = ((pBox + lBox) * 2) + tabMm;
+  const lSheet = isFullOverlap ? (lBox * 2) + tBox + lExtra : lBox + tBox + lExtra;
+  const pSheet = ((pBox + lBox) * 2) + pExtra;
   const ukuranSheet = data.ukuran_sheet && data.ukuran_sheet !== '-' && !data.ukuran_sheet.includes('NaN')
     ? data.ukuran_sheet
     : `${lSheet} x ${pSheet} mm`;
