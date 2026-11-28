@@ -85,6 +85,25 @@ export default function BahanSheetPage() {
   const [slotMetode, setSlotMetode] = useState('m2'); // 'm2' | 'kg'
   const [slotNilaiIndex, setSlotNilaiIndex] = useState('');
   const [slotGsm, setSlotGsm] = useState(420);
+  const [slotUseRollWidth, setSlotUseRollWidth] = useState(true);
+  const [slotRollOuts, setSlotRollOuts] = useState(1);
+  const [slotRollWidthMm, setSlotRollWidthMm] = useState(1850);
+  const [slotIsManualRoll, setSlotIsManualRoll] = useState(false);
+  const [slotPosisiPersen, setSlotPosisiPersen] = useState(15); // Default +15% posisi harga beli supplier
+
+  const getRecommendedSheetRoll = (lebarMm, outs) => {
+    const l = Number(lebarMm) || 0;
+    const o = Math.max(1, Number(outs) || 1);
+    if (!l) return 1000;
+    // Minimal buangan roll 2 cm (20 mm), kelipatan 50 mm
+    return Math.max(1000, Math.ceil((l * o + 20) / 50) * 50);
+  };
+
+  useEffect(() => {
+    if (slotUseRollWidth && !slotIsManualRoll && formData.lebar_mm) {
+      setSlotRollWidthMm(getRecommendedSheetRoll(formData.lebar_mm, slotRollOuts));
+    }
+  }, [formData.lebar_mm, slotRollOuts, slotUseRollWidth, slotIsManualRoll]);
 
   // Standalone Simulator & Kalkulator Index Sheet Modal
   const [isCalcModalOpen, setIsCalcModalOpen] = useState(false);
@@ -198,6 +217,11 @@ export default function BahanSheetPage() {
     setSlotMetode('m2');
     setSlotNilaiIndex('');
     setSlotGsm(getGsmFromFlute(initialFlute));
+    setSlotUseRollWidth(true);
+    setSlotRollOuts(1);
+    setSlotIsManualRoll(false);
+    setSlotRollWidthMm(getRecommendedSheetRoll(1200, 1));
+    setSlotPosisiPersen(15);
     setShowIndexSlot(false);
     setIsModalOpen(true);
   };
@@ -691,13 +715,13 @@ export default function BahanSheetPage() {
                     </label>
                     <input
                       type="number"
-                      placeholder={slotMetode === 'kg' ? 'Contoh: 12000' : 'Contoh: 2800'}
+                      placeholder={slotMetode === 'kg' ? 'Contoh: 12000' : 'Contoh: 4450'}
                       value={slotNilaiIndex}
                       onChange={(e) => setSlotNilaiIndex(e.target.value)}
-                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-emerald-300 rounded-xl"
+                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-emerald-300 rounded-xl font-semibold"
                     />
                   </div>
-                  {slotMetode === 'kg' && (
+                  {slotMetode === 'kg' ? (
                     <div>
                       <label className="block text-[11px] font-semibold text-emerald-950 mb-1">Estimasi GSM (gr/m²)</label>
                       <input
@@ -707,6 +731,128 @@ export default function BahanSheetPage() {
                         className="w-full px-2.5 py-1.5 text-xs bg-white border border-emerald-300 rounded-xl"
                       />
                     </div>
+                  ) : (
+                    <div>
+                      <label className="block text-[11px] font-semibold text-emerald-950 mb-1">
+                        Posisi Beli Supplier (%)
+                      </label>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          value={slotPosisiPersen}
+                          onChange={(e) => setSlotPosisiPersen(Number(e.target.value) || 0)}
+                          className="w-full px-2.5 py-1.5 text-xs bg-white border border-emerald-300 rounded-xl font-bold text-amber-800"
+                          placeholder="15"
+                        />
+                        <span className="text-xs font-bold text-emerald-900">%</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {slotMetode === 'kg' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-emerald-950 mb-1">
+                        Posisi Beli Supplier (%)
+                      </label>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          value={slotPosisiPersen}
+                          onChange={(e) => setSlotPosisiPersen(Number(e.target.value) || 0)}
+                          className="w-24 px-2.5 py-1.5 text-xs bg-white border border-emerald-300 rounded-xl font-bold text-amber-800"
+                        />
+                        <span className="text-xs font-bold text-emerald-900">%</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Preset cepat Posisi Beli Supplier & Pengaturan Roll */}
+                <div className="p-2.5 bg-white/80 border border-emerald-200 rounded-xl space-y-2.5 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <label className="flex items-center gap-2 cursor-pointer font-semibold text-emerald-950">
+                      <input
+                        type="checkbox"
+                        checked={slotUseRollWidth}
+                        onChange={(e) => setSlotUseRollWidth(e.target.checked)}
+                        className="w-4 h-4 text-emerald-600 rounded"
+                      />
+                      <span>Hitung Pakai Lebar Roll Supplier (Min Buangan 2 cm)</span>
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-slate-500 mr-1">Posisi %:</span>
+                      {[0, 10, 15, 20].map((pct) => (
+                        <button
+                          key={pct}
+                          type="button"
+                          onClick={() => setSlotPosisiPersen(pct)}
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${
+                            Number(slotPosisiPersen) === pct
+                              ? 'bg-amber-600 text-white border-amber-600'
+                              : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          {pct === 0 ? '0%' : `+${pct}%`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {slotUseRollWidth && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-2 border-t border-emerald-100">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-1">Jumlah Out</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="20"
+                          value={slotRollOuts}
+                          onChange={(e) => setSlotRollOuts(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="w-full px-2.5 py-1 text-xs font-bold bg-white border border-slate-300 rounded-lg"
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-[10px] font-semibold text-slate-600">Lebar Roll (mm)</label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSlotRollWidthMm(getRecommendedSheetRoll(formData.lebar_mm, slotRollOuts));
+                              setSlotIsManualRoll(false);
+                            }}
+                            className="text-[10px] text-emerald-700 font-bold hover:underline"
+                          >
+                            ⚡ Auto
+                          </button>
+                        </div>
+                        <input
+                          type="number"
+                          min="500"
+                          max="4000"
+                          step="10"
+                          value={slotRollWidthMm}
+                          onChange={(e) => {
+                            setSlotRollWidthMm(Number(e.target.value) || 0);
+                            setSlotIsManualRoll(true);
+                          }}
+                          className="w-full px-2.5 py-1 text-xs font-bold bg-white border border-slate-300 rounded-lg"
+                        />
+                      </div>
+                      <div className="col-span-2 sm:col-span-1 flex flex-col justify-center bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
+                        <span className="text-[10px] text-slate-500">Sisa Buangan:</span>
+                        {(() => {
+                          const totalL = (Number(formData.lebar_mm) || 0) * slotRollOuts;
+                          const buangan = (Number(slotRollWidthMm) || 0) - totalL;
+                          return (
+                            <span className={`text-[11px] font-bold font-mono ${buangan < 20 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                              {buangan} mm ({(buangan / 10).toFixed(1)} cm)
+                            </span>
+                          );
+                        })()}
+                      </div>
+                    </div>
                   )}
                 </div>
 
@@ -714,31 +860,54 @@ export default function BahanSheetPage() {
                 {(() => {
                   const p_m = Number(formData.panjang_mm || 0) / 1000;
                   const l_m = Number(formData.lebar_mm || 0) / 1000;
-                  const luas_m2 = p_m * l_m;
+                  const luas_net_m2 = p_m * l_m;
+                  const outs = Math.max(1, Number(slotRollOuts) || 1);
+                  const roll_m = (Number(slotRollWidthMm) || 0) / 1000;
+                  const luas_tagihan_m2 = slotUseRollWidth && roll_m > 0
+                    ? (roll_m * p_m) / outs
+                    : luas_net_m2;
+
                   const valIndex = Number(slotNilaiIndex || 0);
-                  let calculatedPrice = 0;
+                  let basePrice = 0;
                   let berat_kg = 0;
 
                   if (slotMetode === 'm2') {
-                    calculatedPrice = Math.round(luas_m2 * valIndex);
+                    basePrice = Math.round(luas_tagihan_m2 * valIndex);
                   } else {
-                    berat_kg = luas_m2 * (Number(slotGsm || 0) / 1000);
-                    calculatedPrice = Math.round(berat_kg * valIndex);
+                    berat_kg = luas_tagihan_m2 * (Number(slotGsm || 0) / 1000);
+                    basePrice = Math.round(berat_kg * valIndex);
                   }
 
+                  const posPct = Number(slotPosisiPersen) || 0;
+                  const posSelisih = Math.round(basePrice * (posPct / 100));
+                  const calculatedPrice = basePrice + posSelisih;
+
                   return (
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/90 p-2.5 rounded-xl border border-emerald-200">
-                      <div className="text-xs text-slate-700 space-y-0.5">
-                        <div>
-                          Luas: <span className="font-semibold">{luas_m2.toFixed(4)} m²</span> / lembar
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/95 p-3 rounded-xl border border-emerald-200">
+                      <div className="text-xs text-slate-700 space-y-1">
+                        <div className="text-[11px] text-slate-500">
+                          Luas Bersih: <span className="font-semibold text-slate-700">{luas_net_m2.toFixed(4)} m²</span>
+                          {slotUseRollWidth && (
+                            <span className="ml-2">
+                              • Tagihan Roll ({(roll_m * 100).toFixed(0)} cm): <span className="font-semibold text-brand-700">{luas_tagihan_m2.toFixed(4)} m²</span>
+                            </span>
+                          )}
                           {slotMetode === 'kg' && (
                             <span className="ml-2">
-                              • Berat: <span className="font-semibold">{(berat_kg * 1000).toFixed(0)} gr</span> ({berat_kg.toFixed(3)} kg)
+                              • Berat: <span className="font-semibold">{(berat_kg * 1000).toFixed(0)} gr</span>
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-600">
+                          Harga Dasar: <span className="font-semibold">Rp {basePrice.toLocaleString('id-ID')}</span>
+                          {posPct !== 0 && (
+                            <span className="ml-2 text-amber-700 font-semibold">
+                              ({posPct > 0 ? `+${posPct}%` : `${posPct}%`}: {posSelisih >= 0 ? '+' : ''}Rp {posSelisih.toLocaleString('id-ID')})
                             </span>
                           )}
                         </div>
                         <div className="text-emerald-950 font-bold">
-                          Hasil Hitung: <span className="text-sm text-emerald-700">Rp {calculatedPrice.toLocaleString('id-ID')}</span> / lembar
+                          Harga Beli Supplier: <span className="text-sm text-emerald-700">Rp {calculatedPrice.toLocaleString('id-ID')}</span> / lembar
                         </div>
                       </div>
                       <button
@@ -751,9 +920,9 @@ export default function BahanSheetPage() {
                             nilai_index: valIndex,
                             metode_index: slotMetode,
                           }));
-                          toast.success(`Harga Rp ${calculatedPrice.toLocaleString('id-ID')} berhasil diterapkan ke form`);
+                          toast.success(`Harga Beli Rp ${calculatedPrice.toLocaleString('id-ID')} berhasil diterapkan ke form`);
                         }}
-                        className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 rounded-lg shadow-sm whitespace-nowrap"
+                        className="px-3 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 rounded-lg shadow-sm whitespace-nowrap"
                       >
                         Terapkan ke Harga Beli
                       </button>
