@@ -156,6 +156,26 @@ export const MASPION_PRICE_LIST = [
   { no: 28, substance: '200WK/125M/200WK', 'E/F': 7592, 'B/F': 7592, 'C/F': 7702, 'B/C': 10935 },
 ];
 
+// Format substance sesuai tipe flute:
+// - Double Wall (B/C) tengahnya ditambahi x3 (misal 125K/125Mx3/125K)
+// - Jika lapisan tengah di-upgrade ke 150M, tengah 125M menjadi 150M (Single: 150K/150M/150K, Double: 150K/150Mx3/150K)
+export const formatMaspionSubstance = (baseSub, flute, middle150 = false) => {
+  if (!baseSub) return '';
+  const parts = baseSub.split('/');
+  if (parts.length !== 3) return baseSub;
+  const mid = middle150 ? parts[1].replace('125', '150') : parts[1];
+  const midFormatted = flute === 'B/C' ? `${mid}x3` : mid;
+  return `${parts[0]}/${midFormatted}/${parts[2]}`;
+};
+
+// Tambahan harga index jika lapisan tengah memakai 150M:
+// - Single Wall (E/F, B/F, C/F): +300 Rp
+// - Double Wall (B/C / x3): +300 x 3 = +900 Rp
+export const getMaspionMiddleExtra = (flute, middle150) => {
+  if (!middle150) return 0;
+  return flute === 'B/C' ? 900 : 300;
+};
+
 export default function EstimasiHargaPage() {
   const navigate = useNavigate();
 
@@ -183,11 +203,12 @@ export default function EstimasiHargaPage() {
 
   const [sourceType, setSourceType] = useState('maspion'); // 'maspion' | 'warehouse' | 'manual'
   const [selectedMaspionSubstance, setSelectedMaspionSubstance] = useState('125K/125M/125K');
+  const [useMiddle150, setUseMiddle150] = useState(false);
   const [isMaspionModalOpen, setIsMaspionModalOpen] = useState(false);
 
   const [metodeIndex, setMetodeIndex] = useState('m2');
   const [nilaiIndex, setNilaiIndex] = useState(7575);
-  const [substansi, setSubstansi] = useState('125K/125M/125K');
+  const [substansi, setSubstansi] = useState('125K/125Mx3/125K');
   const [gsm, setGsm] = useState(680);
   const [masterSheets, setMasterSheets] = useState([]);
   const [selectedSheetId, setSelectedSheetId] = useState('');
@@ -285,20 +306,23 @@ export default function EstimasiHargaPage() {
     if (sourceType === 'maspion') {
       const found = MASPION_PRICE_LIST.find((m) => m.substance === selectedMaspionSubstance);
       if (found && found[fluteType]) {
-        setNilaiIndex(found[fluteType]);
+        const extra = getMaspionMiddleExtra(fluteType, useMiddle150);
+        setNilaiIndex(found[fluteType] + extra);
+        setSubstansi(formatMaspionSubstance(selectedMaspionSubstance, fluteType, useMiddle150));
       }
     }
-  }, [fluteType, jointType, useCustomAllowance, sourceType, selectedMaspionSubstance, paperMode]);
+  }, [fluteType, jointType, useCustomAllowance, sourceType, selectedMaspionSubstance, useMiddle150, paperMode]);
 
   // Handle Pilih Substance Maspion
-  const handleSelectMaspionSubstance = (sub) => {
+  const handleSelectMaspionSubstance = (sub, overrideMiddle150 = useMiddle150) => {
     setSelectedMaspionSubstance(sub);
-    setSubstansi(sub);
+    setSubstansi(formatMaspionSubstance(sub, fluteType, overrideMiddle150));
     const found = MASPION_PRICE_LIST.find((m) => m.substance === sub);
+    const extra = getMaspionMiddleExtra(fluteType, overrideMiddle150);
     if (found && found[fluteType]) {
-      setNilaiIndex(found[fluteType]);
+      setNilaiIndex(found[fluteType] + extra);
     } else if (found) {
-      setNilaiIndex(found['B/C'] || found['B/F'] || 7575);
+      setNilaiIndex((found['B/C'] || found['B/F'] || 7575) + extra);
     }
   };
 
@@ -732,7 +756,8 @@ export default function EstimasiHargaPage() {
     setModelTutup('standar');
     setFluteType('B/F');
     setSourceType('maspion');
-    handleSelectMaspionSubstance('125K/125M/125M');
+    setUseMiddle150(false);
+    handleSelectMaspionSubstance('125K/125M/125M', false);
     setUseRollWidth(false);
     setPosisiSupplierPersen(10);
     setBiayaCetak(0);
@@ -748,7 +773,8 @@ export default function EstimasiHargaPage() {
     setModelTutup('standar');
     setFluteType('B/C');
     setSourceType('maspion');
-    handleSelectMaspionSubstance('125K/125M/125M');
+    setUseMiddle150(false);
+    handleSelectMaspionSubstance('125K/125M/125M', false);
     setUseRollWidth(false);
     setPosisiSupplierPersen(10);
     setBiayaCetak(0);
@@ -764,7 +790,8 @@ export default function EstimasiHargaPage() {
     setModelTutup('full');
     setFluteType('B/F');
     setSourceType('maspion');
-    handleSelectMaspionSubstance('125K/125M/125M');
+    setUseMiddle150(false);
+    handleSelectMaspionSubstance('125K/125M/125M', false);
     setUseRollWidth(false);
     setPosisiSupplierPersen(10);
     setBiayaCetak(0);
@@ -780,7 +807,8 @@ export default function EstimasiHargaPage() {
     setModelTutup('standar');
     setFluteType('B/F');
     setSourceType('maspion');
-    handleSelectMaspionSubstance('125K/125M/125M');
+    setUseMiddle150(false);
+    handleSelectMaspionSubstance('125K/125M/125M', false);
     setUseRollWidth(false);
     toast.success('Contoh Double Joint "650x190x395 BF (2 Sambungan)" dimuat!');
   };
@@ -1402,25 +1430,62 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
                   <div className="space-y-3 p-3.5 bg-emerald-50/50 border border-emerald-200/80 rounded-xl text-xs">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Pilih Substance Kertas Maspion:
+                        Pilih Substance Kertas Maspion ({fluteType === 'B/C' ? 'Double Wall: Tengah x3' : 'Single Wall'}):
                       </label>
                       <SearchableSelect
-                        options={MASPION_PRICE_LIST.map((m) => ({
-                          value: m.substance,
-                          label: `${m.no}. ${m.substance} (${fluteType}: Rp ${
-                            m[fluteType] ? m[fluteType].toLocaleString('id-ID') : '-'
-                          })`,
-                        }))}
+                        options={MASPION_PRICE_LIST.map((m) => {
+                          const formattedSub = formatMaspionSubstance(m.substance, fluteType, useMiddle150);
+                          const extra = getMaspionMiddleExtra(fluteType, useMiddle150);
+                          const totalIdx = m[fluteType] ? m[fluteType] + extra : 0;
+                          return {
+                            value: m.substance,
+                            label: `${m.no}. ${formattedSub} (${fluteType}: Rp ${
+                              totalIdx ? totalIdx.toLocaleString('id-ID') : '-'
+                            })`,
+                          };
+                        })}
                         value={selectedMaspionSubstance}
                         onChange={(val) => handleSelectMaspionSubstance(val)}
                         placeholder="Pilih substansi kertas Maspion..."
                       />
                     </div>
-                    <div className="flex items-center justify-between text-xs pt-1 border-t border-emerald-200/60">
-                      <span className="text-slate-600">Nilai Index Otomatis ({fluteType}):</span>
-                      <span className="font-black text-emerald-800 text-sm">
-                        Rp {nilaiIndex.toLocaleString('id-ID')} / m² (Include PPN 11%)
-                      </span>
+
+                    {/* Opsi Upgrade Lapisan Tengah ke 150M (+300 Single / +900 Double Wall x3) */}
+                    <div className="flex items-center justify-between p-2.5 bg-white border border-emerald-200 rounded-lg">
+                      <div>
+                        <span className="font-bold text-slate-800 block">
+                          Pakai Lapisan Tengah 150M
+                        </span>
+                        <span className="text-[11px] text-slate-500">
+                          {fluteType === 'B/C'
+                            ? 'Double Wall (150Mx3): Index + Rp 900 (Rp 300 × 3)'
+                            : 'Single Wall (150M): Index + Rp 300'}
+                        </span>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={useMiddle150}
+                          onChange={(e) => setUseMiddle150(e.target.checked)}
+                          className="w-4 h-4 text-emerald-600 rounded cursor-pointer"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="space-y-1 pt-1.5 border-t border-emerald-200/60">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-600">Substance Aktif:</span>
+                        <span className="font-bold text-slate-900 font-mono">{substansi}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-600">
+                          Nilai Index Otomatis ({fluteType}
+                          {useMiddle150 ? (fluteType === 'B/C' ? ' + Rp 900' : ' + Rp 300') : ''}):
+                        </span>
+                        <span className="font-black text-emerald-800 text-sm">
+                          Rp {nilaiIndex.toLocaleString('id-ID')} / m² (Include PPN 11%)
+                        </span>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -2479,41 +2544,46 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
               <thead className="bg-slate-100 sticky top-0 border-b border-slate-300 text-slate-800 font-bold">
                 <tr>
                   <th className="p-2.5 text-center w-10 border-r border-slate-200">No</th>
-                  <th className="p-2.5 border-r border-slate-200">Substance (Lapisan Kertas)</th>
+                  <th className="p-2.5 border-r border-slate-200">
+                    Substance ({fluteType === 'B/C' ? 'BCF pakai x3' : 'Single Wall'})
+                  </th>
                   <th className="p-2.5 text-right border-r border-slate-200">E/F (Rp/m²)</th>
                   <th className="p-2.5 text-right border-r border-slate-200">B/F (Rp/m²)</th>
                   <th className="p-2.5 text-right border-r border-slate-200">C/F (Rp/m²)</th>
-                  <th className="p-2.5 text-right">BC/F (Rp/m²)</th>
+                  <th className="p-2.5 text-right">BC/F x3 (Rp/m²)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {MASPION_PRICE_LIST.map((m) => {
                   const isSelected = selectedMaspionSubstance === m.substance;
+                  const swExtra = getMaspionMiddleExtra('B/F', useMiddle150);
+                  const dwExtra = getMaspionMiddleExtra('B/C', useMiddle150);
+                  const displaySub = formatMaspionSubstance(m.substance, fluteType, useMiddle150);
                   return (
                     <tr
                       key={m.no}
                       onClick={() => {
                         handleSelectMaspionSubstance(m.substance);
                         setIsMaspionModalOpen(false);
-                        toast.success(`Substance "${m.substance}" dipilih dari tabel Maspion`);
+                        toast.success(`Substance "${displaySub}" dipilih dari tabel Maspion`);
                       }}
                       className={`cursor-pointer transition-colors ${
                         isSelected ? 'bg-brand-50 font-bold text-brand-900' : 'hover:bg-slate-50 text-slate-700'
                       }`}
                     >
                       <td className="p-2 text-center border-r border-slate-200">{m.no}</td>
-                      <td className="p-2 font-mono border-r border-slate-200">{m.substance}</td>
+                      <td className="p-2 font-mono border-r border-slate-200">{displaySub}</td>
                       <td className="p-2 text-right border-r border-slate-200 font-mono">
-                        Rp {m['E/F'].toLocaleString('id-ID')}
+                        Rp {(m['E/F'] + swExtra).toLocaleString('id-ID')}
                       </td>
                       <td className="p-2 text-right border-r border-slate-200 font-mono">
-                        Rp {m['B/F'].toLocaleString('id-ID')}
+                        Rp {(m['B/F'] + swExtra).toLocaleString('id-ID')}
                       </td>
                       <td className="p-2 text-right border-r border-slate-200 font-mono">
-                        Rp {m['C/F'].toLocaleString('id-ID')}
+                        Rp {(m['C/F'] + swExtra).toLocaleString('id-ID')}
                       </td>
                       <td className="p-2 text-right font-mono font-bold text-emerald-700">
-                        Rp {m['B/C'].toLocaleString('id-ID')}
+                        Rp {(m['B/C'] + dwExtra).toLocaleString('id-ID')}
                       </td>
                     </tr>
                   );
