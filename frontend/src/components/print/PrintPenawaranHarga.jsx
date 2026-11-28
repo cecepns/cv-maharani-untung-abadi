@@ -152,7 +152,7 @@ export default function PrintPenawaranHarga({ data, onClose, customers = [] }) {
                   </p>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[11px] text-slate-600">
                     <p>• Model: <span className="font-semibold text-slate-800">A1 / RSC (Regular Slotted Carton)</span></p>
-                    <p>• Ukuran Box Luar: <span className="font-semibold text-slate-800">{data.panjang} × {data.lebar} × {data.tinggi} mm</span></p>
+                    <p>• Ukuran Box Dalam: <span className="font-semibold text-slate-800">{data.panjang} × {data.lebar} × {data.tinggi} mm</span></p>
                     <p>• Tipe Flute: <span className="font-semibold text-slate-800">{data.tipe_flute} ({data.nama_flute || ''})</span></p>
                     <p>• Substansi Bahan: <span className="font-semibold text-slate-800">{data.substansi || 'K125/M125/K125'}</span></p>
                     <p>• Sambungan: <span className="font-semibold text-slate-800">{data.jenis_sambungan || 'Stitching (Kawat Jahit)'}</span></p>
