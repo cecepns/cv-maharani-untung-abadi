@@ -681,14 +681,14 @@ export default function EstimasiHargaPage() {
     simulasiQty,
   ]);
 
-  // Saat ukuran sheet berubah dan menggunakan roll width pada mode Corrugated
-  useEffect(() => {
-    if (paperMode === 'corrugated' && useRollWidth && calculation.L_sheet) {
-      const totalOutsWidth = calculation.L_sheet * rollOuts;
-      const autoRoll = Math.max(1000, Math.ceil(totalOutsWidth / 50) * 50);
-      setRollWidthMm(autoRoll);
-    }
-  }, [calculation.L_sheet, rollOuts, useRollWidth, paperMode]);
+  // Helper fungsi untuk menghitung otomatis lebar roll terdekat (kelipatan 50mm)
+  const handleAutoRollWidth = () => {
+    if (!calculation.L_sheet) return;
+    const totalOutsWidth = calculation.L_sheet * rollOuts;
+    const autoRoll = Math.max(1000, Math.ceil(totalOutsWidth / 50) * 50);
+    setRollWidthMm(autoRoll);
+    toast.success(`Lebar roll disesuaikan ke ${autoRoll} mm (${rollOuts} Out x ${calculation.L_sheet} mm)`);
+  };
 
   // Handler Preset 1: Contoh Resmi Client BF Single Wall (650x190x395 -> Sheet 597x1723 mm)
   const applyClientExampleBF = () => {
@@ -1439,63 +1439,185 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
                   </div>
                 )}
 
-                {/* Perhitungan Lebar Roll Maspion */}
+                {/* Perhitungan Lebar Roll Supplier / Corrugator */}
                 <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3 text-xs">
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="font-bold text-slate-800 block">
-                        Hitung Berdasarkan Lebar Kertas Roll Supplier
+                        Hitung Berdasarkan Lebar Roll Mesin Supplier (Corrugator)
                       </span>
                       <span className="text-[11px] text-slate-500">
-                        Sesuai Aturan Maspion No. 5: Lebar sheet dihitung kelipatan out & roll terdekat
+                        Bebas atur jumlah Out dan lebar roll mesin supplier (1.6m s/d 2.5m atau custom)
                       </span>
                     </div>
-                    <input
-                      type="checkbox"
-                      checked={useRollWidth}
-                      onChange={(e) => setUseRollWidth(e.target.checked)}
-                      className="w-4 h-4 text-brand-600 rounded"
-                    />
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={useRollWidth}
+                        onChange={(e) => setUseRollWidth(e.target.checked)}
+                        className="w-4 h-4 text-brand-600 rounded cursor-pointer"
+                      />
+                    </label>
                   </div>
 
                   {useRollWidth && (
-                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200">
-                      <div>
-                        <label className="block text-slate-600 font-semibold mb-1">
-                          Potongan / Kelipatan (Outs):
-                        </label>
-                        <div className="flex items-center gap-1.5">
-                          {[1, 2, 3, 4].map((o) => (
+                    <div className="space-y-3 pt-2.5 border-t border-slate-200">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {/* 1. Kelipatan / Potongan (Outs) - Bisa ditulis sendiri */}
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-slate-700 font-bold">
+                              Jumlah Out (Bisa Ditulis Sendiri):
+                            </label>
+                            <span className="text-[10px] text-brand-700 font-bold bg-brand-50 px-1.5 py-0.5 rounded border border-brand-200">
+                              {rollOuts} Out
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <input
+                              type="number"
+                              min="1"
+                              max="20"
+                              value={rollOuts}
+                              onChange={(e) => setRollOuts(Math.max(1, parseInt(e.target.value) || 1))}
+                              className="w-20 px-2.5 py-1.5 text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-brand-500 focus:border-brand-500 text-center"
+                              placeholder="Out"
+                            />
+                            <div className="flex items-center gap-1 flex-1">
+                              {[1, 2, 3, 4, 5, 6].map((o) => (
+                                <button
+                                  key={o}
+                                  type="button"
+                                  onClick={() => setRollOuts(o)}
+                                  className={`flex-1 py-1 rounded text-[11px] font-bold border transition-colors ${
+                                    rollOuts === o
+                                      ? 'bg-brand-600 text-white border-brand-600 shadow-sm'
+                                      : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                                  }`}
+                                >
+                                  {o}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <p className="text-[10px] text-slate-500">
+                            1 roll mesin dipotong jadi {rollOuts} sheet (lebar {calculation.L_sheet} mm/sheet)
+                          </p>
+                        </div>
+
+                        {/* 2. Lebar Roll Kertas Supplier (mm) - Bebas ditulis / preset 1.6m - 2.5m */}
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-slate-700 font-bold">
+                              Lebar Roll Kertas Supplier (mm):
+                            </label>
                             <button
-                              key={o}
                               type="button"
-                              onClick={() => setRollOuts(o)}
-                              className={`flex-1 py-1 rounded-lg text-xs font-bold border transition-colors ${
-                                rollOuts === o
-                                  ? 'bg-brand-600 text-white border-brand-600'
-                                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
-                              }`}
+                              onClick={handleAutoRollWidth}
+                              className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200 transition-colors"
+                              title="Hitung otomatis roll terdekat kelipatan 50mm"
                             >
-                              {o} Out
+                              ⚡ Auto Roll
                             </button>
-                          ))}
+                          </div>
+                          <div className="relative mb-1.5">
+                            <input
+                              type="number"
+                              min="500"
+                              max="4000"
+                              step="10"
+                              value={rollWidthMm}
+                              onChange={(e) => setRollWidthMm(Number(e.target.value) || 0)}
+                              placeholder="Contoh: 2100 atau 2500"
+                              className="w-full pl-3 pr-10 py-1.5 text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-brand-500 focus:border-brand-500"
+                            />
+                            <span className="absolute right-3 top-1.5 text-xs text-slate-400 font-bold">mm</span>
+                          </div>
+
+                          {/* Preset lebar mesin supplier umum: 1.6m s/d 2.5m */}
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {[
+                              { label: '1.6m', val: 1600 },
+                              { label: '1.8m', val: 1800 },
+                              { label: '2.0m', val: 2000 },
+                              { label: '2.1m', val: 2100 },
+                              { label: '2.2m', val: 2200 },
+                              { label: '2.5m', val: 2500 },
+                            ].map((preset) => (
+                              <button
+                                key={preset.val}
+                                type="button"
+                                onClick={() => setRollWidthMm(preset.val)}
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${
+                                  rollWidthMm === preset.val
+                                    ? 'bg-brand-600 text-white border-brand-600 shadow-sm'
+                                    : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
+                                }`}
+                              >
+                                {preset.label}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       </div>
 
-                      <div>
-                        <label className="block text-slate-600 font-semibold mb-1">
-                          Lebar Roll Kertas Supplier (mm):
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            value={rollWidthMm}
-                            onChange={(e) => setRollWidthMm(Number(e.target.value) || 0)}
-                            className="w-full pl-3 pr-9 py-1 text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-lg"
-                          />
-                          <span className="absolute right-3 top-1 text-xs text-slate-400 font-semibold">mm</span>
+                      {/* Detail Analisis Efisiensi & Buangan Roll */}
+                      {calculation.L_sheet > 0 && (
+                        <div className="p-2.5 bg-white border border-slate-200 rounded-lg space-y-1.5">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                            <div className="bg-slate-50 p-1.5 rounded border border-slate-100">
+                              <span className="text-slate-500 block text-[10px]">Total Lebar Sheet:</span>
+                              <span className="font-bold text-slate-800 font-mono">
+                                {calculation.L_sheet * rollOuts} mm
+                              </span>
+                              <span className="text-[9px] text-slate-400 block">
+                                ({calculation.L_sheet} × {rollOuts} Out)
+                              </span>
+                            </div>
+                            <div className="bg-slate-50 p-1.5 rounded border border-slate-100">
+                              <span className="text-slate-500 block text-[10px]">Lebar Roll Mesin:</span>
+                              <span className="font-bold text-brand-700 font-mono">
+                                {rollWidthMm} mm
+                              </span>
+                              <span className="text-[9px] text-slate-400 block">
+                                ({(rollWidthMm / 1000).toFixed(2)} Meter)
+                              </span>
+                            </div>
+                            <div className="bg-slate-50 p-1.5 rounded border border-slate-100">
+                              <span className="text-slate-500 block text-[10px]">Sisa Trim / Buangan:</span>
+                              <span className={`font-bold font-mono ${
+                                rollWidthMm - (calculation.L_sheet * rollOuts) < 0
+                                  ? 'text-rose-600'
+                                  : 'text-amber-600'
+                              }`}>
+                                {rollWidthMm - (calculation.L_sheet * rollOuts)} mm
+                              </span>
+                              <span className="text-[9px] text-slate-400 block">
+                                ({rollWidthMm > 0 ? (((calculation.L_sheet * rollOuts) / rollWidthMm) * 100).toFixed(1) : 0}% efisien)
+                              </span>
+                            </div>
+                            <div className="bg-slate-50 p-1.5 rounded border border-slate-100">
+                              <span className="text-slate-500 block text-[10px]">Lebar Tagihan / Sheet:</span>
+                              <span className="font-bold text-emerald-700 font-mono">
+                                {rollOuts > 0 ? (rollWidthMm / rollOuts).toFixed(1) : 0} mm
+                              </span>
+                              <span className="text-[9px] text-slate-400 block">
+                                (Beban m² roll / out)
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Peringatan jika total lebar sheet melebihi lebar roll */}
+                          {(calculation.L_sheet * rollOuts) > rollWidthMm && (
+                            <div className="p-2 bg-rose-50 border border-rose-200 rounded text-rose-800 text-[11px] flex items-start gap-1.5">
+                              <span className="font-bold">⚠️ Perhatian:</span>
+                              <span>
+                                Total lebar sheet ({calculation.L_sheet * rollOuts} mm) MELEBIHI lebar roll mesin ({rollWidthMm} mm)! Silakan pilih roll yang lebih lebar (misal 2.1m / 2.5m) atau kurangi jumlah Out.
+                              </span>
+                            </div>
+                          )}
                         </div>
-                      </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -2057,9 +2179,9 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
                     </div>
                     {useRollWidth && (
                       <div className="flex justify-between text-amber-300">
-                        <span>Roll Kertas Maspion:</span>
-                        <span className="font-semibold">
-                          {calculation.rollWidth} mm ({calculation.outs} Out)
+                        <span>Roll Mesin Supplier:</span>
+                        <span className="font-semibold text-right">
+                          {calculation.rollWidth} mm ({calculation.outs} Out • Tagih {calculation.outs > 0 ? (calculation.rollWidth / calculation.outs).toFixed(0) : 0} mm)
                         </span>
                       </div>
                     )}
