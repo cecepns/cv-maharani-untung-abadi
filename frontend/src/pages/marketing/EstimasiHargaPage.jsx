@@ -194,7 +194,8 @@ export default function EstimasiHargaPage() {
 
   const [useRollWidth, setUseRollWidth] = useState(true);
   const [rollOuts, setRollOuts] = useState(3);
-  const [rollWidthMm, setRollWidthMm] = useState(1750);
+  const [rollWidthMm, setRollWidthMm] = useState(1900);
+  const [isManualRoll, setIsManualRoll] = useState(false);
 
   const [posisiSupplierPersen, setPosisiSupplierPersen] = useState(10); // +10%
 
@@ -409,10 +410,18 @@ export default function EstimasiHargaPage() {
       const l_meter = L_sheet / 1000;
       const luasSheetNetM2 = p_meter * l_meter;
 
-      // Luas tagihan roll Maspion
+      // Luas tagihan roll Supplier (Corrugator)
+      // Aturan Pabrik/Corrugator: Minimal buangan adalah 2 cm (20 mm)
+      // Contoh: 612 x 3 out = 1836 mm -> + 20 mm = 1856 mm -> Wajib pakai roll 1900 mm (tidak bisa 1850 mm karena buangan cuma 1.4 cm)
       const outs = Number(rollOuts) || 1;
-      const rollWidth = Number(rollWidthMm) || L_sheet * outs;
       const totalLebarOuts = L_sheet * outs;
+      const minBuanganMm = 20; // 2 cm
+      const minRollNeeded = totalLebarOuts + minBuanganMm;
+      const recommendedRoll = Math.max(1000, Math.ceil(minRollNeeded / 50) * 50);
+      const rollWidth = Number(rollWidthMm) || recommendedRoll;
+      const buanganMm = rollWidth - totalLebarOuts;
+      const buanganCm = Math.round((buanganMm / 10) * 10) / 10;
+      const isBuanganValid = buanganMm >= minBuanganMm;
       const luasTagihanPerSheetM2 = useRollWidth
         ? ((rollWidth / 1000) * p_meter) / outs
         : luasSheetNetM2;
@@ -482,6 +491,12 @@ export default function EstimasiHargaPage() {
         outs,
         rollWidth,
         totalLebarOuts,
+        minBuanganMm,
+        minRollNeeded,
+        recommendedRoll,
+        buanganMm,
+        buanganCm,
+        isBuanganValid,
         luasNetM2: Math.round(luasSheetNetM2 * sheetsPerBox * 10000) / 10000,
         luasTagihanM2: Math.round(luasTagihanM2 * 10000) / 10000,
         hargaDasarPricelist,
@@ -681,13 +696,32 @@ export default function EstimasiHargaPage() {
     simulasiQty,
   ]);
 
-  // Helper fungsi untuk menghitung otomatis lebar roll terdekat (kelipatan 50mm)
+  // Helper fungsi menghitung rekomendasi lebar roll terdekat (kelipatan 50mm, minim buangan 2cm / 20mm)
+  // Aturan Pabrik/Corrugator: Minimal buangan adalah 2 cm (20 mm)
+  // Contoh Client: 612 x 3 out = 1836 mm -> + 20 mm = 1856 mm -> Wajib pakai lebar 1900 mm (tidak bisa 1850 mm karena buangan cuma 1.4 cm)
+  const getRecommendedRollWidth = (lSheet, outs) => {
+    if (!lSheet || !outs) return 1000;
+    const totalOuts = lSheet * outs;
+    const minBuanganMm = 20; // 2 cm
+    return Math.max(1000, Math.ceil((totalOuts + minBuanganMm) / 50) * 50);
+  };
+
+  // Saat ukuran sheet berubah atau jumlah out berubah, jika mode auto aktif sesuaikan roll width
+  useEffect(() => {
+    if (paperMode === 'corrugated' && useRollWidth && calculation.L_sheet && !isManualRoll) {
+      const rec = getRecommendedRollWidth(calculation.L_sheet, rollOuts);
+      setRollWidthMm(rec);
+    }
+  }, [calculation.L_sheet, rollOuts, useRollWidth, paperMode, isManualRoll]);
+
+  // Helper fungsi tombol '⚡ Auto Roll' untuk reset otomatis ke roll yang valid
   const handleAutoRollWidth = () => {
     if (!calculation.L_sheet) return;
-    const totalOutsWidth = calculation.L_sheet * rollOuts;
-    const autoRoll = Math.max(1000, Math.ceil(totalOutsWidth / 50) * 50);
-    setRollWidthMm(autoRoll);
-    toast.success(`Lebar roll disesuaikan ke ${autoRoll} mm (${rollOuts} Out x ${calculation.L_sheet} mm)`);
+    const rec = getRecommendedRollWidth(calculation.L_sheet, rollOuts);
+    setRollWidthMm(rec);
+    setIsManualRoll(false);
+    const buangan = ((rec - (calculation.L_sheet * rollOuts)) / 10).toFixed(1);
+    toast.success(`Lebar roll diset otomatis ke ${rec} mm (Out: ${rollOuts}, Buangan: ${buangan} cm ≥ 2 cm)`);
   };
 
   // Handler Preset 1: Contoh Resmi Client BF Single Wall (650x190x395 -> Sheet 597x1723 mm)
@@ -1508,16 +1542,25 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
                         {/* 2. Lebar Roll Kertas Supplier (mm) - Bebas ditulis / preset 1.6m - 2.5m */}
                         <div>
                           <div className="flex items-center justify-between mb-1">
-                            <label className="text-slate-700 font-bold">
-                              Lebar Roll Kertas Supplier (mm):
+                            <label className="text-slate-700 font-bold flex items-center gap-1.5">
+                              <span>Lebar Roll Kertas Supplier (mm):</span>
+                              {isManualRoll ? (
+                                <span className="text-[10px] text-amber-700 font-semibold bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
+                                  Manual
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                                  Auto (Min Buangan 2cm)
+                                </span>
+                              )}
                             </label>
                             <button
                               type="button"
                               onClick={handleAutoRollWidth}
                               className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200 transition-colors"
-                              title="Hitung otomatis roll terdekat kelipatan 50mm"
+                              title="Hitung otomatis roll terdekat kelipatan 50mm dengan minimal buangan 2 cm"
                             >
-                              ⚡ Auto Roll
+                              ⚡ Auto Roll (Min 2cm)
                             </button>
                           </div>
                           <div className="relative mb-1.5">
@@ -1527,8 +1570,11 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
                               max="4000"
                               step="10"
                               value={rollWidthMm}
-                              onChange={(e) => setRollWidthMm(Number(e.target.value) || 0)}
-                              placeholder="Contoh: 2100 atau 2500"
+                              onChange={(e) => {
+                                setRollWidthMm(Number(e.target.value) || 0);
+                                setIsManualRoll(true);
+                              }}
+                              placeholder="Contoh: 1900, 2100 atau 2500"
                               className="w-full pl-3 pr-10 py-1.5 text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-brand-500 focus:border-brand-500"
                             />
                             <span className="absolute right-3 top-1.5 text-xs text-slate-400 font-bold">mm</span>
@@ -1539,6 +1585,7 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
                             {[
                               { label: '1.6m', val: 1600 },
                               { label: '1.8m', val: 1800 },
+                              { label: '1.9m', val: 1900 },
                               { label: '2.0m', val: 2000 },
                               { label: '2.1m', val: 2100 },
                               { label: '2.2m', val: 2200 },
@@ -1547,7 +1594,10 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
                               <button
                                 key={preset.val}
                                 type="button"
-                                onClick={() => setRollWidthMm(preset.val)}
+                                onClick={() => {
+                                  setRollWidthMm(preset.val);
+                                  setIsManualRoll(true);
+                                }}
                                 className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${
                                   rollWidthMm === preset.val
                                     ? 'bg-brand-600 text-white border-brand-600 shadow-sm'
@@ -1563,12 +1613,12 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
 
                       {/* Detail Analisis Efisiensi & Buangan Roll */}
                       {calculation.L_sheet > 0 && (
-                        <div className="p-2.5 bg-white border border-slate-200 rounded-lg space-y-1.5">
+                        <div className="p-2.5 bg-white border border-slate-200 rounded-lg space-y-2">
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
                             <div className="bg-slate-50 p-1.5 rounded border border-slate-100">
                               <span className="text-slate-500 block text-[10px]">Total Lebar Sheet:</span>
                               <span className="font-bold text-slate-800 font-mono">
-                                {calculation.L_sheet * rollOuts} mm
+                                {calculation.totalLebarOuts} mm
                               </span>
                               <span className="text-[9px] text-slate-400 block">
                                 ({calculation.L_sheet} × {rollOuts} Out)
@@ -1584,16 +1634,18 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
                               </span>
                             </div>
                             <div className="bg-slate-50 p-1.5 rounded border border-slate-100">
-                              <span className="text-slate-500 block text-[10px]">Sisa Trim / Buangan:</span>
+                              <span className="text-slate-500 block text-[10px]">Sisa Buangan Roll:</span>
                               <span className={`font-bold font-mono ${
-                                rollWidthMm - (calculation.L_sheet * rollOuts) < 0
-                                  ? 'text-rose-600'
-                                  : 'text-amber-600'
+                                calculation.buanganMm < 20 ? 'text-rose-600' : 'text-emerald-600'
                               }`}>
-                                {rollWidthMm - (calculation.L_sheet * rollOuts)} mm
+                                {calculation.buanganMm} mm ({calculation.buanganCm} cm)
                               </span>
-                              <span className="text-[9px] text-slate-400 block">
-                                ({rollWidthMm > 0 ? (((calculation.L_sheet * rollOuts) / rollWidthMm) * 100).toFixed(1) : 0}% efisien)
+                              <span className="text-[9px] block">
+                                {calculation.buanganMm < 20 ? (
+                                  <span className="text-rose-600 font-semibold">⚠️ Kurang (Min 2 cm)</span>
+                                ) : (
+                                  <span className="text-emerald-600">✓ Memenuhi syarat (≥2 cm)</span>
+                                )}
                               </span>
                             </div>
                             <div className="bg-slate-50 p-1.5 rounded border border-slate-100">
@@ -1607,13 +1659,40 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
                             </div>
                           </div>
 
-                          {/* Peringatan jika total lebar sheet melebihi lebar roll */}
-                          {(calculation.L_sheet * rollOuts) > rollWidthMm && (
-                            <div className="p-2 bg-rose-50 border border-rose-200 rounded text-rose-800 text-[11px] flex items-start gap-1.5">
+                          {/* Kasus 1: Lebar total sheet melebihi lebar roll mesin */}
+                          {calculation.totalLebarOuts > rollWidthMm && (
+                            <div className="p-2.5 bg-rose-50 border border-rose-300 rounded-lg text-rose-800 text-[11px] flex items-start gap-1.5">
                               <span className="font-bold">⚠️ Perhatian:</span>
                               <span>
-                                Total lebar sheet ({calculation.L_sheet * rollOuts} mm) MELEBIHI lebar roll mesin ({rollWidthMm} mm)! Silakan pilih roll yang lebih lebar (misal 2.1m / 2.5m) atau kurangi jumlah Out.
+                                Total lebar sheet ({calculation.totalLebarOuts} mm) MELEBIHI lebar roll mesin ({rollWidthMm} mm)! Silakan pilih roll yang lebih lebar (misal 2.1m / 2.5m) atau kurangi jumlah Out.
                               </span>
+                            </div>
+                          )}
+
+                          {/* Kasus 2: Aturan Minimal Buangan 2 cm (20 mm) */}
+                          {calculation.totalLebarOuts <= rollWidthMm && calculation.buanganMm < 20 && (
+                            <div className="p-2.5 bg-rose-50 border border-rose-300 rounded-lg text-rose-800 text-xs space-y-1.5">
+                              <div className="flex items-center justify-between font-bold">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-base">❌</span>
+                                  <span>Roll {rollWidthMm} mm TIDAK BISA DIPAKAI (Buangan cuma {calculation.buanganCm} cm)!</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setRollWidthMm(calculation.recommendedRoll);
+                                    setIsManualRoll(false);
+                                  }}
+                                  className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded text-[11px] font-bold shadow-sm transition-colors"
+                                >
+                                  Ganti ke {calculation.recommendedRoll} mm
+                                </button>
+                              </div>
+                              <p className="text-[11px] leading-relaxed text-rose-700">
+                                Sesuai aturan corrugator: <strong>Minimal buangan roll kertas adalah 2 cm (20 mm)</strong>.
+                                Total lebar sheet <strong>{calculation.totalLebarOuts} mm</strong> ({calculation.L_sheet} × {rollOuts} Out) + minim buangan 20 mm = <strong>{calculation.minRollNeeded} mm</strong>.
+                                Karena roll {rollWidthMm} mm buangannya cuma {calculation.buanganCm} cm (kurang dari 2 cm), maka <strong>HARUS pakai lebar minimal {calculation.recommendedRoll} mm</strong>.
+                              </p>
                             </div>
                           )}
                         </div>
@@ -2178,11 +2257,19 @@ CV. Maharani Untung Abadi • Packaging & Offset Printing`;
                       </span>
                     </div>
                     {useRollWidth && (
-                      <div className="flex justify-between text-amber-300">
-                        <span>Roll Mesin Supplier:</span>
-                        <span className="font-semibold text-right">
-                          {calculation.rollWidth} mm ({calculation.outs} Out • Tagih {calculation.outs > 0 ? (calculation.rollWidth / calculation.outs).toFixed(0) : 0} mm)
-                        </span>
+                      <div className="space-y-1 pt-1 border-t border-white/5">
+                        <div className="flex justify-between text-amber-300">
+                          <span>Roll Mesin Supplier:</span>
+                          <span className="font-semibold text-right">
+                            {calculation.rollWidth} mm ({calculation.outs} Out • Tagih {calculation.outs > 0 ? (calculation.rollWidth / calculation.outs).toFixed(0) : 0} mm)
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-[11px]">
+                          <span className="text-slate-400">Sisa Buangan Roll:</span>
+                          <span className={`font-mono font-bold ${calculation.isBuanganValid ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {calculation.buanganMm} mm ({calculation.buanganCm} cm) {calculation.isBuanganValid ? '✓ Valid (≥2 cm)' : '❌ Kurang (<2 cm)'}
+                          </span>
+                        </div>
                       </div>
                     )}
                     <div className="flex justify-between">
